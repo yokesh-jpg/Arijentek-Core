@@ -1,1 +1,155 @@
-var u=Object.defineProperty,f=Object.defineProperties;var w=Object.getOwnPropertyDescriptors;var h=Object.getOwnPropertySymbols;var v=Object.prototype.hasOwnProperty,x=Object.prototype.propertyIsEnumerable;var j=(e,a,t)=>a in e?u(e,a,{enumerable:!0,configurable:!0,writable:!0,value:t}):e[a]=t,g=(e,a)=>{for(var t in a||(a={}))v.call(a,t)&&j(e,t,a[t]);if(h)for(var t of h(a))x.call(a,t)&&j(e,t,a[t]);return e},y=(e,a)=>f(e,w(a));var d=(e,a,t)=>new Promise((n,r)=>{var _=o=>{try{p(t.next(o))}catch(c){r(c)}},l=o=>{try{p(t.throw(o))}catch(c){r(c)}},p=o=>o.done?n(o.value):Promise.resolve(o.value).then(_,l);p((t=t.apply(e,a)).next())});import{u as S}from"./main.js";const $="/api/method";function k(t){return d(this,arguments,function*(e,a={}){const n=S(),r={"Content-Type":"application/json",Accept:"application/json"},_=n.csrfToken||window.csrf_token;_&&a.method&&a.method!=="GET"&&(r["X-Frappe-CSRF-Token"]=_);const l=yield fetch(`${$}/${e}`,y(g({},a),{headers:g(g({},r),a.headers||{}),credentials:"include"}));if(!l.ok){const o=yield l.json().catch(()=>({}));let c="Request failed";if(o._server_messages)try{const m=JSON.parse(o._server_messages);c=JSON.parse(m[0]).message||c}catch(m){}else o.exception&&(c=o.exception);throw new Error(c)}const p=yield l.json();return p.message!==void 0?p.message:p})}function s(e){return k(e,{method:"GET"})}function i(e,a){return k(e,{method:"POST",body:a?JSON.stringify(a):void 0})}const T=60*60*1e3;function C(e,a,t){return d(this,null,function*(){const n=localStorage.getItem(`cache_${e}`);if(n)try{const{data:r,timestamp:_}=JSON.parse(n);Date.now()-_>T?localStorage.removeItem(`cache_${e}`):t(r)}catch(r){console.warn("Cache parse error",e),localStorage.removeItem(`cache_${e}`)}try{const r=yield a();t(r),localStorage.setItem(`cache_${e}`,JSON.stringify({data:r,timestamp:Date.now()}))}catch(r){if(console.error("Fetch failed",e,r),!n)throw r}})}const b={getData:()=>s("arijentek_core.api.get_dashboard_data"),getEmployeeInfo:()=>s("arijentek_core.api.get_employee_info"),getReportingInfo:()=>s("arijentek_core.api.get_reporting_info")},I={punch:e=>i("arijentek_core.api.punch",{timestamp:e}),getTodayCheckin:()=>s("arijentek_core.api.get_today_checkin"),getStatus:()=>s("arijentek_core.api.v1.attendance.get_status"),getSummary:()=>s("arijentek_core.api.get_attendance_summary"),getRecords:(e,a)=>s(`arijentek_core.api.get_attendance_records${e&&a?`?month=${e}&year=${a}`:""}`)},D={getTypes:()=>s("arijentek_core.api.get_leave_types"),getBalance:()=>s("arijentek_core.api.get_leave_balance"),getApplications:()=>s("arijentek_core.api.get_leave_applications"),getHolidays:(e,a,t)=>{const n=[];e&&a&&n.push(`from_date=${e}`,`to_date=${a}`),t&&n.push("exclude_weekly_off=1");const r=n.length?`?${n.join("&")}`:"";return s(`arijentek_core.api.get_holidays${r}`)},apply:e=>i("arijentek_core.api.apply_leave",e),cancel:e=>i("arijentek_core.api.cancel_leave",{leave_application:e})},O={getSlips:()=>s("arijentek_core.api.get_salary_slips"),getDownloadUrl:e=>`/api/method/arijentek_core.api.download_payslip?name=${encodeURIComponent(e)}`,generatePayroll:(e,a)=>i("arijentek_core.api.generate_payroll",{month:e,year:a}),getSlipDetails:e=>s(`arijentek_core.api.get_payslip_details?name=${encodeURIComponent(e)}`),getPreview:(e,a)=>s(`arijentek_core.api.get_payroll_preview${e&&a?`?month=${e}&year=${a}`:""}`),getDashboard:()=>s("arijentek_core.api.get_payroll_dashboard"),generateMyPayslip:(e,a)=>i("arijentek_core.api.generate_my_payslip",{month:e,year:a}),deletePayslip:e=>i("arijentek_core.api.delete_my_payslip",{name:e})},P={getTeamLeaves:()=>s("arijentek_core.api.get_team_leaves"),processLeave:(e,a)=>i("arijentek_core.api.process_leave",{leave_application:e,status:a})},R={changePassword:(e,a)=>i("arijentek_core.api.auth.change_password",{old_password:e,new_password:a})},J={getTypes:()=>s("arijentek_core.api.expenses.get_expense_types"),getMyExpenses:()=>s("arijentek_core.api.expenses.get_my_expenses"),submit:e=>i("arijentek_core.api.expenses.submit_expense_claim",e),getTeamExpenses:()=>s("arijentek_core.api.expenses.get_team_expenses"),process:(e,a)=>i("arijentek_core.api.expenses.process_expense",{name:e,action:a})};export{I as a,R as b,b as d,J as e,D as l,P as m,O as p,C as u};
+var u = Object.defineProperty,
+	f = Object.defineProperties;
+var w = Object.getOwnPropertyDescriptors;
+var h = Object.getOwnPropertySymbols;
+var $ = Object.prototype.hasOwnProperty,
+	v = Object.prototype.propertyIsEnumerable;
+var k = (e, a, r) =>
+		a in e
+			? u(e, a, { enumerable: !0, configurable: !0, writable: !0, value: r })
+			: (e[a] = r),
+	g = (e, a) => {
+		for (var r in a || (a = {})) $.call(a, r) && k(e, r, a[r]);
+		if (h) for (var r of h(a)) v.call(a, r) && k(e, r, a[r]);
+		return e;
+	},
+	j = (e, a) => f(e, w(a));
+var d = (e, a, r) =>
+	new Promise((n, s) => {
+		var _ = (o) => {
+				try {
+					p(r.next(o));
+				} catch (c) {
+					s(c);
+				}
+			},
+			l = (o) => {
+				try {
+					p(r.throw(o));
+				} catch (c) {
+					s(c);
+				}
+			},
+			p = (o) => (o.done ? n(o.value) : Promise.resolve(o.value).then(_, l));
+		p((r = r.apply(e, a)).next());
+	});
+import { u as x } from "./main.js";
+const S = "/api/method";
+function y(r) {
+	return d(this, arguments, function* (e, a = {}) {
+		const n = x(),
+			s = { "Content-Type": "application/json", Accept: "application/json" },
+			_ = n.csrfToken || window.csrf_token;
+		_ && a.method && a.method !== "GET" && (s["X-Frappe-CSRF-Token"] = _);
+		const l = yield fetch(
+			`${S}/${e}`,
+			j(g({}, a), { headers: g(g({}, s), a.headers || {}), credentials: "include" })
+		);
+		if (!l.ok) {
+			const o = yield l.json().catch(() => ({}));
+			let c = "Request failed";
+			if (o._server_messages)
+				try {
+					const m = JSON.parse(o._server_messages);
+					c = JSON.parse(m[0]).message || c;
+				} catch (m) {}
+			else o.exception && (c = o.exception);
+			throw new Error(c);
+		}
+		const p = yield l.json();
+		return p.message !== void 0 ? p.message : p;
+	});
+}
+function t(e) {
+	return y(e, { method: "GET" });
+}
+function i(e, a) {
+	return y(e, { method: "POST", body: a ? JSON.stringify(a) : void 0 });
+}
+const T = 60 * 60 * 1e3;
+function E(e, a, r) {
+	return d(this, null, function* () {
+		const n = localStorage.getItem(`cache_${e}`);
+		if (n)
+			try {
+				const { data: s, timestamp: _ } = JSON.parse(n);
+				Date.now() - _ > T ? localStorage.removeItem(`cache_${e}`) : r(s);
+			} catch (s) {
+				console.warn("Cache parse error", e), localStorage.removeItem(`cache_${e}`);
+			}
+		try {
+			const s = yield a();
+			r(s),
+				localStorage.setItem(
+					`cache_${e}`,
+					JSON.stringify({ data: s, timestamp: Date.now() })
+				);
+		} catch (s) {
+			if ((console.error("Fetch failed", e, s), !n)) throw s;
+		}
+	});
+}
+const C = {
+		getData: () => t("arijentek_core.api.get_dashboard_data"),
+		getEmployeeInfo: () => t("arijentek_core.api.get_employee_info"),
+		getReportingInfo: () => t("arijentek_core.api.get_reporting_info"),
+	},
+	I = {
+		punch: (e) => i("arijentek_core.api.punch", { timestamp: e }),
+		getTodayCheckin: () => t("arijentek_core.api.get_today_checkin"),
+		getStatus: () => t("arijentek_core.api.v1.attendance.get_status"),
+		getSummary: () => t("arijentek_core.api.get_attendance_summary"),
+		getRecords: (e, a) =>
+			t(`arijentek_core.api.get_attendance_records${e && a ? `?month=${e}&year=${a}` : ""}`),
+		startBreak: () => i("arijentek_core.api.start_break"),
+		endBreak: () => i("arijentek_core.api.end_break"),
+		getBreakStatus: () => t("arijentek_core.api.get_break_status"),
+		getRoster: (e, a) =>
+			t(`arijentek_core.api.get_roster_data${e && a ? `?month=${e}&year=${a}` : ""}`),
+	},
+	R = {
+		getTypes: () => t("arijentek_core.api.get_leave_types"),
+		getBalance: () => t("arijentek_core.api.get_leave_balance"),
+		getApplications: () => t("arijentek_core.api.get_leave_applications"),
+		getHolidays: (e, a, r) => {
+			const n = [];
+			e && a && n.push(`from_date=${e}`, `to_date=${a}`),
+				r && n.push("exclude_weekly_off=1");
+			const s = n.length ? `?${n.join("&")}` : "";
+			return t(`arijentek_core.api.get_holidays${s}`);
+		},
+		apply: (e) => i("arijentek_core.api.apply_leave", e),
+		cancel: (e) => i("arijentek_core.api.cancel_leave", { leave_application: e }),
+	},
+	D = {
+		getSlips: () => t("arijentek_core.api.get_salary_slips"),
+		getDownloadUrl: (e) =>
+			`/api/method/arijentek_core.api.download_payslip?name=${encodeURIComponent(e)}`,
+		generatePayroll: (e, a) => i("arijentek_core.api.generate_payroll", { month: e, year: a }),
+		getSlipDetails: (e) =>
+			t(`arijentek_core.api.get_payslip_details?name=${encodeURIComponent(e)}`),
+		getPreview: (e, a) =>
+			t(`arijentek_core.api.get_payroll_preview${e && a ? `?month=${e}&year=${a}` : ""}`),
+		getDashboard: () => t("arijentek_core.api.get_payroll_dashboard"),
+		generateMyPayslip: (e, a) =>
+			i("arijentek_core.api.generate_my_payslip", { month: e, year: a }),
+		deletePayslip: (e) => i("arijentek_core.api.delete_my_payslip", { name: e }),
+	},
+	O = {
+		getTeamLeaves: () => t("arijentek_core.api.get_team_leaves"),
+		processLeave: (e, a) =>
+			i("arijentek_core.api.process_leave", { leave_application: e, status: a }),
+	},
+	P = {
+		changePassword: (e, a) =>
+			i("arijentek_core.api.auth.change_password", { old_password: e, new_password: a }),
+	},
+	B = {
+		getTypes: () => t("arijentek_core.api.expenses.get_expense_types"),
+		getMyExpenses: () => t("arijentek_core.api.expenses.get_my_expenses"),
+		submit: (e) => i("arijentek_core.api.expenses.submit_expense_claim", e),
+		getTeamExpenses: () => t("arijentek_core.api.expenses.get_team_expenses"),
+		process: (e, a) =>
+			i("arijentek_core.api.expenses.process_expense", { name: e, action: a }),
+	};
+export { I as a, P as b, C as d, B as e, R as l, O as m, D as p, E as u };

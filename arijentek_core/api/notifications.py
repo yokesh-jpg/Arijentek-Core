@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 
+
 def notify_leave_application(doc):
 	"""Notify manager about new leave application"""
 	if not doc.employee:
@@ -18,7 +19,7 @@ def notify_leave_application(doc):
 	message = _("{0} has applied for {1} from {2} to {3}.").format(
 		employee.employee_name, doc.leave_type, doc.from_date, doc.to_date
 	)
-	
+
 	# System Notification
 	create_system_notification(manager_user, subject, message, "Leave Application", doc.name)
 

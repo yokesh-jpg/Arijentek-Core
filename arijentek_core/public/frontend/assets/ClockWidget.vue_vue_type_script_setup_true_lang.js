@@ -1,21 +1,615 @@
-var x=(c,m,s)=>new Promise((i,u)=>{var l=e=>{try{a(s.next(e))}catch(d){u(d)}},t=e=>{try{a(s.throw(e))}catch(d){u(d)}},a=e=>e.done?i(e.value):Promise.resolve(e.value).then(l,t);a((s=s.apply(c,m)).next())});import{c as b,z as U,x as $,r as p,d as H,u as R,m as W,A as J,o,a as r,h as _,g as X,k as w,t as y,i as M,b as h,B as G,q as K,F as Q,p as f}from"./main.js";import{a as I}from"./api.js";/**
+var S = (v, y, o) =>
+	new Promise((m, p) => {
+		var d = (a) => {
+				try {
+					e(o.next(a));
+				} catch (i) {
+					p(i);
+				}
+			},
+			s = (a) => {
+				try {
+					e(o.throw(a));
+				} catch (i) {
+					p(i);
+				}
+			},
+			e = (a) => (a.done ? m(a.value) : Promise.resolve(a.value).then(d, s));
+		e((o = o.apply(v, y)).next());
+	});
+import {
+	c as D,
+	z as Q,
+	x as Y,
+	r as c,
+	d as Z,
+	u as ee,
+	m as te,
+	A as ae,
+	o as n,
+	a as r,
+	h as M,
+	g as se,
+	k as I,
+	t as h,
+	i as C,
+	b as f,
+	B as le,
+	q as $,
+	F as ne,
+	j as re,
+	p as k,
+} from "./main.js";
+import { a as g } from "./api.js";
+/**
  * @license lucide-vue-next v0.563.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const be=b("calendar-clock",[["path",{d:"M16 14v2.2l1.6 1",key:"fo4ql5"}],["path",{d:"M16 2v4",key:"4m81vk"}],["path",{d:"M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5",key:"1osxxc"}],["path",{d:"M3 10h5",key:"r794hk"}],["path",{d:"M8 2v4",key:"1cmpym"}],["circle",{cx:"16",cy:"16",r:"6",key:"qoo3c4"}]]);/**
+ */ const qe = D("calendar-clock", [
+	["path", { d: "M16 14v2.2l1.6 1", key: "fo4ql5" }],
+	["path", { d: "M16 2v4", key: "4m81vk" }],
+	["path", { d: "M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5", key: "1osxxc" }],
+	["path", { d: "M3 10h5", key: "r794hk" }],
+	["path", { d: "M8 2v4", key: "1cmpym" }],
+	["circle", { cx: "16", cy: "16", r: "6", key: "qoo3c4" }],
+]);
+/**
  * @license lucide-vue-next v0.563.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Se=b("calendar-heart",[["path",{d:"M12.127 22H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5.125",key:"vxdnp4"}],["path",{d:"M14.62 18.8A2.25 2.25 0 1 1 18 15.836a2.25 2.25 0 1 1 3.38 2.966l-2.626 2.856a.998.998 0 0 1-1.507 0z",key:"15cy7q"}],["path",{d:"M16 2v4",key:"4m81vk"}],["path",{d:"M3 10h18",key:"8toen8"}],["path",{d:"M8 2v4",key:"1cmpym"}]]);/**
+ */ const Ae = D("calendar-heart", [
+	[
+		"path",
+		{ d: "M12.127 22H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5.125", key: "vxdnp4" },
+	],
+	[
+		"path",
+		{
+			d: "M14.62 18.8A2.25 2.25 0 1 1 18 15.836a2.25 2.25 0 1 1 3.38 2.966l-2.626 2.856a.998.998 0 0 1-1.507 0z",
+			key: "15cy7q",
+		},
+	],
+	["path", { d: "M16 2v4", key: "4m81vk" }],
+	["path", { d: "M3 10h18", key: "8toen8" }],
+	["path", { d: "M8 2v4", key: "1cmpym" }],
+]);
+/**
  * @license lucide-vue-next v0.563.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Ce=b("calendar-x",[["path",{d:"M8 2v4",key:"1cmpym"}],["path",{d:"M16 2v4",key:"4m81vk"}],["rect",{width:"18",height:"18",x:"3",y:"4",rx:"2",key:"1hopcy"}],["path",{d:"M3 10h18",key:"8toen8"}],["path",{d:"m14 14-4 4",key:"rymu2i"}],["path",{d:"m10 14 4 4",key:"3sz06r"}]]);/**
+ */ const He = D("calendar-x", [
+	["path", { d: "M8 2v4", key: "1cmpym" }],
+	["path", { d: "M16 2v4", key: "4m81vk" }],
+	["rect", { width: "18", height: "18", x: "3", y: "4", rx: "2", key: "1hopcy" }],
+	["path", { d: "M3 10h18", key: "8toen8" }],
+	["path", { d: "m14 14-4 4", key: "rymu2i" }],
+	["path", { d: "m10 14 4 4", key: "3sz06r" }],
+]);
+/**
  * @license lucide-vue-next v0.563.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Y=b("wifi-off",[["path",{d:"M12 20h.01",key:"zekei9"}],["path",{d:"M8.5 16.429a5 5 0 0 1 7 0",key:"1bycff"}],["path",{d:"M5 12.859a10 10 0 0 1 5.17-2.69",key:"1dl1wf"}],["path",{d:"M19 12.859a10 10 0 0 0-2.007-1.523",key:"4k23kn"}],["path",{d:"M2 8.82a15 15 0 0 1 4.177-2.643",key:"1grhjp"}],["path",{d:"M22 8.82a15 15 0 0 0-11.288-3.764",key:"z3jwby"}],["path",{d:"m2 2 20 20",key:"1ooewy"}]]),Z=U("offline",()=>{const c=p([]),m=p(!1),s=p(""),i=localStorage.getItem("arijentek_offline_punches");if(i)try{c.value=JSON.parse(i)}catch(t){console.error("Failed to parse offline punches",t)}$(c,t=>{localStorage.setItem("arijentek_offline_punches",JSON.stringify(t))},{deep:!0});function u(){c.value.push({id:crypto.randomUUID(),timestamp:new Date().toISOString(),type:"IN"})}function l(){return x(this,null,function*(){if(c.value.length===0||m.value)return;m.value=!0,s.value="";const t=[...c.value];t.sort((a,e)=>new Date(a.timestamp).getTime()-new Date(e.timestamp).getTime());try{for(const a of t){console.log(`Syncing punch from ${a.timestamp}...`);const e=yield I.punch(a.timestamp);if(e.status==="success"||e.error&&e.error.includes("already clocked"))c.value=c.value.filter(d=>d.id!==a.id);else{console.error("Sync failed for punch",a,e.error),s.value=e.error||"Sync failed";break}}}catch(a){s.value=a.message||"Network error during sync"}finally{m.value=!1}})}return{pendingPunches:c,isSyncing:m,lastSyncError:s,addPunch:u,sync:l}}),ee={class:"flex flex-col items-center"},te={key:0,class:"mb-4 px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full text-xs font-medium flex items-center gap-2 animate-pulse"},ae={class:"relative mb-6"},ne={width:"200",height:"200",class:"transform -rotate-90"},se=["stroke","stroke-dashoffset"],le=["disabled"],oe={key:0,class:"w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin"},re={class:"text-[11px] font-semibold uppercase tracking-wider opacity-70"},ce={key:0,class:"text-2xl font-bold tabular-nums tracking-tight"},ie={key:1,xmlns:"http://www.w3.org/2000/svg",width:"28",height:"28",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor","stroke-width":"1.5","stroke-linecap":"round","stroke-linejoin":"round"},ue={class:"text-center space-y-1.5"},de={key:0,class:"badge-success mb-2"},ve={key:1,class:"badge-success mb-2"},he={key:2,class:"text-sm text-slate-400"},fe={class:"text-white font-medium"},pe={key:3,class:"text-sm text-slate-400"},me={class:"text-white font-medium"},ye={key:4,class:"text-sm text-slate-500"},ke={key:1,class:"mt-3 text-xs text-red-400 text-center max-w-[220px]"},ge=8*60*60,D=82,Me=H({__name:"ClockWidget",emits:["punched"],setup(c,{emit:m}){R();const s=Z(),i=p(!1),u=p(""),l=p(!1),t=p(!1),a=p(null),e=p(0);let d=null;const T=f(()=>e.value===0?0:Math.min(e.value/ge,1)),g=f(()=>T.value>=1),P=2*Math.PI*D,E=f(()=>P*(1-T.value)),N=f(()=>{const n=Math.floor(e.value/3600),v=Math.floor(e.value%3600/60),A=e.value%60;return`${String(n).padStart(2,"0")}:${String(v).padStart(2,"0")}:${String(A).padStart(2,"0")}`}),S=f(()=>a.value?a.value.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):""),O=f(()=>t.value||g.value?"#22c55e":"#ef4444"),L=f(()=>t.value||g.value?"rgba(34, 197, 94, 0.35)":"rgba(239, 68, 68, 0.25)"),j=f(()=>t.value?"Day Complete":l.value?"Clock Out":"Clock In"),B=f(()=>i.value||t.value);function C(){k(),d=setInterval(()=>{a.value&&(e.value=Math.floor((Date.now()-a.value.getTime())/1e3))},1e3)}function k(){d&&(clearInterval(d),d=null)}let z=!1;function F(){return x(this,null,function*(){if(!z){z=!0;try{const n=yield I.getTodayCheckin();n.clock_in&&n.clock_out?(t.value=!0,l.value=!1,a.value=new Date(n.clock_in),e.value=Math.floor((new Date(n.clock_out).getTime()-new Date(n.clock_in).getTime())/1e3),k()):n.clock_in&&!n.clock_out?(l.value=!0,t.value=!1,a.value=new Date(n.clock_in),e.value=Math.floor((Date.now()-a.value.getTime())/1e3),C()):(l.value=!1,t.value=!1,a.value=null,e.value=0)}catch(n){}}})}function V(){return x(this,null,function*(){if(!t.value){i.value=!0,u.value="";try{if(!navigator.onLine){s.addPunch(),i.value=!1,l.value?(l.value=!1,t.value=!0,k()):(l.value=!0,a.value=new Date,C());return}const n=yield I.punch();n.status==="success"?(n.log_type==="IN"?(l.value=!0,t.value=!1,a.value=new Date(n.time),e.value=0,C()):(l.value=!1,t.value=!0,k()),q("punched")):u.value=n.error||"Punch failed"}catch(n){u.value=n.message||"Something went wrong"}finally{i.value=!1}}})}W(()=>{F(),window.addEventListener("online",s.sync),setInterval(()=>{navigator.onLine&&s.pendingPunches.length&&s.sync()},6e4)}),J(()=>{k(),window.removeEventListener("online",s.sync)});const q=m;return(n,v)=>(o(),r("div",ee,[_(s).pendingPunches.length>0?(o(),r("div",te,[X(_(Y),{size:12}),w(" "+y(_(s).pendingPunches.length)+" Pending Punch"+y(_(s).pendingPunches.length!==1?"es":""),1)])):M("",!0),h("div",ae,[(o(),r("svg",ne,[h("circle",{cx:100,cy:100,r:D,fill:"none",class:"clock-ring-bg","stroke-width":"6"}),h("circle",{cx:100,cy:100,r:D,fill:"none",stroke:O.value,"stroke-width":"6","stroke-linecap":"round",class:"clock-ring-progress","stroke-dasharray":P,"stroke-dashoffset":E.value},null,8,se)])),h("button",{onClick:V,disabled:B.value,class:K(["absolute inset-0 m-auto w-[140px] h-[140px] rounded-full flex flex-col items-center justify-center gap-1 transition-all duration-500 focus:outline-none",[t.value?"bg-emerald-500/15 text-emerald-400 cursor-default":l.value?g.value?"bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25":"bg-red-500/10 text-red-400 hover:bg-red-500/20":"bg-white/[0.05] text-slate-300 hover:bg-white/[0.08] hover:text-white"]]),style:G(l.value||t.value?{boxShadow:`0 0 40px ${L.value}`}:{})},[i.value?(o(),r("div",oe)):(o(),r(Q,{key:1},[h("span",re,y(j.value),1),l.value||t.value?(o(),r("span",ce,y(N.value),1)):(o(),r("svg",ie,[...v[0]||(v[0]=[h("circle",{cx:"12",cy:"12",r:"10"},null,-1),h("polyline",{points:"12 6 12 12 16 14"},null,-1)])]))],64))],14,le)]),h("div",ue,[t.value?(o(),r("div",de," Day Complete ")):g.value&&l.value?(o(),r("div",ve," Shift Complete ")):M("",!0),t.value&&S.value?(o(),r("p",he,[v[1]||(v[1]=w(" Worked ",-1)),h("span",fe,y(N.value),1),v[2]||(v[2]=w(" today ",-1))])):l.value&&S.value?(o(),r("p",pe,[v[3]||(v[3]=w(" Clocked in at ",-1)),h("span",me,y(S.value),1)])):(o(),r("p",ye," Tap to start your shift "))]),u.value?(o(),r("p",ke,y(u.value),1)):M("",!0)]))}});export{Ce as C,Me as _,be as a,Se as b};
+ */ const oe = D("coffee", [
+	["path", { d: "M10 2v2", key: "7u0qdc" }],
+	["path", { d: "M14 2v2", key: "6buw04" }],
+	[
+		"path",
+		{
+			d: "M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1",
+			key: "pwadti",
+		},
+	],
+	["path", { d: "M6 2v2", key: "colzsn" }],
+]);
+/**
+ * @license lucide-vue-next v0.563.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */ const ue = D("wifi-off", [
+		["path", { d: "M12 20h.01", key: "zekei9" }],
+		["path", { d: "M8.5 16.429a5 5 0 0 1 7 0", key: "1bycff" }],
+		["path", { d: "M5 12.859a10 10 0 0 1 5.17-2.69", key: "1dl1wf" }],
+		["path", { d: "M19 12.859a10 10 0 0 0-2.007-1.523", key: "4k23kn" }],
+		["path", { d: "M2 8.82a15 15 0 0 1 4.177-2.643", key: "1grhjp" }],
+		["path", { d: "M22 8.82a15 15 0 0 0-11.288-3.764", key: "z3jwby" }],
+		["path", { d: "m2 2 20 20", key: "1ooewy" }],
+	]),
+	ie = Q("offline", () => {
+		const v = c([]),
+			y = c(!1),
+			o = c(""),
+			m = localStorage.getItem("arijentek_offline_punches");
+		if (m)
+			try {
+				v.value = JSON.parse(m);
+			} catch (s) {
+				console.error("Failed to parse offline punches", s);
+			}
+		Y(
+			v,
+			(s) => {
+				localStorage.setItem("arijentek_offline_punches", JSON.stringify(s));
+			},
+			{ deep: !0 }
+		);
+		function p() {
+			v.value.push({
+				id: crypto.randomUUID(),
+				timestamp: new Date().toISOString(),
+				type: "IN",
+			});
+		}
+		function d() {
+			return S(this, null, function* () {
+				if (v.value.length === 0 || y.value) return;
+				(y.value = !0), (o.value = "");
+				const s = [...v.value];
+				s.sort(
+					(e, a) => new Date(e.timestamp).getTime() - new Date(a.timestamp).getTime()
+				);
+				try {
+					for (const e of s) {
+						console.log(`Syncing punch from ${e.timestamp}...`);
+						const a = yield g.punch(e.timestamp);
+						if (
+							a.status === "success" ||
+							(a.error && a.error.includes("already clocked"))
+						)
+							v.value = v.value.filter((i) => i.id !== e.id);
+						else {
+							console.error("Sync failed for punch", e, a.error),
+								(o.value = a.error || "Sync failed");
+							break;
+						}
+					}
+				} catch (e) {
+					o.value = e.message || "Network error during sync";
+				} finally {
+					y.value = !1;
+				}
+			});
+		}
+		return { pendingPunches: v, isSyncing: y, lastSyncError: o, addPunch: p, sync: d };
+	}),
+	ce = { class: "flex flex-col items-center" },
+	de = {
+		key: 0,
+		class: "mb-4 px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full text-xs font-medium flex items-center gap-2 animate-pulse",
+	},
+	ve = { class: "relative mb-6" },
+	he = { width: "200", height: "200", class: "transform -rotate-90" },
+	fe = ["stroke", "stroke-dashoffset"],
+	me = ["disabled"],
+	ke = {
+		key: 0,
+		class: "w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin",
+	},
+	pe = { class: "text-[11px] font-semibold uppercase tracking-wider opacity-70" },
+	ye = { key: 0, class: "text-2xl font-bold tabular-nums tracking-tight" },
+	ge = {
+		key: 1,
+		xmlns: "http://www.w3.org/2000/svg",
+		width: "28",
+		height: "28",
+		viewBox: "0 0 24 24",
+		fill: "none",
+		stroke: "currentColor",
+		"stroke-width": "1.5",
+		"stroke-linecap": "round",
+		"stroke-linejoin": "round",
+	},
+	be = { key: 1, class: "mb-4" },
+	_e = ["disabled"],
+	xe = {
+		key: 0,
+		class: "w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin",
+	},
+	we = { key: 2 },
+	Se = { key: 3 },
+	Me = {
+		key: 2,
+		class: "mb-3 px-3 py-1.5 bg-white/[0.03] rounded-lg text-xs text-slate-500 text-center",
+	},
+	Ce = { class: "text-center space-y-1.5" },
+	De = { key: 0, class: "badge-success mb-2" },
+	Te = { key: 1, class: "badge-warning mb-2" },
+	Be = { key: 2, class: "badge-success mb-2" },
+	Ie = { key: 3, class: "text-sm text-slate-400" },
+	Pe = { class: "text-white font-medium" },
+	Ne = { key: 4, class: "text-sm text-amber-400/80" },
+	ze = { key: 5, class: "text-sm text-slate-400" },
+	Ee = { class: "text-white font-medium" },
+	Oe = { key: 6, class: "text-sm text-slate-500" },
+	Fe = { key: 3, class: "mt-3 text-xs text-red-400 text-center max-w-[220px]" },
+	Le = 8 * 60 * 60,
+	O = 82,
+	Ue = Z({
+		__name: "ClockWidget",
+		emits: ["punched"],
+		setup(v, { emit: y }) {
+			ee();
+			const o = ie(),
+				m = c(!1),
+				p = c(!1),
+				d = c(""),
+				s = c(!1),
+				e = c(!1),
+				a = c(null),
+				i = c(0),
+				u = c(!1),
+				P = c(0),
+				b = c(0),
+				_ = c(null),
+				x = c(0);
+			let T = null;
+			const F = k(() => (i.value === 0 ? 0 : Math.min(i.value / Le, 1))),
+				B = k(() => F.value >= 1),
+				L = 2 * Math.PI * O,
+				q = k(() => L * (1 - F.value)),
+				j = k(() => {
+					const t = Math.floor(i.value / 3600),
+						l = Math.floor((i.value % 3600) / 60),
+						E = i.value % 60;
+					return `${String(t).padStart(2, "0")}:${String(l).padStart(2, "0")}:${String(
+						E
+					).padStart(2, "0")}`;
+				}),
+				A = k(() => {
+					const t = x.value,
+						l = Math.floor(t / 60),
+						E = t % 60;
+					return `${String(l).padStart(2, "0")}:${String(E).padStart(2, "0")}`;
+				}),
+				N = k(() =>
+					a.value
+						? a.value.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+						: ""
+				),
+				H = k(() =>
+					e.value ? "#22c55e" : u.value ? "#f59e0b" : B.value ? "#22c55e" : "#ef4444"
+				),
+				U = k(() =>
+					e.value
+						? "rgba(34, 197, 94, 0.35)"
+						: u.value
+						? "rgba(245, 158, 11, 0.3)"
+						: B.value
+						? "rgba(34, 197, 94, 0.35)"
+						: "rgba(239, 68, 68, 0.25)"
+				),
+				R = k(() =>
+					e.value
+						? "Day Complete"
+						: u.value
+						? "On Break"
+						: s.value
+						? "Clock Out"
+						: "Clock In"
+				),
+				W = k(() => m.value || e.value || u.value);
+			function z() {
+				w(),
+					(T = setInterval(() => {
+						a.value && (i.value = Math.floor((Date.now() - a.value.getTime()) / 1e3)),
+							u.value &&
+								_.value &&
+								(x.value = Math.floor((Date.now() - _.value.getTime()) / 1e3));
+					}, 1e3));
+			}
+			function w() {
+				T && (clearInterval(T), (T = null));
+			}
+			let V = !1;
+			function J() {
+				return S(this, null, function* () {
+					if (!V) {
+						V = !0;
+						try {
+							const [t, l] = yield Promise.all([
+								g.getTodayCheckin(),
+								g.getBreakStatus(),
+							]);
+							t.clock_in && t.clock_out
+								? ((e.value = !0),
+								  (s.value = !1),
+								  (a.value = new Date(t.clock_in)),
+								  (i.value = Math.floor(
+										(new Date(t.clock_out).getTime() -
+											new Date(t.clock_in).getTime()) /
+											1e3
+								  )),
+								  w())
+								: t.clock_in && !t.clock_out
+								? ((s.value = !0),
+								  (e.value = !1),
+								  (a.value = new Date(t.clock_in)),
+								  (i.value = Math.floor((Date.now() - a.value.getTime()) / 1e3)),
+								  z())
+								: ((s.value = !1),
+								  (e.value = !1),
+								  (a.value = null),
+								  (i.value = 0)),
+								l &&
+									((u.value = l.on_break || !1),
+									(P.value = l.total_break_minutes || 0),
+									(b.value = l.break_count || 0),
+									l.on_break &&
+										l.break_start_time &&
+										((_.value = new Date(l.break_start_time)),
+										(x.value = Math.floor(
+											(Date.now() - _.value.getTime()) / 1e3
+										))));
+						} catch (t) {}
+					}
+				});
+			}
+			function X() {
+				return S(this, null, function* () {
+					if (!(e.value || u.value)) {
+						(m.value = !0), (d.value = "");
+						try {
+							if (!navigator.onLine) {
+								o.addPunch(),
+									(m.value = !1),
+									s.value
+										? ((s.value = !1), (e.value = !0), w())
+										: ((s.value = !0), (a.value = new Date()), z());
+								return;
+							}
+							const t = yield g.punch();
+							t.status === "success"
+								? (t.log_type === "IN"
+										? ((s.value = !0),
+										  (e.value = !1),
+										  (a.value = new Date(t.time)),
+										  (i.value = 0),
+										  z())
+										: ((s.value = !1), (e.value = !0), w()),
+								  K("punched"))
+								: (d.value = t.error || "Punch failed");
+						} catch (t) {
+							d.value = t.message || "Something went wrong";
+						} finally {
+							m.value = !1;
+						}
+					}
+				});
+			}
+			function G() {
+				return S(this, null, function* () {
+					(p.value = !0), (d.value = "");
+					try {
+						if (u.value) {
+							const t = yield g.endBreak();
+							if (t.success) {
+								(u.value = !1), (_.value = null), (x.value = 0);
+								const l = yield g.getBreakStatus();
+								(P.value = l.total_break_minutes || 0),
+									(b.value = l.break_count || 0);
+							} else d.value = t.error || "Failed to end break";
+						} else {
+							const t = yield g.startBreak();
+							t.success
+								? ((u.value = !0),
+								  (_.value = new Date(t.time)),
+								  (x.value = 0),
+								  (b.value += 1))
+								: (d.value = t.error || "Failed to start break");
+						}
+					} catch (t) {
+						d.value = t.message || "Something went wrong";
+					} finally {
+						p.value = !1;
+					}
+				});
+			}
+			te(() => {
+				J(),
+					window.addEventListener("online", o.sync),
+					setInterval(() => {
+						navigator.onLine && o.pendingPunches.length && o.sync();
+					}, 6e4);
+			}),
+				ae(() => {
+					w(), window.removeEventListener("online", o.sync);
+				});
+			const K = y;
+			return (t, l) => (
+				n(),
+				r("div", ce, [
+					M(o).pendingPunches.length > 0
+						? (n(),
+						  r("div", de, [
+								se(M(ue), { size: 12 }),
+								I(
+									" " +
+										h(M(o).pendingPunches.length) +
+										" Pending Punch" +
+										h(M(o).pendingPunches.length !== 1 ? "es" : ""),
+									1
+								),
+						  ]))
+						: C("", !0),
+					f("div", ve, [
+						(n(),
+						r("svg", he, [
+							f("circle", {
+								cx: 100,
+								cy: 100,
+								r: O,
+								fill: "none",
+								class: "clock-ring-bg",
+								"stroke-width": "6",
+							}),
+							f(
+								"circle",
+								{
+									cx: 100,
+									cy: 100,
+									r: O,
+									fill: "none",
+									stroke: H.value,
+									"stroke-width": "6",
+									"stroke-linecap": "round",
+									class: "clock-ring-progress",
+									"stroke-dasharray": L,
+									"stroke-dashoffset": q.value,
+								},
+								null,
+								8,
+								fe
+							),
+						])),
+						f(
+							"button",
+							{
+								onClick: X,
+								disabled: W.value,
+								class: $([
+									"absolute inset-0 m-auto w-[140px] h-[140px] rounded-full flex flex-col items-center justify-center gap-1 transition-all duration-500 focus:outline-none",
+									[
+										e.value
+											? "bg-emerald-500/15 text-emerald-400 cursor-default"
+											: u.value
+											? "bg-amber-500/10 text-amber-400 cursor-default"
+											: s.value
+											? B.value
+												? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
+												: "bg-red-500/10 text-red-400 hover:bg-red-500/20"
+											: "bg-white/[0.05] text-slate-300 hover:bg-white/[0.08] hover:text-white",
+									],
+								]),
+								style: le(
+									s.value || e.value || u.value
+										? { boxShadow: `0 0 40px ${U.value}` }
+										: {}
+								),
+							},
+							[
+								m.value
+									? (n(), r("div", ke))
+									: (n(),
+									  r(
+											ne,
+											{ key: 1 },
+											[
+												f("span", pe, h(R.value), 1),
+												s.value || e.value
+													? (n(), r("span", ye, h(j.value), 1))
+													: (n(),
+													  r("svg", ge, [
+															...(l[0] ||
+																(l[0] = [
+																	f(
+																		"circle",
+																		{
+																			cx: "12",
+																			cy: "12",
+																			r: "10",
+																		},
+																		null,
+																		-1
+																	),
+																	f(
+																		"polyline",
+																		{
+																			points: "12 6 12 12 16 14",
+																		},
+																		null,
+																		-1
+																	),
+																])),
+													  ])),
+											],
+											64
+									  )),
+							],
+							14,
+							me
+						),
+					]),
+					s.value && !e.value
+						? (n(),
+						  r("div", be, [
+								f(
+									"button",
+									{
+										onClick: G,
+										disabled: p.value,
+										class: $([
+											"flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+											[
+												u.value
+													? "bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25"
+													: "bg-white/[0.04] text-slate-400 border border-white/[0.08] hover:bg-white/[0.08] hover:text-slate-200",
+											],
+										]),
+									},
+									[
+										p.value
+											? (n(), r("div", xe))
+											: (n(),
+											  re(M(oe), {
+													key: 1,
+													size: 16,
+													"stroke-width": 1.8,
+											  })),
+										u.value
+											? (n(), r("span", we, "End Break · " + h(A.value), 1))
+											: (n(), r("span", Se, "Take Break")),
+									],
+									10,
+									_e
+								),
+						  ]))
+						: C("", !0),
+					(s.value || e.value) && b.value > 0 && !u.value
+						? (n(),
+						  r(
+								"div",
+								Me,
+								h(b.value) +
+									" break" +
+									h(b.value !== 1 ? "s" : "") +
+									" · " +
+									h(P.value.toFixed(0)) +
+									" min total ",
+								1
+						  ))
+						: C("", !0),
+					f("div", Ce, [
+						e.value
+							? (n(), r("div", De, "Day Complete"))
+							: u.value
+							? (n(), r("div", Te, "On Break"))
+							: B.value && s.value
+							? (n(), r("div", Be, "Shift Complete"))
+							: C("", !0),
+						e.value && N.value
+							? (n(),
+							  r("p", Ie, [
+									l[1] || (l[1] = I(" Worked ", -1)),
+									f("span", Pe, h(j.value), 1),
+									l[2] || (l[2] = I(" today ", -1)),
+							  ]))
+							: u.value
+							? (n(), r("p", Ne, " Break started · Timer paused "))
+							: s.value && N.value
+							? (n(),
+							  r("p", ze, [
+									l[3] || (l[3] = I(" Clocked in at ", -1)),
+									f("span", Ee, h(N.value), 1),
+							  ]))
+							: (n(), r("p", Oe, "Tap to start your shift")),
+					]),
+					d.value ? (n(), r("p", Fe, h(d.value), 1)) : C("", !0),
+				])
+			);
+		},
+	});
+export { He as C, Ue as _, qe as a, Ae as b };

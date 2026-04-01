@@ -11,9 +11,10 @@ Integrates with ERPNext's payroll system and extends it with:
 
 import frappe
 from frappe import _
-from frappe.utils import getdate, add_months, get_first_day, get_last_day, flt
-from arijentek_core.payroll.payslip_generator import PayslipGenerator, generate_payroll_for_month
+from frappe.utils import add_months, flt, get_first_day, get_last_day, getdate
+
 from arijentek_core.payroll.calculator import PayrollCalculator, get_lop_summary
+from arijentek_core.payroll.payslip_generator import PayslipGenerator, generate_payroll_for_month
 
 
 def generate_monthly_payroll(company=None, payroll_period=None, posting_date=None, dry_run=False):
@@ -140,8 +141,7 @@ def process_payroll_entry(payroll_entry_name, submit_salary_slips=True):
 	payroll_entry = frappe.get_doc("Payroll Entry", payroll_entry_name)
 
 	payroll_entry.create_salary_slips()
-	frappe.db.commit()
-
+	frappe.db.commit()  # nosemgrep: salary slip creation must persist
 	if submit_salary_slips:
 		payroll_entry.submit_salary_slips()
 		frappe.db.commit()
@@ -150,7 +150,7 @@ def process_payroll_entry(payroll_entry_name, submit_salary_slips=True):
 
 
 @frappe.whitelist()
-def run_monthly_payroll_automation(posting_date=None):
+def run_monthly_payroll_automation(posting_date: str | None = None):
 	"""
 	Whitelisted method to run payroll automation.
 	Can be called from API or scheduled job.
@@ -182,7 +182,7 @@ def run_monthly_payroll_automation(posting_date=None):
 
 
 @frappe.whitelist()
-def get_payroll_status(employee, month=None, year=None):
+def get_payroll_status(employee: str, month: int | None = None, year: int | None = None):
 	"""
 	Check if salary slip exists for employee for given month/year.
 	Also returns attendance summary and LOP details.
@@ -250,7 +250,7 @@ def get_attendance_summary(employee, start_date, end_date):
 
 
 @frappe.whitelist()
-def get_payroll_preview_for_employee(employee, month=None, year=None):
+def get_payroll_preview_for_employee(employee: str, month: int | None = None, year: int | None = None):
 	"""
 	Get a preview of payroll calculation for an employee.
 	Shows what the salary slip would look like before generation.
@@ -276,7 +276,7 @@ def get_payroll_preview_for_employee(employee, month=None, year=None):
 
 
 @frappe.whitelist()
-def recalculate_payroll_for_employee(employee, month, year):
+def recalculate_payroll_for_employee(employee: str, month: int, year: int):
 	"""
 	Recalculate payroll for an employee after attendance changes.
 	This can be used to update a salary slip with new attendance data.
@@ -334,7 +334,7 @@ def recalculate_payroll_for_employee(employee, month, year):
 
 
 @frappe.whitelist()
-def get_payroll_summary(company=None, month=None, year=None):
+def get_payroll_summary(company: str | None = None, month: int | None = None, year: int | None = None):
 	"""
 	Get payroll summary for a company and period.
 
@@ -360,7 +360,7 @@ def get_payroll_summary(company=None, month=None, year=None):
 	# Get salary slips for the period
 	slips = frappe.db.sql(
 		"""
-		SELECT 
+		SELECT
 			name, employee, employee_name, department,
 			gross_pay, net_pay, total_deduction,
 			working_days, payment_days

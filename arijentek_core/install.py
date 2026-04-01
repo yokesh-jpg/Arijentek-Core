@@ -1,5 +1,5 @@
 """
-Arijentek Core – Post-install / Post-migrate setup.
+Arijentek Core - Post-install / Post-migrate setup.
 
 Creates the "Employee Portal" workspace in the Frappe Desk sidebar with
 shortcuts to the portal and related DocTypes (Holiday List, Leave
@@ -11,7 +11,6 @@ Runs both:
 """
 
 import frappe
-
 
 # ── Public hooks ──────────────────────────────────────────────────────
 
@@ -34,13 +33,14 @@ def _setup_employee_portal():
 	_ensure_employee_role()
 	_ensure_module_def()
 	_create_workspace()
-	frappe.db.commit()
+	_set_session_expiry()
+	frappe.db.commit()  # nosemgrep: post-install setup must persist workspace and role config
 
 
 def _ensure_employee_role():
 	"""Make sure the Employee role exists and Website Users with it are
 	properly restricted (desk_access=0 for Website Users via role config
-	is irrelevant – Frappe blocks them by user_type).
+	is irrelevant - Frappe blocks them by user_type).
 
 	We do NOT set desk_access=1 here because Website Users should NOT
 	reach the desk.  System Users already have desk access via their
@@ -170,3 +170,21 @@ def _expected_shortcuts():
 			)
 
 	return shortcuts
+
+
+def _set_session_expiry():
+	"""Set session expiry to 30 days (720 hours) to prevent premature logout.
+
+	Employees using the portal should not be logged out during their workday.
+	The default Frappe session expiry can be as short as 6-12 hours which
+	causes the 'auto logout after 12 hours' bug.
+	"""
+	try:
+		settings = frappe.get_single("System Settings")
+		current = settings.session_expiry or ""
+		# Only update if it's less than 720 hours
+		if not current or current < "720:00:00":
+			settings.session_expiry = "720:00:00"
+			settings.save(ignore_permissions=True)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Session Expiry Setup Error")

@@ -8,7 +8,7 @@ PORTAL_PATH = "/employee-portal"
 
 
 def get_employee_home_page(user: str):
-	"""Frappe hook – returns the home page URL. ALL users land on portal first."""
+	"""Frappe hook - returns the home page URL. ALL users land on portal first."""
 	if user == "Guest":
 		return None
 	return PORTAL_PATH

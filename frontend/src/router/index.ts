@@ -1,61 +1,67 @@
-import { createRouter, createWebHashHistory } from 'vue-router';
-import { useAuthStore } from '../stores/auth';
+import { createRouter, createWebHashHistory } from "vue-router";
+import { useAuthStore } from "../stores/auth";
 
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     {
-      path: '/login',
-      name: 'login',
-      component: () => import('../views/Login.vue'),
+      path: "/login",
+      name: "login",
+      component: () => import("../views/Login.vue"),
       meta: { guest: true },
     },
     {
-      path: '/',
-      name: 'dashboard',
-      component: () => import('../views/DashboardView.vue'),
+      path: "/",
+      name: "dashboard",
+      component: () => import("../views/DashboardView.vue"),
       meta: { requiresAuth: true },
     },
     {
-      path: '/attendance',
-      name: 'attendance',
-      component: () => import('../views/AttendanceView.vue'),
+      path: "/attendance",
+      name: "attendance",
+      component: () => import("../views/AttendanceView.vue"),
       meta: { requiresAuth: true },
     },
     {
-      path: '/leave',
-      name: 'leave',
-      component: () => import('../views/LeaveView.vue'),
+      path: "/leave",
+      name: "leave",
+      component: () => import("../views/LeaveView.vue"),
       meta: { requiresAuth: true },
     },
     {
-      path: '/payroll',
-      name: 'payroll',
-      component: () => import('../views/PayrollView.vue'),
+      path: "/payroll",
+      name: "payroll",
+      component: () => import("../views/PayrollView.vue"),
       meta: { requiresAuth: true },
     },
     {
-      path: '/manager',
-      name: 'manager',
-      component: () => import('../views/ManagerView.vue'),
+      path: "/manager",
+      name: "manager",
+      component: () => import("../views/ManagerView.vue"),
       meta: { requiresAuth: true, requiresManager: true },
     },
     {
-      path: '/change-password',
-      name: 'change-password',
-      component: () => import('../views/ChangePasswordView.vue'),
+      path: "/change-password",
+      name: "change-password",
+      component: () => import("../views/ChangePasswordView.vue"),
       meta: { requiresAuth: true },
     },
     {
-      path: '/expense',
-      name: 'expense',
-      component: () => import('../views/ExpenseView.vue'),
+      path: "/expense",
+      name: "expense",
+      component: () => import("../views/ExpenseView.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/roster",
+      name: "roster",
+      component: () => import("../views/RosterView.vue"),
       meta: { requiresAuth: true },
     },
     // Catch-all → dashboard
     {
-      path: '/:pathMatch(.*)*',
-      redirect: '/',
+      path: "/:pathMatch(.*)*",
+      redirect: "/",
     },
   ],
 });
@@ -72,11 +78,11 @@ router.beforeEach((to, _from, next) => {
   }
 
   if (to.meta.requiresAuth && !auth.isLoggedIn) {
-    next({ name: 'login' });
+    next({ name: "login" });
   } else if (to.meta.requiresManager && !auth.isManager) {
-    next({ name: 'dashboard' });
+    next({ name: "dashboard" });
   } else if (to.meta.guest && auth.isLoggedIn) {
-    next({ name: 'dashboard' });
+    next({ name: "dashboard" });
   } else {
     next();
   }

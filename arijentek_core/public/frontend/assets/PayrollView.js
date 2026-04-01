@@ -1,21 +1,566 @@
-var f=(S,_,d)=>new Promise((u,r)=>{var y=o=>{try{x(d.next(o))}catch(p){r(p)}},c=o=>{try{x(d.throw(o))}catch(p){r(p)}},x=o=>o.done?u(o.value):Promise.resolve(o.value).then(y,c);x((d=d.apply(S,_)).next())});import{c as w,d as T,u as U,m as B,a as n,b as t,f as F,y as E,F as V,n as A,v as G,j as P,h as m,k as g,t as i,g as h,i as j,r as v,o as l,I as J}from"./main.js";import{u as I,p as k}from"./api.js";import{L as O}from"./loader-circle.js";import{C as $}from"./circle-alert.js";import{C as q}from"./circle-check.js";/**
+var f = (S, _, d) =>
+	new Promise((u, r) => {
+		var y = (o) => {
+				try {
+					x(d.next(o));
+				} catch (p) {
+					r(p);
+				}
+			},
+			c = (o) => {
+				try {
+					x(d.throw(o));
+				} catch (p) {
+					r(p);
+				}
+			},
+			x = (o) => (o.done ? u(o.value) : Promise.resolve(o.value).then(y, c));
+		x((d = d.apply(S, _)).next());
+	});
+import {
+	c as w,
+	d as T,
+	u as U,
+	m as B,
+	a as n,
+	b as t,
+	f as F,
+	y as E,
+	F as V,
+	n as A,
+	v as G,
+	j as P,
+	h as m,
+	k as g,
+	t as i,
+	g as h,
+	i as j,
+	r as v,
+	o as l,
+	I as J,
+} from "./main.js";
+import { u as I, p as k } from "./api.js";
+import { L as O } from "./loader-circle.js";
+import { C as $ } from "./circle-alert.js";
+import { C as q } from "./circle-check.js";
+/**
  * @license lucide-vue-next v0.563.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const R=w("download",[["path",{d:"M12 15V3",key:"m9g1x1"}],["path",{d:"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4",key:"ih7n3h"}],["path",{d:"m7 10 5 5 5-5",key:"brsn70"}]]);/**
+ */ const R = w("download", [
+	["path", { d: "M12 15V3", key: "m9g1x1" }],
+	["path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4", key: "ih7n3h" }],
+	["path", { d: "m7 10 5 5 5-5", key: "brsn70" }],
+]);
+/**
  * @license lucide-vue-next v0.563.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const K=w("file-text",[["path",{d:"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z",key:"1oefj6"}],["path",{d:"M14 2v5a1 1 0 0 0 1 1h5",key:"wfsgrz"}],["path",{d:"M10 9H8",key:"b1mrlr"}],["path",{d:"M16 13H8",key:"t4e002"}],["path",{d:"M16 17H8",key:"z1uh3a"}]]);/**
+ */ const K = w("file-text", [
+	[
+		"path",
+		{
+			d: "M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z",
+			key: "1oefj6",
+		},
+	],
+	["path", { d: "M14 2v5a1 1 0 0 0 1 1h5", key: "wfsgrz" }],
+	["path", { d: "M10 9H8", key: "b1mrlr" }],
+	["path", { d: "M16 13H8", key: "t4e002" }],
+	["path", { d: "M16 17H8", key: "z1uh3a" }],
+]);
+/**
  * @license lucide-vue-next v0.563.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Q=w("play",[["path",{d:"M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z",key:"10ikf1"}]]);/**
+ */ const Q = w("play", [
+	[
+		"path",
+		{
+			d: "M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z",
+			key: "10ikf1",
+		},
+	],
+]);
+/**
  * @license lucide-vue-next v0.563.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const W=w("trash-2",[["path",{d:"M10 11v6",key:"nco0om"}],["path",{d:"M14 11v6",key:"outv1u"}],["path",{d:"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6",key:"miytrc"}],["path",{d:"M3 6h18",key:"d0wm0j"}],["path",{d:"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2",key:"e791ji"}]]),X={key:0,class:"flex items-center justify-center py-20"},Z={key:1,class:"space-y-6 animate-slide-up"},ee={class:"glass-card p-6 animate-fade-in-up"},te={class:"flex flex-wrap items-end gap-4"},ae=["value"],se=["disabled"],le={key:0,class:"mt-4 flex items-start gap-2 text-sm text-red-400 bg-red-500/10 p-3 rounded-xl"},ne={key:1,class:"mt-4 flex items-center gap-2 text-sm text-emerald-400 bg-emerald-500/10 p-3 rounded-xl"},oe={key:0,class:"space-y-3"},re={class:"flex items-center gap-4"},ie={class:"w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0"},de={class:"flex items-center gap-2"},ue={class:"text-base font-semibold text-white"},ce={class:"text-xs text-slate-500 mt-0.5"},pe={class:"flex items-center gap-3"},me=["onClick"],ve=["onClick"],ye={key:1,class:"glass-card p-12 text-center"},we=T({__name:"PayrollView",setup(S){const _=U(),d=v(!0),u=v(!1),r=v(""),y=v(""),c=new Date,x=c.getMonth()===0?12:c.getMonth(),o=c.getMonth()===0?c.getFullYear()-1:c.getFullYear(),p=v(x),M=v(o),b=v([]);function D(a){_.csrfToken||window.csrf_token;const e=k.getDownloadUrl(a);window.open(e,"_blank")}function L(a){return f(this,null,function*(){if(confirm("Are you sure you want to delete this payslip?"))try{const e=yield k.deletePayslip(a);e&&e.success?b.value=b.value.filter(C=>C.name!==a):alert((e==null?void 0:e.error)||"Failed to delete payslip")}catch(e){alert(e.message||"Error deleting payslip")}})}function z(){return f(this,null,function*(){I("salary_slips",k.getSlips,a=>{a&&(b.value=Array.isArray(a)?a:[],d.value=!1)})})}function N(){return f(this,null,function*(){u.value=!0,r.value="",y.value="";try{const a=yield k.generateMyPayslip(p.value,M.value);a!=null&&a.success?(y.value=a.message||"Payslip generated successfully",yield z(),a.salary_slip&&D(a.salary_slip)):r.value=(a==null?void 0:a.error)||"Failed to generate payslip. Check if attendance exists."}catch(a){r.value=(a==null?void 0:a.message)||"Something went wrong"}finally{u.value=!1}})}const Y=[{value:1,label:"January"},{value:2,label:"February"},{value:3,label:"March"},{value:4,label:"April"},{value:5,label:"May"},{value:6,label:"June"},{value:7,label:"July"},{value:8,label:"August"},{value:9,label:"September"},{value:10,label:"October"},{value:11,label:"November"},{value:12,label:"December"}];return B(z),(a,e)=>{const C=J("FileCheck");return l(),n("div",null,[e[12]||(e[12]=t("div",{class:"mb-8 animate-fade-in"},[t("h1",{class:"text-2xl sm:text-3xl font-bold text-white"},"Payroll"),t("p",{class:"text-sm text-slate-500 mt-1"},"View and download your salary slips")],-1)),d.value?(l(),n("div",X,[...e[2]||(e[2]=[t("div",{class:"w-10 h-10 border-2 border-accent/30 border-t-accent rounded-full animate-spin"},null,-1)])])):(l(),n("div",Z,[t("div",ee,[e[5]||(e[5]=t("h3",{class:"text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4"},"Request Salary Slip",-1)),e[6]||(e[6]=t("p",{class:"text-sm text-slate-500 mb-4"},"Generate and download your salary slip",-1)),t("div",te,[t("div",null,[e[3]||(e[3]=t("label",{class:"block text-xs font-medium text-slate-400 mb-1.5"},"Month",-1)),F(t("select",{"onUpdate:modelValue":e[0]||(e[0]=s=>p.value=s),class:"input-dark w-40"},[(l(),n(V,null,A(Y,s=>t("option",{key:s.value,value:s.value},i(s.label),9,ae)),64))],512),[[E,p.value,void 0,{number:!0}]])]),t("div",null,[e[4]||(e[4]=t("label",{class:"block text-xs font-medium text-slate-400 mb-1.5"},"Year",-1)),F(t("input",{"onUpdate:modelValue":e[1]||(e[1]=s=>M.value=s),type:"number",min:"2020",max:"2030",class:"input-dark w-24"},null,512),[[G,M.value,void 0,{number:!0}]])]),t("button",{onClick:N,disabled:u.value,class:"btn-accent flex items-center gap-2 px-5 py-2.5"},[u.value?(l(),P(m(O),{key:0,size:18,class:"animate-spin"})):(l(),P(m(Q),{key:1,size:18,"stroke-width":1.8})),g(" "+i(u.value?"Processing...":"Generate"),1)],8,se)]),r.value?(l(),n("div",le,[h(m($),{size:16,class:"mt-0.5 shrink-0"}),g(" "+i(r.value),1)])):j("",!0),y.value?(l(),n("div",ne,[h(m(q),{size:16,class:"shrink-0"}),g(" "+i(y.value),1)])):j("",!0)]),t("div",null,[e[11]||(e[11]=t("h3",{class:"text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4"},"Salary Slips",-1)),b.value.length?(l(),n("div",oe,[(l(!0),n(V,null,A(b.value,s=>(l(),n("div",{key:s.name,class:"glass-card-hover p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"},[t("div",re,[t("div",ie,[h(C,{size:20,"stroke-width":1.8})]),t("div",null,[t("div",de,[t("p",ue,i(s.month)+" "+i(s.year),1),e[7]||(e[7]=t("div",{class:"px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wide bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"}," Generated ",-1))]),t("p",ce,i(new Date(s.start_date).toLocaleDateString("en-US",{month:"short",day:"numeric"}))+" — "+i(new Date(s.end_date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})),1)])]),t("div",pe,[t("button",{onClick:H=>L(s.name),class:"p-2 rounded-lg bg-white/[0.04] hover:bg-red-500/10 border border-white/[0.06] hover:border-red-500/20 text-slate-400 hover:text-red-400 transition-all",title:"Delete Payslip"},[h(m(W),{size:18,"stroke-width":1.8})],8,me),t("button",{onClick:H=>D(s.name),class:"flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-sm font-medium text-slate-300 hover:text-white transition-all shrink-0"},[h(m(R),{size:16,"stroke-width":1.8}),e[8]||(e[8]=g(" Download PDF ",-1))],8,ve)])]))),128))])):(l(),n("div",ye,[h(m(K),{size:40,class:"mx-auto text-slate-600 mb-3"}),e[9]||(e[9]=t("p",{class:"text-slate-400 font-medium"},"No salary slips found",-1)),e[10]||(e[10]=t("p",{class:"text-sm text-slate-500 mt-1"},"Your payslips will appear here once processed",-1))]))])]))])}}});export{we as default};
+ */ const W = w("trash-2", [
+		["path", { d: "M10 11v6", key: "nco0om" }],
+		["path", { d: "M14 11v6", key: "outv1u" }],
+		["path", { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", key: "miytrc" }],
+		["path", { d: "M3 6h18", key: "d0wm0j" }],
+		["path", { d: "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2", key: "e791ji" }],
+	]),
+	X = { key: 0, class: "flex items-center justify-center py-20" },
+	Z = { key: 1, class: "space-y-6 animate-slide-up" },
+	ee = { class: "glass-card p-6 animate-fade-in-up" },
+	te = { class: "flex flex-wrap items-end gap-4" },
+	ae = ["value"],
+	se = ["disabled"],
+	le = {
+		key: 0,
+		class: "mt-4 flex items-start gap-2 text-sm text-red-400 bg-red-500/10 p-3 rounded-xl",
+	},
+	ne = {
+		key: 1,
+		class: "mt-4 flex items-center gap-2 text-sm text-emerald-400 bg-emerald-500/10 p-3 rounded-xl",
+	},
+	oe = { key: 0, class: "space-y-3" },
+	re = { class: "flex items-center gap-4" },
+	ie = {
+		class: "w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0",
+	},
+	de = { class: "flex items-center gap-2" },
+	ue = { class: "text-base font-semibold text-white" },
+	ce = { class: "text-xs text-slate-500 mt-0.5" },
+	pe = { class: "flex items-center gap-3" },
+	me = ["onClick"],
+	ve = ["onClick"],
+	ye = { key: 1, class: "glass-card p-12 text-center" },
+	we = T({
+		__name: "PayrollView",
+		setup(S) {
+			const _ = U(),
+				d = v(!0),
+				u = v(!1),
+				r = v(""),
+				y = v(""),
+				c = new Date(),
+				x = c.getMonth() === 0 ? 12 : c.getMonth(),
+				o = c.getMonth() === 0 ? c.getFullYear() - 1 : c.getFullYear(),
+				p = v(x),
+				M = v(o),
+				b = v([]);
+			function D(a) {
+				_.csrfToken || window.csrf_token;
+				const e = k.getDownloadUrl(a);
+				window.open(e, "_blank");
+			}
+			function L(a) {
+				return f(this, null, function* () {
+					if (confirm("Are you sure you want to delete this payslip?"))
+						try {
+							const e = yield k.deletePayslip(a);
+							e && e.success
+								? (b.value = b.value.filter((C) => C.name !== a))
+								: alert(
+										(e == null ? void 0 : e.error) ||
+											"Failed to delete payslip"
+								  );
+						} catch (e) {
+							alert(e.message || "Error deleting payslip");
+						}
+				});
+			}
+			function z() {
+				return f(this, null, function* () {
+					I("salary_slips", k.getSlips, (a) => {
+						a && ((b.value = Array.isArray(a) ? a : []), (d.value = !1));
+					});
+				});
+			}
+			function N() {
+				return f(this, null, function* () {
+					(u.value = !0), (r.value = ""), (y.value = "");
+					try {
+						const a = yield k.generateMyPayslip(p.value, M.value);
+						a != null && a.success
+							? ((y.value = a.message || "Payslip generated successfully"),
+							  yield z(),
+							  a.salary_slip && D(a.salary_slip))
+							: (r.value =
+									(a == null ? void 0 : a.error) ||
+									"Failed to generate payslip. Check if attendance exists.");
+					} catch (a) {
+						r.value = (a == null ? void 0 : a.message) || "Something went wrong";
+					} finally {
+						u.value = !1;
+					}
+				});
+			}
+			const Y = [
+				{ value: 1, label: "January" },
+				{ value: 2, label: "February" },
+				{ value: 3, label: "March" },
+				{ value: 4, label: "April" },
+				{ value: 5, label: "May" },
+				{ value: 6, label: "June" },
+				{ value: 7, label: "July" },
+				{ value: 8, label: "August" },
+				{ value: 9, label: "September" },
+				{ value: 10, label: "October" },
+				{ value: 11, label: "November" },
+				{ value: 12, label: "December" },
+			];
+			return (
+				B(z),
+				(a, e) => {
+					const C = J("FileCheck");
+					return (
+						l(),
+						n("div", null, [
+							e[12] ||
+								(e[12] = t(
+									"div",
+									{ class: "mb-8 animate-fade-in" },
+									[
+										t(
+											"h1",
+											{ class: "text-2xl sm:text-3xl font-bold text-white" },
+											"Payroll"
+										),
+										t(
+											"p",
+											{ class: "text-sm text-slate-500 mt-1" },
+											"View and download your salary slips"
+										),
+									],
+									-1
+								)),
+							d.value
+								? (l(),
+								  n("div", X, [
+										...(e[2] ||
+											(e[2] = [
+												t(
+													"div",
+													{
+														class: "w-10 h-10 border-2 border-accent/30 border-t-accent rounded-full animate-spin",
+													},
+													null,
+													-1
+												),
+											])),
+								  ]))
+								: (l(),
+								  n("div", Z, [
+										t("div", ee, [
+											e[5] ||
+												(e[5] = t(
+													"h3",
+													{
+														class: "text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4",
+													},
+													" Request Salary Slip ",
+													-1
+												)),
+											e[6] ||
+												(e[6] = t(
+													"p",
+													{ class: "text-sm text-slate-500 mb-4" },
+													"Generate and download your salary slip",
+													-1
+												)),
+											t("div", te, [
+												t("div", null, [
+													e[3] ||
+														(e[3] = t(
+															"label",
+															{
+																class: "block text-xs font-medium text-slate-400 mb-1.5",
+															},
+															"Month",
+															-1
+														)),
+													F(
+														t(
+															"select",
+															{
+																"onUpdate:modelValue":
+																	e[0] ||
+																	(e[0] = (s) => (p.value = s)),
+																class: "input-dark w-40",
+															},
+															[
+																(l(),
+																n(
+																	V,
+																	null,
+																	A(Y, (s) =>
+																		t(
+																			"option",
+																			{
+																				key: s.value,
+																				value: s.value,
+																			},
+																			i(s.label),
+																			9,
+																			ae
+																		)
+																	),
+																	64
+																)),
+															],
+															512
+														),
+														[[E, p.value, void 0, { number: !0 }]]
+													),
+												]),
+												t("div", null, [
+													e[4] ||
+														(e[4] = t(
+															"label",
+															{
+																class: "block text-xs font-medium text-slate-400 mb-1.5",
+															},
+															"Year",
+															-1
+														)),
+													F(
+														t(
+															"input",
+															{
+																"onUpdate:modelValue":
+																	e[1] ||
+																	(e[1] = (s) => (M.value = s)),
+																type: "number",
+																min: "2020",
+																max: "2030",
+																class: "input-dark w-24",
+															},
+															null,
+															512
+														),
+														[[G, M.value, void 0, { number: !0 }]]
+													),
+												]),
+												t(
+													"button",
+													{
+														onClick: N,
+														disabled: u.value,
+														class: "btn-accent flex items-center gap-2 px-5 py-2.5",
+													},
+													[
+														u.value
+															? (l(),
+															  P(m(O), {
+																	key: 0,
+																	size: 18,
+																	class: "animate-spin",
+															  }))
+															: (l(),
+															  P(m(Q), {
+																	key: 1,
+																	size: 18,
+																	"stroke-width": 1.8,
+															  })),
+														g(
+															" " +
+																i(
+																	u.value
+																		? "Processing..."
+																		: "Generate"
+																),
+															1
+														),
+													],
+													8,
+													se
+												),
+											]),
+											r.value
+												? (l(),
+												  n("div", le, [
+														h(m($), {
+															size: 16,
+															class: "mt-0.5 shrink-0",
+														}),
+														g(" " + i(r.value), 1),
+												  ]))
+												: j("", !0),
+											y.value
+												? (l(),
+												  n("div", ne, [
+														h(m(q), { size: 16, class: "shrink-0" }),
+														g(" " + i(y.value), 1),
+												  ]))
+												: j("", !0),
+										]),
+										t("div", null, [
+											e[11] ||
+												(e[11] = t(
+													"h3",
+													{
+														class: "text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4",
+													},
+													" Salary Slips ",
+													-1
+												)),
+											b.value.length
+												? (l(),
+												  n("div", oe, [
+														(l(!0),
+														n(
+															V,
+															null,
+															A(
+																b.value,
+																(s) => (
+																	l(),
+																	n(
+																		"div",
+																		{
+																			key: s.name,
+																			class: "glass-card-hover p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4",
+																		},
+																		[
+																			t("div", re, [
+																				t("div", ie, [
+																					h(C, {
+																						size: 20,
+																						"stroke-width": 1.8,
+																					}),
+																				]),
+																				t("div", null, [
+																					t("div", de, [
+																						t(
+																							"p",
+																							ue,
+																							i(
+																								s.month
+																							) +
+																								" " +
+																								i(
+																									s.year
+																								),
+																							1
+																						),
+																						e[7] ||
+																							(e[7] =
+																								t(
+																									"div",
+																									{
+																										class: "px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wide bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+																									},
+																									" Generated ",
+																									-1
+																								)),
+																					]),
+																					t(
+																						"p",
+																						ce,
+																						i(
+																							new Date(
+																								s.start_date
+																							).toLocaleDateString(
+																								"en-US",
+																								{
+																									month: "short",
+																									day: "numeric",
+																								}
+																							)
+																						) +
+																							" — " +
+																							i(
+																								new Date(
+																									s.end_date
+																								).toLocaleDateString(
+																									"en-US",
+																									{
+																										month: "short",
+																										day: "numeric",
+																										year: "numeric",
+																									}
+																								)
+																							),
+																						1
+																					),
+																				]),
+																			]),
+																			t("div", pe, [
+																				t(
+																					"button",
+																					{
+																						onClick: (
+																							H
+																						) =>
+																							L(
+																								s.name
+																							),
+																						class: "p-2 rounded-lg bg-white/[0.04] hover:bg-red-500/10 border border-white/[0.06] hover:border-red-500/20 text-slate-400 hover:text-red-400 transition-all",
+																						title: "Delete Payslip",
+																					},
+																					[
+																						h(m(W), {
+																							size: 18,
+																							"stroke-width": 1.8,
+																						}),
+																					],
+																					8,
+																					me
+																				),
+																				t(
+																					"button",
+																					{
+																						onClick: (
+																							H
+																						) =>
+																							D(
+																								s.name
+																							),
+																						class: "flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-sm font-medium text-slate-300 hover:text-white transition-all shrink-0",
+																					},
+																					[
+																						h(m(R), {
+																							size: 16,
+																							"stroke-width": 1.8,
+																						}),
+																						e[8] ||
+																							(e[8] =
+																								g(
+																									" Download PDF ",
+																									-1
+																								)),
+																					],
+																					8,
+																					ve
+																				),
+																			]),
+																		]
+																	)
+																)
+															),
+															128
+														)),
+												  ]))
+												: (l(),
+												  n("div", ye, [
+														h(m(K), {
+															size: 40,
+															class: "mx-auto text-slate-600 mb-3",
+														}),
+														e[9] ||
+															(e[9] = t(
+																"p",
+																{
+																	class: "text-slate-400 font-medium",
+																},
+																"No salary slips found",
+																-1
+															)),
+														e[10] ||
+															(e[10] = t(
+																"p",
+																{
+																	class: "text-sm text-slate-500 mt-1",
+																},
+																"Your payslips will appear here once processed",
+																-1
+															)),
+												  ])),
+										]),
+								  ])),
+						])
+					);
+				}
+			);
+		},
+	});
+export { we as default };

@@ -32,7 +32,7 @@ def _check_suspicious_patterns():
 			if hasattr(frappe.local, "request_form") and frappe.local.request_form:
 				form_data = frappe.local.request_form or {}
 				request_data.extend(form_data.values())
-		except (AttributeError, TypeError):
+		except AttributeError, TypeError:
 			pass
 
 	for data in request_data:

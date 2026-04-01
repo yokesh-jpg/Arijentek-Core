@@ -11,7 +11,7 @@ Handles notifications for leave application events:
 
 import frappe
 from frappe import _
-from frappe.utils import getdate, get_url
+from frappe.utils import get_url, getdate
 
 
 def on_leave_application_insert(doc, method=None):
@@ -50,7 +50,7 @@ def _handle_leave_approval(doc):
 		# Submit the leave application if it's still in Draft
 		if doc.docstatus == 0:
 			doc.submit()
-			frappe.db.commit()
+			frappe.db.commit()  # nosemgrep: notification batch must persist after sending all emails
 
 		# Notify the employee
 		_notify_user(
@@ -83,16 +83,15 @@ def _handle_leave_rejection(doc):
 		_notify_user(
 			user=employee_user,
 			subject=_("Leave Application Rejected"),
-			message=_("Your {0} application ({1} to {2}) has been rejected. "
-					  "The day(s) will be marked as Leave Without Pay (LWP).").format(
-				doc.leave_type, doc.from_date, doc.to_date
-			),
+			message=_(
+				"Your {0} application ({1} to {2}) has been rejected. "
+				"The day(s) will be marked as Leave Without Pay (LWP)."
+			).format(doc.leave_type, doc.from_date, doc.to_date),
 			doc=doc,
 		)
 
 		frappe.logger().info(
-			f"Leave rejected for {doc.employee_name}: {doc.leave_type} "
-			f"({doc.from_date} to {doc.to_date})"
+			f"Leave rejected for {doc.employee_name}: {doc.leave_type} ({doc.from_date} to {doc.to_date})"
 		)
 
 	except Exception:
@@ -132,15 +131,17 @@ def _send_leave_notification(doc, subject, message):
 		try:
 			# Frappe desk notification
 			notification = frappe.new_doc("Notification Log")
-			notification.update({
-				"subject": subject,
-				"email_content": message,
-				"for_user": user,
-				"document_type": "Leave Application",
-				"document_name": doc.name,
-				"from_user": frappe.session.user,
-				"type": "Alert",
-			})
+			notification.update(
+				{
+					"subject": subject,
+					"email_content": message,
+					"for_user": user,
+					"document_type": "Leave Application",
+					"document_name": doc.name,
+					"from_user": frappe.session.user,
+					"type": "Alert",
+				}
+			)
 			notification.insert(ignore_permissions=True)
 		except Exception:
 			frappe.log_error(frappe.get_traceback(), f"Leave Notification Error for {user}")
@@ -170,15 +171,17 @@ def _notify_user(user, subject, message, doc):
 
 	try:
 		notification = frappe.new_doc("Notification Log")
-		notification.update({
-			"subject": subject,
-			"email_content": message,
-			"for_user": user,
-			"document_type": "Leave Application",
-			"document_name": doc.name,
-			"from_user": frappe.session.user,
-			"type": "Alert",
-		})
+		notification.update(
+			{
+				"subject": subject,
+				"email_content": message,
+				"for_user": user,
+				"document_type": "Leave Application",
+				"document_name": doc.name,
+				"from_user": frappe.session.user,
+				"type": "Alert",
+			}
+		)
 		notification.insert(ignore_permissions=True)
 		frappe.db.commit()
 	except Exception:
