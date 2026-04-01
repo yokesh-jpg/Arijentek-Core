@@ -141,9 +141,7 @@ def process_payroll_entry(payroll_entry_name, submit_salary_slips=True):
 	payroll_entry = frappe.get_doc("Payroll Entry", payroll_entry_name)
 
 	payroll_entry.create_salary_slips()
-	frappe.db.commit()
-
-	if submit_salary_slips:
+	frappe.db.commit()  # nosemgrep: salary slip creation must persist
 		payroll_entry.submit_salary_slips()
 		frappe.db.commit()
 
@@ -151,7 +149,7 @@ def process_payroll_entry(payroll_entry_name, submit_salary_slips=True):
 
 
 @frappe.whitelist()
-def run_monthly_payroll_automation(posting_date=None):
+def run_monthly_payroll_automation(posting_date: str | None = None):
 	"""
 	Whitelisted method to run payroll automation.
 	Can be called from API or scheduled job.
@@ -183,7 +181,7 @@ def run_monthly_payroll_automation(posting_date=None):
 
 
 @frappe.whitelist()
-def get_payroll_status(employee, month=None, year=None):
+def get_payroll_status(employee: str, month: int | None = None, year: int | None = None):
 	"""
 	Check if salary slip exists for employee for given month/year.
 	Also returns attendance summary and LOP details.
@@ -251,7 +249,7 @@ def get_attendance_summary(employee, start_date, end_date):
 
 
 @frappe.whitelist()
-def get_payroll_preview_for_employee(employee, month=None, year=None):
+def get_payroll_preview_for_employee(employee: str, month: int | None = None, year: int | None = None):
 	"""
 	Get a preview of payroll calculation for an employee.
 	Shows what the salary slip would look like before generation.
@@ -277,7 +275,7 @@ def get_payroll_preview_for_employee(employee, month=None, year=None):
 
 
 @frappe.whitelist()
-def recalculate_payroll_for_employee(employee, month, year):
+def recalculate_payroll_for_employee(employee: str, month: int, year: int):
 	"""
 	Recalculate payroll for an employee after attendance changes.
 	This can be used to update a salary slip with new attendance data.
@@ -335,7 +333,7 @@ def recalculate_payroll_for_employee(employee, month, year):
 
 
 @frappe.whitelist()
-def get_payroll_summary(company=None, month=None, year=None):
+def get_payroll_summary(company: str | None = None, month: int | None = None, year: int | None = None):
 	"""
 	Get payroll summary for a company and period.
 

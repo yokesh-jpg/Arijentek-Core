@@ -578,7 +578,7 @@ class PayrollCalculator:
 
 
 @frappe.whitelist()
-def calculate_employee_payroll(employee, start_date, end_date):
+def calculate_employee_payroll(employee: str, start_date: str, end_date: str):
 	"""
 	API endpoint to calculate payroll for an employee.
 
@@ -595,7 +595,7 @@ def calculate_employee_payroll(employee, start_date, end_date):
 
 
 @frappe.whitelist()
-def get_payroll_preview(employee, month, year):
+def get_payroll_preview(employee: str, month: int, year: int):
 	"""
 	Get a preview of payroll calculation for an employee.
 

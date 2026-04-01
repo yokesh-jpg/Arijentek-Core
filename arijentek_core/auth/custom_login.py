@@ -4,8 +4,8 @@ from frappe.auth import LoginManager
 from frappe.utils import get_site_url
 
 
-@frappe.whitelist(allow_guest=True)
-def login(usr, pwd):
+@frappe.whitelist(allow_guest=True)  # nosemgrep: login endpoint must be accessible to guests
+def login(usr: str, pwd: str):
 	"""
 	Custom Login Logic:
 	1. Supports login by Employee ID.

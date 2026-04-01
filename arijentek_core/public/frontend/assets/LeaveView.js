@@ -1518,7 +1518,7 @@ import { C as ge } from "./circle-check.js";
 																					},
 																				},
 																				[
-																					_(" Reason "),
+																					_("Reason"),
 																					e(
 																						"span",
 																						{

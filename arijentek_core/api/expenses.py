@@ -27,7 +27,7 @@ def get_my_expenses():
 
 
 @frappe.whitelist()
-def submit_expense_claim(expense_type, amount, description, proof=None):
+def submit_expense_claim(expense_type: str, amount: str | float, description: str, proof: str | None = None):
 	"""Submit a new Expense Claim"""
 	employee = get_current_employee()
 	if not employee:
@@ -102,7 +102,7 @@ def get_team_expenses():
 
 
 @frappe.whitelist()
-def process_expense(name, action):
+def process_expense(name: str, action: str):
 	"""Approve or Reject expense"""
 	if action not in ["Approve", "Reject"]:
 		return {"success": False, "error": "Invalid action"}

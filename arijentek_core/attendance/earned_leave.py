@@ -40,7 +40,7 @@ def sync_earned_leave_allocations():
 				f"Earned Leave Sync Error for {emp.name}",
 			)
 
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: earned leave batch must persist after all employee updates
 	frappe.logger().info(f"Earned Leave Sync: Updated {updated}/{len(employees)} employees")
 
 

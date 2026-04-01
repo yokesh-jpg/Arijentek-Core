@@ -228,7 +228,7 @@ def setup_payroll_for_company(company=None):
 
 
 @frappe.whitelist()
-def get_payroll_setup_status(company=None):
+def get_payroll_setup_status(company: str | None = None):
 	"""
 	Check payroll setup status for a company.
 

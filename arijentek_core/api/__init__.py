@@ -282,7 +282,7 @@ def clock_out():
 
 @frappe.whitelist()
 @user_rate_limit(limit=20, seconds=60)
-def punch(timestamp=None):
+def punch(timestamp: str | None = None):
 	"""Unified punch endpoint — one clock-in and one clock-out per day.
 
 	Rules:
@@ -539,7 +539,9 @@ def get_leave_types():
 
 
 @frappe.whitelist()
-def get_holidays(from_date=None, to_date=None, exclude_weekly_off=None):
+def get_holidays(
+	from_date: str | None = None, to_date: str | None = None, exclude_weekly_off: str | None = None
+):
 	"""Get holidays for the current employee's Holiday List from ERPNext.
 
 	Args:
@@ -706,7 +708,7 @@ def get_leave_balance():
 
 @frappe.whitelist()
 @user_rate_limit(limit=10, seconds=60)
-def apply_leave(leave_type, from_date, to_date, half_day=0, reason=""):
+def apply_leave(leave_type: str, from_date: str, to_date: str, half_day: int = 0, reason: str = ""):
 	"""Submit leave application.
 
 	Auto-creates a Leave Allocation for the calendar year if one does
@@ -784,8 +786,7 @@ def get_leave_applications():
 
 
 @frappe.whitelist()
-def cancel_leave(leave_application):
-	"""Cancel a pending leave application"""
+def cancel_leave(leave_application: str):
 	employee = get_current_employee()
 	if not employee:
 		return {"success": False, "error": "Employee not found"}
@@ -834,7 +835,7 @@ def get_salary_slips():
 
 
 @frappe.whitelist(allow_guest=False)
-def download_payslip(name):
+def download_payslip(name: str):
 	"""Download salary slip PDF using simplified template."""
 	from arijentek_core.payroll.payslip_generator import download_payslip_pdf
 
@@ -843,7 +844,7 @@ def download_payslip(name):
 
 @frappe.whitelist()
 @user_rate_limit(limit=10, seconds=60)
-def delete_my_payslip(name):
+def delete_my_payslip(name: str):
 	"""Delete a salary slip owned by the current employee."""
 	from arijentek_core.payroll.payslip_generator import delete_my_payslip as _delete
 
@@ -851,7 +852,7 @@ def delete_my_payslip(name):
 
 
 @frappe.whitelist()
-def generate_payroll(month=None, year=None):
+def generate_payroll(month: int | None = None, year: int | None = None):
 	"""Generate salary slips for a month. Requires HR Manager or Payroll Entry create permission.
 
 	month: 1-12, year: e.g. 2026. Defaults to previous month.
@@ -887,7 +888,7 @@ def generate_payroll(month=None, year=None):
 
 
 @frappe.whitelist()
-def get_payslip_details(name):
+def get_payslip_details(name: str):
 	"""Get detailed payslip information including attendance breakdown."""
 	from arijentek_core.payroll.payslip_generator import get_payslip_details as _get_payslip_details
 
@@ -895,8 +896,7 @@ def get_payslip_details(name):
 
 
 @frappe.whitelist()
-def get_payroll_preview(month=None, year=None):
-	"""Get a preview of payroll calculation for the current employee."""
+def get_payroll_preview(month: int | None = None, year: int | None = None):
 	employee = get_current_employee()
 	if not employee:
 		return {"error": "Employee not found"}
@@ -927,7 +927,7 @@ def get_payroll_dashboard():
 
 @frappe.whitelist()
 @user_rate_limit(limit=5, seconds=60)
-def generate_my_payslip(month=None, year=None):
+def generate_my_payslip(month: int | None = None, year: int | None = None):
 	"""Generate a payslip for the current employee.
 
 	All employees can generate their own payslips. This is a self-service feature.
@@ -1035,7 +1035,7 @@ def get_attendance_summary():
 
 
 @frappe.whitelist()
-def get_attendance_records(month=None, year=None):
+def get_attendance_records(month: int | None = None, year: int | None = None):
 	"""Get attendance records for a given month/year (defaults to current month).
 
 	Returns list of records with date, status, working_hours, in_time, out_time
@@ -1094,7 +1094,7 @@ def get_attendance_records(month=None, year=None):
 
 
 @frappe.whitelist()
-def get_roster_data(month=None, year=None):
+def get_roster_data(month: int | None = None, year: int | None = None):
 	"""Get roster data for the current employee's department/team.
 
 	Returns a grid of employees x dates with shift assignments,
@@ -1237,8 +1237,7 @@ def get_roster_data(month=None, year=None):
 
 
 @frappe.whitelist()
-def create_issue(issue_type, description):
-	"""Create HR issue/ticket"""
+def create_issue(issue_type: str, description: str):
 	employee = get_current_employee()
 	if not employee:
 		return {"success": False, "error": "Employee not found"}
@@ -1312,7 +1311,7 @@ def get_reporting_info():
 
 
 @frappe.whitelist(allow_guest=True)
-def get_session_info():
+def get_session_info():  # nosemgrep: guest access required for session detection on SPA load
 	"""Return session information for the current user.
 
 	Called by the Vue SPA on startup to determine:
@@ -1352,7 +1351,7 @@ def get_session_info():
 		if set(roles).issubset({"Employee", "Employee Self Service"}):
 			has_desk_access = False
 
-	has_payroll_permission = frappe.has_permission(
+	has_payroll_permission = frappe.has_permission(  # nosemgrep: return value IS used in the or-expression
 		"Payroll Entry", "create"
 	) or "HR Manager" in frappe.get_roles(user)
 
@@ -1478,7 +1477,7 @@ def setup_payroll_for_company():
 
 
 @frappe.whitelist()
-def get_payroll_summary(month=None, year=None):
+def get_payroll_summary(month: int | None = None, year: int | None = None):
 	"""Get payroll summary for the company. Requires HR Manager or Payroll permission."""
 	user = frappe.session.user
 	if not (frappe.has_permission("Salary Slip", "read") or "HR Manager" in frappe.get_roles(user)):
@@ -1533,7 +1532,7 @@ def get_team_leaves():
 
 
 @frappe.whitelist()
-def process_leave(leave_application, status, rejection_reason=None):
+def process_leave(leave_application: str, status: str, rejection_reason: str | None = None):
 	"""Approve or Reject a leave application.
 
 	Bug 3 fix: Ensures leave balance is deducted on approval by properly

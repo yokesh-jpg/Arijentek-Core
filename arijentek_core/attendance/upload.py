@@ -62,9 +62,7 @@ def _import_attendance_rows(rows):
 	if error:
 		frappe.db.rollback()
 	else:
-		frappe.db.commit()
-
-	return {"messages": ret, "error": error}
+		frappe.db.commit()  # nosemgrep: commit required after batch attendance upload
 
 
 @frappe.whitelist()

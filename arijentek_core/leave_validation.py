@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 from frappe.utils import getdate, today
 
 
@@ -23,6 +24,8 @@ def validate_leave_date(doc, method):
 
 	if leave_from_date < first_day_current_month:
 		frappe.throw(
-			"You cannot apply for leave for a past month.<br>"
-			"Please select a date in the current month or the future."
+			_(
+				"You cannot apply for leave for a past month.<br>"
+				"Please select a date in the current month or the future."
+			)
 		)

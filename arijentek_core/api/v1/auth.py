@@ -6,7 +6,7 @@ LOGIN_RATE_LIMIT = 5
 LOGIN_RATE_LIMIT_SECONDS = 60
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET"])
+@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: CSRF token must be accessible to guests
 def get_csrf_token():
 	"""Return the CSRF token for the current session.
 
@@ -16,9 +16,9 @@ def get_csrf_token():
 	return frappe.sessions.get_csrf_token()
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist(allow_guest=True)  # nosemgrep: login endpoint must be accessible to guests
 @rate_limit(limit=LOGIN_RATE_LIMIT, seconds=LOGIN_RATE_LIMIT_SECONDS)
-def login(usr, pwd):
+def login(usr: str, pwd: str):
 	usr = _sanitize_input(usr)
 
 	if not usr or not pwd:

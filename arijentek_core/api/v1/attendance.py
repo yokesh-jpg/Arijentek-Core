@@ -11,7 +11,7 @@ MAX_SHIFT_HOURS = 12
 
 @frappe.whitelist()
 @user_rate_limit(limit=ATTENDANCE_RATE_LIMIT, seconds=ATTENDANCE_RATE_LIMIT_SECONDS)
-def punch(employee=None, timestamp=None):
+def punch(employee: str | None = None, timestamp: str | None = None):
 	"""Punch endpoint with enforcement: one IN + one OUT per day, 12hr max."""
 	employee = _validate_and_get_employee(employee)
 	timestamp = _validate_timestamp(timestamp)
@@ -56,7 +56,7 @@ def punch(employee=None, timestamp=None):
 		}
 	)
 	checkin.insert()
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: commit required so attendance sync reads the new checkin
 
 	# Auto-sync attendance after punch
 	from arijentek_core.attendance.auto_attendance import sync_attendance_after_clock
@@ -68,7 +68,7 @@ def punch(employee=None, timestamp=None):
 
 @frappe.whitelist()
 @user_rate_limit(limit=ATTENDANCE_RATE_LIMIT, seconds=ATTENDANCE_RATE_LIMIT_SECONDS)
-def get_status(employee=None):
+def get_status(employee: str | None = None):
 	employee = _validate_and_get_employee(employee)
 
 	last_checkin = frappe.db.get_all(
@@ -163,8 +163,7 @@ def get_dashboard_data():
 
 
 @frappe.whitelist()
-def get_attendance_records(month=None, year=None):
-	"""Get attendance records for current month"""
+def get_attendance_records(month: int | None = None, year: int | None = None):
 	employee = _validate_and_get_employee()
 
 	if not month or not year:

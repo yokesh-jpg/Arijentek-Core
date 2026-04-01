@@ -53,7 +53,7 @@ def mark_attendance_for_month(month=None, year=None):
 		_mark_attendance_for_date(current)
 		current = add_days(current, 1)
 
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: batch daily attendance must persist before next day's run
 
 
 def _mark_attendance_for_date(att_date):
@@ -73,7 +73,7 @@ def _mark_attendance_for_date(att_date):
 				f"Daily Attendance Error for {emp.name} on {att_date}",
 			)
 
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: persist attendance batch after processing all employees
 
 
 def _process_employee_date(emp, att_date):

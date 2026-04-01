@@ -199,7 +199,7 @@ def sync_today_attendance():
 
 
 @frappe.whitelist()
-def sync_date_range(from_date, to_date, employee=None):
+def sync_date_range(from_date: str, to_date: str, employee: str | None = None):
 	"""
 	Sync attendance for a date range.
 	BUG FIX 3: Added Role Guard.
@@ -230,7 +230,7 @@ def sync_date_range(from_date, to_date, employee=None):
 
 
 @frappe.whitelist()
-def get_employee_attendance(employee, month=None, year=None):
+def get_employee_attendance(employee: str, month: int | None = None, year: int | None = None):
 	"""
 	Get attendance summary for employee.
 	BUG FIX 5: Object Level Permission Check.

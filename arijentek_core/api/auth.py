@@ -25,7 +25,7 @@ def validate_password_policy(password):
 
 @frappe.whitelist()
 @rate_limit(limit=5, seconds=60)
-def change_password(old_password, new_password):
+def change_password(old_password: str, new_password: str):
 	"""Change current user's password"""
 	user = frappe.session.user
 	if user == "Guest":

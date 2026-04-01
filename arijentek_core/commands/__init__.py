@@ -23,7 +23,7 @@ def upload_attendance(context: CliCtxObj, file_path: str):
 
 	site = get_site(context)
 
-	with open(file_path, "rb") as f:
+	with open(file_path, "rb") as f:  # nosemgrep: CLI command reads user-specified CSV for attendance import
 		content = f.read()
 
 	rows = read_csv_content(content)

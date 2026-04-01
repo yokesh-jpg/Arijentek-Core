@@ -188,7 +188,9 @@ class PayslipGenerator:
 
 
 @frappe.whitelist()
-def generate_payslip_for_employee(employee, month=None, year=None, submit=False):
+def generate_payslip_for_employee(
+	employee: str, month: int | None = None, year: int | None = None, submit: bool = False
+):
 	"""
 	Generate a salary slip for a single employee.
 
@@ -228,8 +230,7 @@ def generate_payslip_for_employee(employee, month=None, year=None, submit=False)
 
 
 @frappe.whitelist()
-def delete_my_payslip(name):
-	"""
+def delete_my_payslip(name: str):
 	Delete a user's payslip.
 
 	Args:
@@ -264,7 +265,9 @@ def delete_my_payslip(name):
 
 
 @frappe.whitelist()
-def generate_payroll_for_month(month=None, year=None, company=None, submit=False):
+def generate_payroll_for_month(
+	month: int | None = None, year: int | None = None, company: str | None = None, submit: bool = False
+):
 	"""
 	Generate salary slips for all eligible employees for a month.
 
@@ -300,7 +303,7 @@ def generate_payroll_for_month(month=None, year=None, company=None, submit=False
 
 
 @frappe.whitelist()
-def get_payslip_details(name):
+def get_payslip_details(name: str):
 	"""
 	Get detailed payslip information for display.
 
@@ -427,7 +430,7 @@ def _get_attendance_summary_for_slip(slip):
 
 
 @frappe.whitelist()
-def get_employee_payslips(employee, limit=12):
+def get_employee_payslips(employee: str, limit: int = 12):
 	"""
 	Get list of salary slips for an employee.
 
@@ -471,7 +474,7 @@ def get_employee_payslips(employee, limit=12):
 
 
 @frappe.whitelist()
-def download_payslip_pdf(name):
+def download_payslip_pdf(name: str):
 	"""
 	Generate and download PDF for a salary slip.
 
@@ -546,7 +549,7 @@ def download_payslip_pdf(name):
 
 
 @frappe.whitelist()
-def get_payroll_dashboard_data(employee):
+def get_payroll_dashboard_data(employee: str):
 	"""
 	Get payroll dashboard data for an employee.
 
