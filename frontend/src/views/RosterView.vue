@@ -1,13 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { attendanceApi } from "../services/api";
-import {
-  CalendarDays,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Users,
-} from "lucide-vue-next";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Users } from "lucide-vue-next";
 
 const loading = ref(true);
 
@@ -226,7 +220,10 @@ onMounted(loadData);
             <tr class="border-b border-white/[0.06]">
               <th
                 class="sticky left-0 z-10 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 min-w-[180px]"
-                :style="{ backgroundColor: 'var(--surface)', borderRight: '1px solid var(--border-color)' }"
+                :style="{
+                  backgroundColor: 'var(--surface)',
+                  borderRight: '1px solid var(--border-color)',
+                }"
               >
                 Employee
               </th>
@@ -237,7 +234,10 @@ onMounted(loadData);
                 :style="{ color: d.is_weekend ? 'var(--accent)' : 'var(--text-tertiary)' }"
               >
                 <div>{{ d.weekday.charAt(0) }}</div>
-                <div class="text-[11px] font-bold" :style="{ color: d.is_weekend ? 'var(--accent)' : 'var(--text-secondary)' }">
+                <div
+                  class="text-[11px] font-bold"
+                  :style="{ color: d.is_weekend ? 'var(--accent)' : 'var(--text-secondary)' }"
+                >
                   {{ d.day }}
                 </div>
               </th>
@@ -251,7 +251,10 @@ onMounted(loadData);
             >
               <td
                 class="sticky left-0 z-10 px-4 py-3"
-                :style="{ backgroundColor: 'var(--surface)', borderRight: '1px solid var(--border-color)' }"
+                :style="{
+                  backgroundColor: 'var(--surface)',
+                  borderRight: '1px solid var(--border-color)',
+                }"
               >
                 <p class="text-sm font-medium text-white truncate max-w-[160px]">
                   {{ emp.employee_name }}

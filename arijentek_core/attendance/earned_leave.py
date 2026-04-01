@@ -10,7 +10,7 @@ This fixes Bug 4: Earned leave not correctly updated.
 """
 
 import frappe
-from frappe.utils import getdate, today, flt, nowdate
+from frappe.utils import flt, getdate, nowdate, today
 
 
 def sync_earned_leave_allocations():
@@ -110,9 +110,7 @@ def _sync_employee_earned_leave(employee, date_of_joining):
 
 	if alloc_name:
 		# Update existing allocation
-		current_alloc = frappe.db.get_value(
-			"Leave Allocation", alloc_name, "new_leaves_allocated"
-		)
+		current_alloc = frappe.db.get_value("Leave Allocation", alloc_name, "new_leaves_allocated")
 		if flt(current_alloc) != earned_days:
 			try:
 				alloc_doc = frappe.get_doc("Leave Allocation", alloc_name)

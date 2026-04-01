@@ -42,7 +42,10 @@ const timerDisplay = computed(() => {
   const h = Math.floor(elapsed.value / 3600);
   const m = Math.floor((elapsed.value % 3600) / 60);
   const s = elapsed.value % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(
+    2,
+    "0"
+  )}`;
 });
 
 // Break timer display MM:SS
@@ -122,7 +125,7 @@ async function fetchStatus() {
       isClockedIn.value = false;
       clockInTime.value = new Date(data.clock_in);
       elapsed.value = Math.floor(
-        (new Date(data.clock_out).getTime() - new Date(data.clock_in).getTime()) / 1000,
+        (new Date(data.clock_out).getTime() - new Date(data.clock_in).getTime()) / 1000
       );
       stopTimer();
     } else if (data.clock_in && !data.clock_out) {
@@ -302,12 +305,12 @@ const emit = defineEmits<{ punched: [] }>();
           isCompleted
             ? 'bg-emerald-500/15 text-emerald-400 cursor-default'
             : onBreak
-              ? 'bg-amber-500/10 text-amber-400 cursor-default'
-              : isClockedIn
-                ? shiftComplete
-                  ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
-                  : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
-                : 'bg-white/[0.05] text-slate-300 hover:bg-white/[0.08] hover:text-white',
+            ? 'bg-amber-500/10 text-amber-400 cursor-default'
+            : isClockedIn
+            ? shiftComplete
+              ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
+              : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
+            : 'bg-white/[0.05] text-slate-300 hover:bg-white/[0.08] hover:text-white',
         ]"
         :style="isClockedIn || isCompleted || onBreak ? { boxShadow: `0 0 40px ${glowColor}` } : {}"
       >
@@ -384,9 +387,7 @@ const emit = defineEmits<{ punched: [] }>();
       <p v-if="isCompleted && clockInTimeFormatted" class="text-sm text-slate-400">
         Worked <span class="text-white font-medium">{{ timerDisplay }}</span> today
       </p>
-      <p v-else-if="onBreak" class="text-sm text-amber-400/80">
-        Break started · Timer paused
-      </p>
+      <p v-else-if="onBreak" class="text-sm text-amber-400/80">Break started · Timer paused</p>
       <p v-else-if="isClockedIn && clockInTimeFormatted" class="text-sm text-slate-400">
         Clocked in at <span class="text-white font-medium">{{ clockInTimeFormatted }}</span>
       </p>

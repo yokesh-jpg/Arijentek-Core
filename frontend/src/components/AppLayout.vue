@@ -47,7 +47,7 @@ const navItems = computed(() => {
 });
 
 const currentNav = computed(
-  () => navItems.value.find((n) => n.path === route.path)?.name || "Dashboard",
+  () => navItems.value.find((n) => n.path === route.path)?.name || "Dashboard"
 );
 
 function navigate(path: string) {

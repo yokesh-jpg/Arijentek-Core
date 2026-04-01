@@ -1,5 +1,5 @@
 """
-Arijentek Core – Post-install / Post-migrate setup.
+Arijentek Core - Post-install / Post-migrate setup.
 
 Creates the "Employee Portal" workspace in the Frappe Desk sidebar with
 shortcuts to the portal and related DocTypes (Holiday List, Leave
@@ -11,7 +11,6 @@ Runs both:
 """
 
 import frappe
-
 
 # ── Public hooks ──────────────────────────────────────────────────────
 
@@ -41,7 +40,7 @@ def _setup_employee_portal():
 def _ensure_employee_role():
 	"""Make sure the Employee role exists and Website Users with it are
 	properly restricted (desk_access=0 for Website Users via role config
-	is irrelevant – Frappe blocks them by user_type).
+	is irrelevant - Frappe blocks them by user_type).
 
 	We do NOT set desk_access=1 here because Website Users should NOT
 	reach the desk.  System Users already have desk access via their

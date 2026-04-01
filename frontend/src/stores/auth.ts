@@ -219,23 +219,29 @@ export const useAuthStore = defineStore("auth", () => {
   function _startKeepAlive() {
     _stopKeepAlive();
     if (!isLoggedIn.value) return;
-    keepAliveInterval = setInterval(async () => {
-      if (!isLoggedIn.value) { _stopKeepAlive(); return; }
-      try {
-        const res = await fetch("/api/method/frappe.auth.get_logged_user", {
-          method: "GET",
-          headers: { Accept: "application/json" },
-          credentials: "include",
-        });
-        if (!res.ok) {
-          // Session expired server-side — force re-login
-          _resetToGuest();
-          window.location.href = "/employee-portal#/login";
+    keepAliveInterval = setInterval(
+      async () => {
+        if (!isLoggedIn.value) {
+          _stopKeepAlive();
+          return;
         }
-      } catch {
-        // Network error — ignore, will retry in 30 min
-      }
-    }, 30 * 60 * 1000); // 30 minutes
+        try {
+          const res = await fetch("/api/method/frappe.auth.get_logged_user", {
+            method: "GET",
+            headers: { Accept: "application/json" },
+            credentials: "include",
+          });
+          if (!res.ok) {
+            // Session expired server-side — force re-login
+            _resetToGuest();
+            window.location.href = "/employee-portal#/login";
+          }
+        } catch {
+          // Network error — ignore, will retry in 30 min
+        }
+      },
+      30 * 60 * 1000,
+    ); // 30 minutes
   }
 
   function _stopKeepAlive() {

@@ -11,10 +11,12 @@ This module creates Salary Slip documents in ERPNext with proper
 attendance-based calculations.
 """
 
+import calendar
+
 import frappe
 from frappe import _
-from frappe.utils import getdate, get_first_day, get_last_day, flt, cint, now_datetime, money_in_words
-import calendar
+from frappe.utils import cint, flt, get_first_day, get_last_day, getdate, money_in_words, now_datetime
+
 from arijentek_core.payroll.calculator import PayrollCalculator, get_lop_summary
 
 
@@ -84,9 +86,7 @@ class PayslipGenerator:
 			)
 
 			if existing:
-				frappe.msgprint(
-					_("Salary Slip already exists for {0}: {1}").format(employee, existing)
-				)
+				frappe.msgprint(_("Salary Slip already exists for {0}: {1}").format(employee, existing))
 				return frappe.get_doc("Salary Slip", existing)
 
 			# Calculate payroll using our calculator
@@ -221,7 +221,9 @@ def generate_payslip_for_employee(employee, month=None, year=None, submit=False)
 		}
 		return {
 			"success": False,
-			"error": generator.failed_employees[0]["error"] if generator.failed_employees else "Unknown error",
+			"error": generator.failed_employees[0]["error"]
+			if generator.failed_employees
+			else "Unknown error",
 		}
 
 
@@ -229,33 +231,33 @@ def generate_payslip_for_employee(employee, month=None, year=None, submit=False)
 def delete_my_payslip(name):
 	"""
 	Delete a user's payslip.
-	
+
 	Args:
 		name: Salary Slip name
 	"""
 	if not name:
 		return {"success": False, "error": "Name is required"}
-		
+
 	try:
 		if not frappe.db.exists("Salary Slip", name):
 			return {"success": False, "error": "Salary Slip not found"}
-			
+
 		slip = frappe.get_doc("Salary Slip", name)
-		
+
 		# Verify ownership
 		employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
 		if not employee or slip.employee != employee:
 			return {"success": False, "error": "Not authorized to delete this payslip"}
-			
+
 		# Cancel if submitted
 		if slip.docstatus == 1:
 			slip.cancel()
-			
+
 		# Delete
 		frappe.delete_doc("Salary Slip", name)
-		
+
 		return {"success": True, "message": "Payslip deleted successfully"}
-		
+
 	except Exception as e:
 		frappe.log_error(f"Error deleting payslip {name}: {e}", "Payslip Delete Error")
 		return {"success": False, "error": str(e)}
@@ -293,9 +295,7 @@ def generate_payroll_for_month(month=None, year=None, company=None, submit=False
 		"failed_employees": result["failed"],
 		"total_created": result["total_created"],
 		"total_failed": result["total_failed"],
-		"message": _("Generated {0} salary slips for {1}/{2}").format(
-			result["total_created"], month, year
-		),
+		"message": _("Generated {0} salary slips for {1}/{2}").format(result["total_created"], month, year),
 	}
 
 
@@ -321,19 +321,23 @@ def get_payslip_details(name):
 	# Format earnings and deductions
 	earnings = []
 	for e in slip.earnings:
-		earnings.append({
-			"component": e.salary_component,
-			"abbr": e.abbr,
-			"amount": flt(e.amount, 2),
-		})
+		earnings.append(
+			{
+				"component": e.salary_component,
+				"abbr": e.abbr,
+				"amount": flt(e.amount, 2),
+			}
+		)
 
 	deductions = []
 	for d in slip.deductions:
-		deductions.append({
-			"component": d.salary_component,
-			"abbr": d.abbr,
-			"amount": flt(d.amount, 2),
-		})
+		deductions.append(
+			{
+				"component": d.salary_component,
+				"abbr": d.abbr,
+				"amount": flt(d.amount, 2),
+			}
+		)
 
 	return {
 		"name": slip.name,
@@ -384,7 +388,7 @@ def _get_month_year(month, year):
 	# Validation: Cannot generate for current or future months
 	requested_date = getdate(f"{year}-{month:02d}-01")
 	current_month_start = getdate(f"{today.year}-{today.month:02d}-01")
-	
+
 	if requested_date >= current_month_start:
 		frappe.throw(_("Payslips can only be generated for completed previous months."))
 
@@ -449,17 +453,19 @@ def get_employee_payslips(employee, limit=12):
 
 	result = []
 	for slip in slips:
-		result.append({
-			"name": slip.name,
-			"start_date": str(slip.start_date),
-			"end_date": str(slip.end_date),
-			"month": getdate(slip.start_date).strftime("%B"),
-			"year": getdate(slip.start_date).year,
-			"gross_pay": flt(slip.gross_pay, 2),
-			"net_pay": flt(slip.net_pay, 2),
-			"total_deduction": flt(slip.total_deduction, 2),
-			"status": "Submitted" if slip.docstatus == 1 else "Draft",
-		})
+		result.append(
+			{
+				"name": slip.name,
+				"start_date": str(slip.start_date),
+				"end_date": str(slip.end_date),
+				"month": getdate(slip.start_date).strftime("%B"),
+				"year": getdate(slip.start_date).year,
+				"gross_pay": flt(slip.gross_pay, 2),
+				"net_pay": flt(slip.net_pay, 2),
+				"total_deduction": flt(slip.total_deduction, 2),
+				"status": "Submitted" if slip.docstatus == 1 else "Draft",
+			}
+		)
 
 	return result
 
@@ -478,23 +484,21 @@ def download_payslip_pdf(name):
 	slip = frappe.get_doc("Salary Slip", name)
 
 	# Verify access
-	employee = frappe.db.get_value(
-		"Employee", {"user_id": frappe.session.user}, "name"
-	)
+	employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
 	if not employee or (slip.employee != employee and not frappe.has_permission("Salary Slip", "read")):
 		frappe.throw(_("Not authorized to view this payslip"))
 
 	# Generate PDF
+	from frappe.utils import formatdate
 	from frappe.utils.pdf import get_pdf
-	from frappe.utils import formatdate, money_in_words
 
 	# Prepare Context
 	company_doc = frappe.get_doc("Company", slip.company)
 	company_logo = company_doc.company_logo
-	
+
 	# Handle logo URL if relative
 	if company_logo and company_logo.startswith("/"):
-		# In PDF generation, sometimes we need full URL or file path. 
+		# In PDF generation, sometimes we need full URL or file path.
 		# But usually get_pdf handles relative paths if host is set.
 		# Let's assume standard behavior.
 		pass
@@ -506,12 +510,12 @@ def download_payslip_pdf(name):
 		"now_date": formatdate(now_datetime()),
 		"currency_symbol": frappe.db.get_value("Currency", slip.currency, "symbol") or "₹",
 	}
-	
+
 	# Add amount in words to doc (monkey patch for template)
 	slip.net_pay_in_words = money_in_words(slip.net_pay, slip.currency)
 
 	html = frappe.render_template("arijentek_core/templates/simple_payslip.html", context)
-	
+
 	# PDF Kit Options - Minimal set for unpatched wkhtmltopdf
 	options = {
 		"page-size": "A4",
@@ -522,9 +526,9 @@ def download_payslip_pdf(name):
 		"encoding": "UTF-8",
 		"quiet": "",
 		"no-outline": None,
-		"disable-smart-shrinking": None, # Sometimes causes issues, but standard
+		"disable-smart-shrinking": None,  # Sometimes causes issues, but standard
 	}
-	
+
 	# Try-catch specifically for PDF generation to return clearer error
 	try:
 		pdf = get_pdf(html, options=options)
@@ -556,7 +560,7 @@ def get_payroll_dashboard_data(employee):
 	# YTD totals
 	ytd_data = frappe.db.sql(
 		"""
-		SELECT 
+		SELECT
 			COALESCE(SUM(gross_pay), 0) as gross_pay,
 			COALESCE(SUM(net_pay), 0) as net_pay,
 			COALESCE(SUM(total_deduction), 0) as total_deduction,
@@ -589,7 +593,7 @@ def get_payroll_dashboard_data(employee):
 	# Monthly breakdown for the year
 	monthly_breakdown = frappe.db.sql(
 		"""
-		SELECT 
+		SELECT
 			MONTH(start_date) as month,
 			YEAR(start_date) as year,
 			gross_pay,
@@ -605,18 +609,33 @@ def get_payroll_dashboard_data(employee):
 		as_dict=True,
 	)
 
-	month_names = ["", "January", "February", "March", "April", "May", "June",
-				   "July", "August", "September", "October", "November", "December"]
+	month_names = [
+		"",
+		"January",
+		"February",
+		"March",
+		"April",
+		"May",
+		"June",
+		"July",
+		"August",
+		"September",
+		"October",
+		"November",
+		"December",
+	]
 
 	monthly_data = []
 	for m in monthly_breakdown:
-		monthly_data.append({
-			"month": month_names[m.month],
-			"year": m.year,
-			"gross_pay": flt(m.gross_pay, 2),
-			"net_pay": flt(m.net_pay, 2),
-			"total_deduction": flt(m.total_deduction, 2),
-		})
+		monthly_data.append(
+			{
+				"month": month_names[m.month],
+				"year": m.year,
+				"gross_pay": flt(m.gross_pay, 2),
+				"net_pay": flt(m.net_pay, 2),
+				"total_deduction": flt(m.total_deduction, 2),
+			}
+		)
 
 	return {
 		"ytd": {
@@ -631,6 +650,8 @@ def get_payroll_dashboard_data(employee):
 			"year": getdate(latest_slip[0].start_date).year,
 			"gross_pay": flt(latest_slip[0].gross_pay, 2),
 			"net_pay": flt(latest_slip[0].net_pay, 2),
-		} if latest_slip else None,
+		}
+		if latest_slip
+		else None,
 		"monthly_breakdown": monthly_data,
 	}

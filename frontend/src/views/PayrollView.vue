@@ -45,7 +45,7 @@ const slips = ref<SalarySlip[]>([]);
 const totalNet = computed(() => slips.value.reduce((s, sl) => s + (sl.net_pay || 0), 0));
 const totalGross = computed(() => slips.value.reduce((s, sl) => s + (sl.gross_pay || 0), 0));
 const avgNet = computed(() =>
-  slips.value.length ? Math.round(totalNet.value / slips.value.length) : 0,
+  slips.value.length ? Math.round(totalNet.value / slips.value.length) : 0
 );
 
 function formatCurrency(val: number) {

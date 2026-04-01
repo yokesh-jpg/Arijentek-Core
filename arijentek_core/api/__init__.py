@@ -1,8 +1,10 @@
+from datetime import datetime, timedelta
+
 import frappe
 from frappe import _
-from frappe.utils import nowdate, now_datetime, getdate, get_first_day, get_last_day, flt
+from frappe.utils import flt, get_first_day, get_last_day, getdate, now_datetime, nowdate
+
 from arijentek_core.api.rate_limiter import user_rate_limit
-from datetime import datetime, timedelta
 
 # ============ DASHBOARD ============
 
@@ -143,9 +145,9 @@ def get_today_checkin():
 	"""Get today's check-in status.
 
 	Returns:
-	  clock_in  – ISO timestamp of the single IN log (or None)
-	  clock_out – ISO timestamp of the single OUT log (or None)
-	  completed – True if the employee has already clocked in AND out today
+	  clock_in  - ISO timestamp of the single IN log (or None)
+	  clock_out - ISO timestamp of the single OUT log (or None)
+	  completed - True if the employee has already clocked in AND out today
 	"""
 	employee = get_current_employee()
 	if not employee:
@@ -858,7 +860,8 @@ def generate_payroll(month=None, year=None):
 	if not (frappe.has_permission("Payroll Entry", "create") or "HR Manager" in frappe.get_roles(user)):
 		return {"success": False, "error": "Not authorized to generate payroll"}
 
-	from frappe.utils import getdate, get_first_day, get_last_day
+	from frappe.utils import get_first_day, get_last_day, getdate
+
 	from arijentek_core.payroll.payslip_generator import generate_payroll_for_month
 
 	today = getdate()
@@ -952,11 +955,12 @@ def generate_my_payslip(month=None, year=None):
 			month = 12
 			year -= 1
 	except (ValueError, TypeError) as e:
-		return {"success": False, "error": f"Invalid month or year: {str(e)}"}
+		return {"success": False, "error": f"Invalid month or year: {e!s}"}
 
 	# Import and call the payslip generator
-	from arijentek_core.payroll.payslip_generator import PayslipGenerator
 	from frappe.utils import get_first_day, get_last_day
+
+	from arijentek_core.payroll.payslip_generator import PayslipGenerator
 
 	try:
 		# Get pay period dates
@@ -988,7 +992,7 @@ def generate_my_payslip(month=None, year=None):
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), f"Payslip Generation Error - {employee}")
-		return {"success": False, "error": f"Failed to generate payslip: {str(e)}"}
+		return {"success": False, "error": f"Failed to generate payslip: {e!s}"}
 
 
 # ============ ATTENDANCE SUMMARY & RECORDS ============
@@ -1085,6 +1089,7 @@ def get_attendance_records(month=None, year=None):
 		"period": {"start": str(start_date), "end": str(end_date), "month": month, "year": year},
 	}
 
+
 # ============ ROSTER ============
 
 
@@ -1092,7 +1097,7 @@ def get_attendance_records(month=None, year=None):
 def get_roster_data(month=None, year=None):
 	"""Get roster data for the current employee's department/team.
 
-	Returns a grid of employees × dates with shift assignments,
+	Returns a grid of employees x dates with shift assignments,
 	attendance status, holidays, and weekly offs.
 	"""
 	import calendar
@@ -1106,9 +1111,7 @@ def get_roster_data(month=None, year=None):
 	year = int(year) if year else today.year
 
 	# Get employee's department
-	emp_info = frappe.db.get_value(
-		"Employee", employee, ["department", "company"], as_dict=True
-	)
+	emp_info = frappe.db.get_value("Employee", employee, ["department", "company"], as_dict=True)
 	department = emp_info.get("department") if emp_info else None
 
 	# Get employees in the same department (or all if no department)
@@ -1133,12 +1136,14 @@ def get_roster_data(month=None, year=None):
 	dates = []
 	current = start_date
 	while current <= end_date:
-		dates.append({
-			"date": str(current),
-			"day": current.day,
-			"weekday": current.strftime("%a"),
-			"is_weekend": current.weekday() in (5, 6),
-		})
+		dates.append(
+			{
+				"date": str(current),
+				"day": current.day,
+				"weekday": current.strftime("%a"),
+				"is_weekend": current.weekday() in (5, 6),
+			}
+		)
 		current = frappe.utils.add_days(current, 1)
 
 	# Get holidays
@@ -1202,19 +1207,23 @@ def get_roster_data(month=None, year=None):
 			else:
 				status = "A"  # No record = Absent
 
-			emp_dates.append({
-				"date": d["date"],
-				"status": status,
-				"hours": att["hours"] if att else 0,
-			})
+			emp_dates.append(
+				{
+					"date": d["date"],
+					"status": status,
+					"hours": att["hours"] if att else 0,
+				}
+			)
 
-		roster.append({
-			"employee": emp.name,
-			"employee_name": emp.employee_name,
-			"designation": emp.designation or "",
-			"shift": emp.default_shift or "General",
-			"dates": emp_dates,
-		})
+		roster.append(
+			{
+				"employee": emp.name,
+				"employee_name": emp.employee_name,
+				"designation": emp.designation or "",
+				"shift": emp.default_shift or "General",
+				"dates": emp_dates,
+			}
+		)
 
 	return {
 		"employees": roster,
@@ -1334,7 +1343,7 @@ def get_session_info():
 		)
 
 	user_type = frappe.db.get_value("User", user, "user_type") or ""
-	
+
 	has_desk_access = user_type == "System User"
 	if has_desk_access:
 		# Feature 3: If user ONLY has Employee and Employee Self Service roles,
@@ -1546,11 +1555,7 @@ def process_leave(leave_application, status, rejection_reason=None):
 		applicant = frappe.get_value("Employee", doc.employee, "reports_to")
 		user_roles = frappe.get_roles()
 
-		if (
-			applicant != employee
-			and "System Manager" not in user_roles
-			and "HR Manager" not in user_roles
-		):
+		if applicant != employee and "System Manager" not in user_roles and "HR Manager" not in user_roles:
 			return {"success": False, "error": "Not authorized to process this application"}
 
 		if doc.status != "Open":

@@ -19,7 +19,7 @@ The attendance is marked as:
 """
 
 import frappe
-from frappe.utils import getdate, add_days
+from frappe.utils import add_days, getdate
 
 
 def on_employee_checkin_insert(doc, method):

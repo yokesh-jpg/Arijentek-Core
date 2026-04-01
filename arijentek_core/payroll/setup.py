@@ -97,36 +97,30 @@ def _set_component_account(component_name, company, component_type):
 	# Get default accounts for the company
 	if component_type == "Earning":
 		account_name = f"Salary - {company}"
-		account_type = "Expense Account"
 	else:
 		account_name = f"Salary Deductions - {company}"
-		account_type = "Liability Account"
 
 	# Check if account exists
-	account = frappe.db.get_value(
-		"Account",
-		{"company": company, "account_name": account_name},
-		"name"
-	)
+	account = frappe.db.get_value("Account", {"company": company, "account_name": account_name}, "name")
 
 	if not account:
 		return
 
 	# Check if component account already exists
-	existing = frappe.db.exists(
-		"Salary Component Account",
-		{"parent": component_name, "company": company}
-	)
+	existing = frappe.db.exists("Salary Component Account", {"parent": component_name, "company": company})
 
 	if existing:
 		return
 
 	# Add account to component
 	component = frappe.get_doc("Salary Component", component_name)
-	component.append("accounts", {
-		"company": company,
-		"account": account,
-	})
+	component.append(
+		"accounts",
+		{
+			"company": company,
+			"account": account,
+		},
+	)
 	component.save()
 
 
@@ -150,12 +144,14 @@ def create_default_salary_structure(company=None, name="Standard Salary Structur
 
 	# Create salary structure
 	structure = frappe.new_doc("Salary Structure")
-	structure.update({
-		"name": name,
-		"company": company,
-		"payroll_frequency": "Monthly",
-		"is_active": "Yes",
-	})
+	structure.update(
+		{
+			"name": name,
+			"company": company,
+			"payroll_frequency": "Monthly",
+			"is_active": "Yes",
+		}
+	)
 
 	# Add earnings
 	earnings = [
@@ -163,12 +159,15 @@ def create_default_salary_structure(company=None, name="Standard Salary Structur
 	]
 
 	for e in earnings:
-		structure.append("earnings", {
-			"salary_component": e["salary_component"],
-			"formula": e["formula"],
-			"idx": e["idx"],
-			"depends_on_payment_days": 1,
-		})
+		structure.append(
+			"earnings",
+			{
+				"salary_component": e["salary_component"],
+				"formula": e["formula"],
+				"idx": e["idx"],
+				"depends_on_payment_days": 1,
+			},
+		)
 
 	# Add deductions
 	deductions = [
@@ -176,13 +175,16 @@ def create_default_salary_structure(company=None, name="Standard Salary Structur
 	]
 
 	for d in deductions:
-		structure.append("deductions", {
-			"salary_component": d["salary_component"],
-			"formula": d.get("formula"),
-			"amount": d.get("amount"),
-			"idx": d["idx"],
-			"depends_on_payment_days": d.get("depends_on_payment_days", 1),
-		})
+		structure.append(
+			"deductions",
+			{
+				"salary_component": d["salary_component"],
+				"formula": d.get("formula"),
+				"amount": d.get("amount"),
+				"idx": d["idx"],
+				"depends_on_payment_days": d.get("depends_on_payment_days", 1),
+			},
+		)
 
 	structure.insert()
 	frappe.db.commit()
@@ -284,9 +286,9 @@ def get_payroll_setup_status(company=None):
 		"has_professional_tax": has_pt,
 		"has_provident_fund": has_pf,
 		"is_setup_complete": (
-			has_earnings and has_deductions and
-			len(structures) > 0 and
-			assignments[0].count > 0 if assignments else False
+			has_earnings and has_deductions and len(structures) > 0 and assignments[0].count > 0
+			if assignments
+			else False
 		),
 		"components": components,
 		"structures": structures,

@@ -49,7 +49,7 @@ const today = computed(() =>
     year: "numeric",
     month: "long",
     day: "numeric",
-  }),
+  })
 );
 
 const stats = computed(() => {

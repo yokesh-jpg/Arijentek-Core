@@ -11,9 +11,10 @@ Integrates with ERPNext's payroll system and extends it with:
 
 import frappe
 from frappe import _
-from frappe.utils import getdate, add_months, get_first_day, get_last_day, flt
-from arijentek_core.payroll.payslip_generator import PayslipGenerator, generate_payroll_for_month
+from frappe.utils import add_months, flt, get_first_day, get_last_day, getdate
+
 from arijentek_core.payroll.calculator import PayrollCalculator, get_lop_summary
+from arijentek_core.payroll.payslip_generator import PayslipGenerator, generate_payroll_for_month
 
 
 def generate_monthly_payroll(company=None, payroll_period=None, posting_date=None, dry_run=False):
@@ -360,7 +361,7 @@ def get_payroll_summary(company=None, month=None, year=None):
 	# Get salary slips for the period
 	slips = frappe.db.sql(
 		"""
-		SELECT 
+		SELECT
 			name, employee, employee_name, department,
 			gross_pay, net_pay, total_deduction,
 			working_days, payment_days

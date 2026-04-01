@@ -12,9 +12,10 @@ This fixes the bug where:
 - Weekly off (WO) days are not marked as Present
 """
 
-import frappe
-from frappe.utils import getdate, today, add_days, get_first_day, get_last_day
 from datetime import date as date_type
+
+import frappe
+from frappe.utils import add_days, get_first_day, get_last_day, getdate, today
 
 
 def mark_daily_attendance():
@@ -138,8 +139,9 @@ def _is_holiday_or_weekly_off(emp, att_date):
 		# Try to get from company
 		try:
 			from erpnext.setup.doctype.employee.employee import get_holiday_list_for_employee
+
 			holiday_list = get_holiday_list_for_employee(emp.name, raise_exception=False)
-		except (ImportError, Exception):
+		except ImportError, Exception:
 			pass
 
 	if not holiday_list:

@@ -1,6 +1,8 @@
-import frappe
 import re
+
+import frappe
 from frappe.rate_limiter import rate_limit
+
 
 def validate_password_policy(password):
 	"""
@@ -20,6 +22,7 @@ def validate_password_policy(password):
 		return "Password must contain at least one special character"
 	return None
 
+
 @frappe.whitelist()
 @rate_limit(limit=5, seconds=60)
 def change_password(old_password, new_password):
@@ -32,7 +35,7 @@ def change_password(old_password, new_password):
 		# Verify old password
 		if not frappe.utils.password.check_password(user, old_password):
 			return {"success": False, "error": "Incorrect old password"}
-		
+
 		# Prevent reuse
 		if old_password == new_password:
 			return {"success": False, "error": "New password cannot be the same as the old password"}
@@ -41,10 +44,11 @@ def change_password(old_password, new_password):
 		policy_error = validate_password_policy(new_password)
 		if policy_error:
 			return {"success": False, "error": policy_error}
-		
+
 		from frappe.utils.password import update_password
+
 		update_password(user, new_password)
-		
+
 		return {"success": True}
 	except Exception as e:
 		return {"success": False, "error": str(e)}

@@ -31,7 +31,7 @@ onBeforeUnmount(() => {
 // Holidays month filter
 const _today = new Date();
 const holidaysMonthFilter = ref<string>(
-  `${_today.getFullYear()}-${String(_today.getMonth() + 1).padStart(2, "0")}`,
+  `${_today.getFullYear()}-${String(_today.getMonth() + 1).padStart(2, "0")}`
 );
 
 // Apply form
@@ -144,7 +144,7 @@ async function loadData() {
     () => leaveApi.getHolidays(from, to, true),
     (data) => {
       if (isMounted && Array.isArray(data)) holidays.value = data;
-    },
+    }
   );
 }
 

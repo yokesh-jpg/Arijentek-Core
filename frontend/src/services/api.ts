@@ -121,9 +121,7 @@ export const attendanceApi = {
   getBreakStatus: () => get("arijentek_core.api.get_break_status"),
   // Roster
   getRoster: (month?: number, year?: number) =>
-    get(
-      `arijentek_core.api.get_roster_data${month && year ? `?month=${month}&year=${year}` : ""}`,
-    ),
+    get(`arijentek_core.api.get_roster_data${month && year ? `?month=${month}&year=${year}` : ""}`),
 };
 
 // ---------- Leave ----------

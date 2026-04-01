@@ -61,7 +61,7 @@ const selectedMonthKey = computed({
 
 // Holiday month key for filtering
 const holidayMonthKey = computed(
-  () => `${selectedYear.value}-${String(selectedMonth.value).padStart(2, "0")}`,
+  () => `${selectedYear.value}-${String(selectedMonth.value).padStart(2, "0")}`
 );
 
 const filteredHolidays = computed(() => {
@@ -158,7 +158,7 @@ async function loadData() {
         summary.value = data.summary || {};
         loading.value = false;
       }
-    },
+    }
   );
 
   const holKey = `holidays_${y}`;
@@ -167,7 +167,7 @@ async function loadData() {
     () => leaveApi.getHolidays(`${y}-01-01`, `${y}-12-31`),
     (data) => {
       if (Array.isArray(data)) holidays.value = data;
-    },
+    }
   );
 }
 

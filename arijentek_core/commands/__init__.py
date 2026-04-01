@@ -2,7 +2,6 @@
 # License: MIT
 
 import click
-
 from frappe.commands import get_site, pass_context
 from frappe.utils.bench_helper import CliCtxObj
 
@@ -18,8 +17,9 @@ def upload_attendance(context: CliCtxObj, file_path: str):
 
 	  bench --site your-site upload-attendance /path/to/Attendance.csv
 	"""
-	from arijentek_core.attendance.upload import _import_attendance_rows
 	from frappe.utils.csvutils import read_csv_content
+
+	from arijentek_core.attendance.upload import _import_attendance_rows
 
 	site = get_site(context)
 
@@ -32,6 +32,7 @@ def upload_attendance(context: CliCtxObj, file_path: str):
 		raise SystemExit(1)
 
 	import frappe
+
 	frappe.init(site)
 	frappe.connect()
 

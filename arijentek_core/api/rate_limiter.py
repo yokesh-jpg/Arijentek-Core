@@ -1,6 +1,7 @@
+from functools import wraps
+
 import frappe
 from frappe import _
-from functools import wraps
 
 
 def user_rate_limit(limit=20, seconds=60):

@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from frappe.utils import now_datetime, nowdate
+
 from arijentek_core.api.rate_limiter import user_rate_limit
 
 ATTENDANCE_RATE_LIMIT = 10
