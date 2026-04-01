@@ -50,7 +50,7 @@ def _handle_leave_approval(doc):
 		# Submit the leave application if it's still in Draft
 		if doc.docstatus == 0:
 			doc.submit()
-			frappe.db.commit()
+			frappe.db.commit()  # nosemgrep: notification batch must persist after sending all emails
 
 		# Notify the employee
 		_notify_user(

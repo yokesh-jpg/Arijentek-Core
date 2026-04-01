@@ -231,7 +231,7 @@ def generate_payslip_for_employee(
 
 @frappe.whitelist()
 def delete_my_payslip(name: str):
-	Delete a user's payslip.
+	"""Delete a user's payslip.
 
 	Args:
 		name: Salary Slip name

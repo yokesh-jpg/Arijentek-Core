@@ -142,6 +142,7 @@ def process_payroll_entry(payroll_entry_name, submit_salary_slips=True):
 
 	payroll_entry.create_salary_slips()
 	frappe.db.commit()  # nosemgrep: salary slip creation must persist
+	if submit_salary_slips:
 		payroll_entry.submit_salary_slips()
 		frappe.db.commit()
 

@@ -76,7 +76,7 @@ def create_default_salary_components(company=None):
 		if company:
 			_set_component_account(doc.name, company, component["type"])
 
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: setup must persist all payroll components atomically
 
 	return {
 		"created": created_count,
@@ -187,7 +187,7 @@ def create_default_salary_structure(company=None, name="Standard Salary Structur
 		)
 
 	structure.insert()
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: payroll structure setup must persist
 
 	return {
 		"message": f"Created salary structure '{name}'",
@@ -196,7 +196,7 @@ def create_default_salary_structure(company=None, name="Standard Salary Structur
 
 
 @frappe.whitelist()
-def setup_payroll_for_company(company=None):
+def setup_payroll_for_company(company: str | None = None):
 	"""
 	Complete payroll setup for a company.
 

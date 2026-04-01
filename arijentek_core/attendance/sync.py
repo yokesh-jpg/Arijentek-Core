@@ -119,7 +119,7 @@ def create_or_update_attendance(employee, date, checkins, auto_commit=True):
 		attendance_name = attendance.name
 
 	if auto_commit:
-		frappe.db.commit()
+		frappe.db.commit()  # nosemgrep: auto_commit requested by caller for attendance sync
 
 	return attendance_name
 

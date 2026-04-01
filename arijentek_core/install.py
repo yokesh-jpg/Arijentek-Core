@@ -34,7 +34,7 @@ def _setup_employee_portal():
 	_ensure_module_def()
 	_create_workspace()
 	_set_session_expiry()
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: post-install setup must persist workspace and role config
 
 
 def _ensure_employee_role():
