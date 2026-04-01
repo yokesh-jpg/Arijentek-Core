@@ -283,8 +283,12 @@ on_session_creation = "arijentek_core.security.on_session_created"
 
 # --- Scheduled Tasks ---
 scheduler_events = {
+	"daily_long": [
+		"arijentek_core.attendance.daily_attendance.mark_daily_attendance",
+	],
 	"monthly": [
 		"arijentek_core.payroll.automation.run_monthly_payroll_automation",
+		"arijentek_core.attendance.earned_leave.sync_earned_leave_allocations",
 	],
 }
 

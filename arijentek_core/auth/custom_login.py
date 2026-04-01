@@ -16,29 +16,35 @@ def login(usr, pwd):
 	# Skip CSRF validation for this guest endpoint
 	frappe.local.flags.ignore_csrf = True
 
-	# 1. Check if username is actually an Employee ID
-	employee_doc = frappe.db.get_value("Employee", {"name": usr, "status": "Active"}, "user_id")
-	actual_usr = employee_doc if employee_doc else usr
+	try:
+		# 1. Check if username is actually an Employee ID
+		employee_doc = frappe.db.get_value("Employee", {"name": usr, "status": "Active"}, "user_id")
+		actual_usr = employee_doc if employee_doc else usr
 
-	# 2. Perform Standard Frappe Authentication
-	login_manager = LoginManager()
-	login_manager.authenticate(user=actual_usr, pwd=pwd)
-	login_manager.post_login()
+		# 2. Perform Standard Frappe Authentication
+		login_manager = LoginManager()
+		login_manager.authenticate(user=actual_usr, pwd=pwd)
+		login_manager.post_login()
 
-	# 3. Post-Login Redirect: EVERY user lands on Employee Portal first
-	home_page = "/employee-portal"
+		# 3. Post-Login Redirect: EVERY user lands on Employee Portal first
+		home_page = "/employee-portal"
 
-	# 4. Generate response with CSRF Token for subsequent requests
-	csrf_token = frappe.sessions.get_csrf_token()
+		# 4. Generate response with CSRF Token for subsequent requests
+		csrf_token = frappe.sessions.get_csrf_token()
 
-	# Get site URL for proper origins
-	site_url = get_site_url(frappe.local.site)
+		# Get site URL for proper origins
+		site_url = get_site_url(frappe.local.site)
 
-	return {
-		"message": "Logged In",
-		"home_page": home_page,
-		"full_name": frappe.utils.get_fullname(user),
-		"csrf_token": csrf_token,
-		"sid": frappe.session.sid,
-		"site_url": site_url,
-	}
+		return {
+			"message": "Logged In",
+			"home_page": home_page,
+			"full_name": frappe.utils.get_fullname(frappe.session.user),
+			"csrf_token": csrf_token,
+			"sid": frappe.session.sid,
+			"site_url": site_url,
+		}
+	except frappe.AuthenticationError:
+		raise
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Login Error")
+		frappe.throw(_("Login failed. Please try again."), frappe.AuthenticationError)

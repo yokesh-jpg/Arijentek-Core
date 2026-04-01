@@ -448,7 +448,13 @@ LEAVE_BALANCE_CATEGORIES = [
 
 
 def _get_earned_leave_balance(employee, today):
-	"""Calculate earned leave: 1 day per 20 working days since date of joining, minus used."""
+	"""Calculate earned leave: 1 day per 20 working days since date of joining, minus used.
+
+	Bug 4 fix:
+	- Half Day attendance now counts as 0.5 working days (was 1)
+	- Uses current leave period (calendar year) for calculation
+	- Properly accounts for used earned leave
+	"""
 	date_of_joining = frappe.db.get_value("Employee", employee, "date_of_joining")
 	if not date_of_joining:
 		return 0
@@ -458,20 +464,37 @@ def _get_earned_leave_balance(employee, today):
 	if date_of_joining > today_d:
 		return 0
 
-	# Count working days (Present + Half Day) from Attendance
-	working_days_result = frappe.db.sql(
+	# Count Present days as 1.0 and Half Day as 0.5
+	present_result = frappe.db.sql(
 		"""
 		SELECT COUNT(DISTINCT attendance_date) as days
 		FROM `tabAttendance`
 		WHERE employee = %s
 		AND docstatus = 1
 		AND attendance_date BETWEEN %s AND %s
-		AND status IN ('Present', 'Half Day')
+		AND status = 'Present'
 		""",
 		(employee, date_of_joining, today_d),
 		as_dict=True,
 	)
-	working_days = flt(working_days_result[0].days) if working_days_result else 0
+	present_days = flt(present_result[0].days) if present_result else 0
+
+	half_day_result = frappe.db.sql(
+		"""
+		SELECT COUNT(DISTINCT attendance_date) as days
+		FROM `tabAttendance`
+		WHERE employee = %s
+		AND docstatus = 1
+		AND attendance_date BETWEEN %s AND %s
+		AND status = 'Half Day'
+		""",
+		(employee, date_of_joining, today_d),
+		as_dict=True,
+	)
+	half_days = flt(half_day_result[0].days) if half_day_result else 0
+
+	# Total working days: Present counts as 1, Half Day as 0.5
+	working_days = present_days + (half_days * 0.5)
 
 	# Earned = floor(working_days / 20)
 	earned = int(working_days // 20)
@@ -1200,7 +1223,12 @@ def get_team_leaves():
 
 @frappe.whitelist()
 def process_leave(leave_application, status, rejection_reason=None):
-	"""Approve or Reject a leave application"""
+	"""Approve or Reject a leave application.
+
+	Bug 3 fix: Ensures leave balance is deducted on approval by properly
+	submitting the Leave Application with ignore_permissions, and creates
+	'On Leave' attendance records for the approved leave dates.
+	"""
 	if status not in ["Approved", "Rejected"]:
 		return {"success": False, "error": "Invalid status"}
 
@@ -1212,12 +1240,15 @@ def process_leave(leave_application, status, rejection_reason=None):
 		doc = frappe.get_doc("Leave Application", leave_application)
 
 		# Verify permission: Current employee must be the manager (reports_to)
-		# Or System Manager (but here we focus on hierarchy)
+		# or have HR Manager / System Manager role
 		applicant = frappe.get_value("Employee", doc.employee, "reports_to")
+		user_roles = frappe.get_roles()
 
-		# If applicant's manager is NOT the current employee, deny
-		# Note: In real world, might allow HR users too. For now, strict hierarchy.
-		if applicant != employee and "System Manager" not in frappe.get_roles():
+		if (
+			applicant != employee
+			and "System Manager" not in user_roles
+			and "HR Manager" not in user_roles
+		):
 			return {"success": False, "error": "Not authorized to process this application"}
 
 		if doc.status != "Open":
@@ -1225,11 +1256,18 @@ def process_leave(leave_application, status, rejection_reason=None):
 
 		if status == "Approved":
 			doc.status = "Approved"
-			doc.submit()  # Submitting makes it effective
+			doc.flags.ignore_permissions = True
+			doc.submit()  # HRMS Leave Application submit deducts leave balance
+			frappe.db.commit()
+
+			# Create "On Leave" attendance for each leave day
+			_create_on_leave_attendance(doc)
+
 		else:
 			doc.status = "Rejected"
-			# doc.reject() # workflow state depending on setup, but simpler:
+			doc.flags.ignore_permissions = True
 			doc.save(ignore_permissions=True)
+			frappe.db.commit()
 
 		# Notify Employee
 		try:
@@ -1241,4 +1279,48 @@ def process_leave(leave_application, status, rejection_reason=None):
 
 		return {"success": True}
 	except Exception as e:
-		return {"success": False, "error": str(e)}
+		frappe.log_error(frappe.get_traceback(), "Leave Process Error")
+		msg = str(e)
+		# Clean up error message for the user
+		if ":" in msg and len(msg) > 100:
+			msg = msg.split(":")[-1].strip()[:200]
+		return {"success": False, "error": msg}
+
+
+def _create_on_leave_attendance(leave_doc):
+	"""Create 'On Leave' attendance records for each day of an approved leave.
+
+	This ensures the attendance calendar shows leave days correctly
+	and the leave count is reflected in attendance summaries.
+	"""
+	from frappe.utils import add_days as _add_days
+
+	try:
+		current = getdate(leave_doc.from_date)
+		end = getdate(leave_doc.to_date)
+
+		while current <= end:
+			# Skip if attendance already exists
+			existing = frappe.db.exists(
+				"Attendance",
+				{"employee": leave_doc.employee, "attendance_date": current, "docstatus": ["!=", 2]},
+			)
+			if not existing:
+				att = frappe.new_doc("Attendance")
+				att.update(
+					{
+						"employee": leave_doc.employee,
+						"attendance_date": current,
+						"status": "On Leave",
+						"leave_type": leave_doc.leave_type,
+					}
+				)
+				att.flags.ignore_permissions = True
+				att.insert(ignore_permissions=True)
+				att.submit()
+
+			current = _add_days(current, 1)
+
+		frappe.db.commit()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "On Leave Attendance Creation Error")

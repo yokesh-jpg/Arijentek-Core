@@ -34,6 +34,7 @@ def _setup_employee_portal():
 	_ensure_employee_role()
 	_ensure_module_def()
 	_create_workspace()
+	_set_session_expiry()
 	frappe.db.commit()
 
 
@@ -170,3 +171,21 @@ def _expected_shortcuts():
 			)
 
 	return shortcuts
+
+
+def _set_session_expiry():
+	"""Set session expiry to 30 days (720 hours) to prevent premature logout.
+
+	Employees using the portal should not be logged out during their workday.
+	The default Frappe session expiry can be as short as 6-12 hours which
+	causes the 'auto logout after 12 hours' bug.
+	"""
+	try:
+		settings = frappe.get_single("System Settings")
+		current = settings.session_expiry or ""
+		# Only update if it's less than 720 hours
+		if not current or current < "720:00:00":
+			settings.session_expiry = "720:00:00"
+			settings.save(ignore_permissions=True)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "Session Expiry Setup Error")

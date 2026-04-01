@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { useAuthStore } from '../stores/auth';
-import { useOfflineStore } from '../stores/offline';
-import { attendanceApi } from '../services/api';
-import { WifiOff } from 'lucide-vue-next';
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import { useAuthStore } from "../stores/auth";
+import { useOfflineStore } from "../stores/offline";
+import { attendanceApi } from "../services/api";
+import { WifiOff } from "lucide-vue-next";
 
 const auth = useAuthStore();
 const offlineStore = useOfflineStore();
 const loading = ref(false);
-const error = ref('');
+const error = ref("");
 const isClockedIn = ref(false);
 const isCompleted = ref(false); // both IN and OUT done for the day
 const clockInTime = ref<Date | null>(null);
@@ -36,33 +36,33 @@ const timerDisplay = computed(() => {
   const h = Math.floor(elapsed.value / 3600);
   const m = Math.floor((elapsed.value % 3600) / 60);
   const s = elapsed.value % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 });
 
 // Clock-in time formatted
 const clockInTimeFormatted = computed(() => {
-  if (!clockInTime.value) return '';
-  return clockInTime.value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (!clockInTime.value) return "";
+  return clockInTime.value.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 });
 
 // Ring color: RED before 8 hrs → GREEN after 8 hrs (safe to clock out)
 const ringColor = computed(() => {
-  if (isCompleted.value) return '#22c55e'; // green – day complete
-  if (shiftComplete.value) return '#22c55e'; // green – safe to clock out
-  return '#ef4444'; // red – shift not complete
+  if (isCompleted.value) return "#22c55e"; // green – day complete
+  if (shiftComplete.value) return "#22c55e"; // green – safe to clock out
+  return "#ef4444"; // red – shift not complete
 });
 
 const glowColor = computed(() => {
-  if (isCompleted.value) return 'rgba(34, 197, 94, 0.35)';
-  if (shiftComplete.value) return 'rgba(34, 197, 94, 0.35)';
-  return 'rgba(239, 68, 68, 0.25)';
+  if (isCompleted.value) return "rgba(34, 197, 94, 0.35)";
+  if (shiftComplete.value) return "rgba(34, 197, 94, 0.35)";
+  return "rgba(239, 68, 68, 0.25)";
 });
 
 // Button label
 const buttonLabel = computed(() => {
-  if (isCompleted.value) return 'Day Complete';
-  if (isClockedIn.value) return 'Clock Out';
-  return 'Clock In';
+  if (isCompleted.value) return "Day Complete";
+  if (isClockedIn.value) return "Clock Out";
+  return "Clock In";
 });
 
 // Whether the button is disabled
@@ -98,7 +98,7 @@ async function fetchStatus() {
       isClockedIn.value = false;
       clockInTime.value = new Date(data.clock_in);
       elapsed.value = Math.floor(
-        (new Date(data.clock_out).getTime() - new Date(data.clock_in).getTime()) / 1000
+        (new Date(data.clock_out).getTime() - new Date(data.clock_in).getTime()) / 1000,
       );
       stopTimer();
     } else if (data.clock_in && !data.clock_out) {
@@ -121,7 +121,7 @@ async function fetchStatus() {
 async function handlePunch() {
   if (isCompleted.value) return;
   loading.value = true;
-  error.value = '';
+  error.value = "";
   try {
     // Offline check
     if (!navigator.onLine) {
@@ -141,8 +141,8 @@ async function handlePunch() {
     }
 
     const result = await attendanceApi.punch();
-    if (result.status === 'success') {
-      if (result.log_type === 'IN') {
+    if (result.status === "success") {
+      if (result.log_type === "IN") {
         isClockedIn.value = true;
         isCompleted.value = false;
         clockInTime.value = new Date(result.time);
@@ -154,12 +154,12 @@ async function handlePunch() {
         stopTimer();
         // Keep elapsed to show total worked
       }
-      emit('punched');
+      emit("punched");
     } else {
-      error.value = result.error || 'Punch failed';
+      error.value = result.error || "Punch failed";
     }
   } catch (e: any) {
-    error.value = e.message || 'Something went wrong';
+    error.value = e.message || "Something went wrong";
   } finally {
     loading.value = false;
   }
@@ -168,7 +168,7 @@ async function handlePunch() {
 onMounted(() => {
   fetchStatus();
   // Listen for online to sync
-  window.addEventListener('online', offlineStore.sync);
+  window.addEventListener("online", offlineStore.sync);
   setInterval(() => {
     // Periodic sync attempt if we have pending and are online
     if (navigator.onLine && offlineStore.pendingPunches.length) {
@@ -179,21 +179,23 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopTimer();
-  window.removeEventListener('online', offlineStore.sync);
+  window.removeEventListener("online", offlineStore.sync);
 });
 
 const emit = defineEmits<{ punched: [] }>();
-
 </script>
 
 <template>
   <div class="flex flex-col items-center">
-
     <!-- Offline Indicator -->
-    <div v-if="offlineStore.pendingPunches.length > 0" 
-         class="mb-4 px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full text-xs font-medium flex items-center gap-2 animate-pulse">
+    <div
+      v-if="offlineStore.pendingPunches.length > 0"
+      class="mb-4 px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full text-xs font-medium flex items-center gap-2 animate-pulse"
+    >
       <WifiOff :size="12" />
-      {{ offlineStore.pendingPunches.length }} Pending Punch{{ offlineStore.pendingPunches.length !== 1 ? 'es' : '' }}
+      {{ offlineStore.pendingPunches.length }} Pending Punch{{
+        offlineStore.pendingPunches.length !== 1 ? "es" : ""
+      }}
     </div>
 
     <!-- SVG Clock Ring -->
@@ -201,14 +203,18 @@ const emit = defineEmits<{ punched: [] }>();
       <svg width="200" height="200" class="transform -rotate-90">
         <!-- Background ring -->
         <circle
-          :cx="100" :cy="100" :r="RADIUS"
+          :cx="100"
+          :cy="100"
+          :r="RADIUS"
           fill="none"
           class="clock-ring-bg"
           stroke-width="6"
         />
         <!-- Progress ring -->
         <circle
-          :cx="100" :cy="100" :r="RADIUS"
+          :cx="100"
+          :cy="100"
+          :r="RADIUS"
           fill="none"
           :stroke="ringColor"
           stroke-width="6"
@@ -223,32 +229,46 @@ const emit = defineEmits<{ punched: [] }>();
       <button
         @click="handlePunch"
         :disabled="isButtonDisabled"
-        class="absolute inset-0 m-auto w-[140px] h-[140px] rounded-full
-               flex flex-col items-center justify-center gap-1
-               transition-all duration-500 focus:outline-none"
+        class="absolute inset-0 m-auto w-[140px] h-[140px] rounded-full flex flex-col items-center justify-center gap-1 transition-all duration-500 focus:outline-none"
         :class="[
           isCompleted
             ? 'bg-emerald-500/15 text-emerald-400 cursor-default'
             : isClockedIn
-              ? (shiftComplete
-                  ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
-                  : 'bg-red-500/10 text-red-400 hover:bg-red-500/20')
-              : 'bg-white/[0.05] text-slate-300 hover:bg-white/[0.08] hover:text-white'
+              ? shiftComplete
+                ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
+                : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
+              : 'bg-white/[0.05] text-slate-300 hover:bg-white/[0.08] hover:text-white',
         ]"
-        :style="(isClockedIn || isCompleted) ? { boxShadow: `0 0 40px ${glowColor}` } : {}"
+        :style="isClockedIn || isCompleted ? { boxShadow: `0 0 40px ${glowColor}` } : {}"
       >
-        <div v-if="loading" class="w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin" />
+        <div
+          v-if="loading"
+          class="w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin"
+        />
         <template v-else>
           <span class="text-[11px] font-semibold uppercase tracking-wider opacity-70">
             {{ buttonLabel }}
           </span>
-          <span v-if="isClockedIn || isCompleted" class="text-2xl font-bold tabular-nums tracking-tight">
+          <span
+            v-if="isClockedIn || isCompleted"
+            class="text-2xl font-bold tabular-nums tracking-tight"
+          >
             {{ timerDisplay }}
           </span>
-          <svg v-else xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24"
-               fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
+          <svg
+            v-else
+            xmlns="http://www.w3.org/2000/svg"
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
           </svg>
         </template>
       </button>
@@ -256,12 +276,8 @@ const emit = defineEmits<{ punched: [] }>();
 
     <!-- Status text -->
     <div class="text-center space-y-1.5">
-      <div v-if="isCompleted" class="badge-success mb-2">
-        Day Complete
-      </div>
-      <div v-else-if="shiftComplete && isClockedIn" class="badge-success mb-2">
-        Shift Complete
-      </div>
+      <div v-if="isCompleted" class="badge-success mb-2">Day Complete</div>
+      <div v-else-if="shiftComplete && isClockedIn" class="badge-success mb-2">Shift Complete</div>
 
       <p v-if="isCompleted && clockInTimeFormatted" class="text-sm text-slate-400">
         Worked <span class="text-white font-medium">{{ timerDisplay }}</span> today
@@ -269,9 +285,7 @@ const emit = defineEmits<{ punched: [] }>();
       <p v-else-if="isClockedIn && clockInTimeFormatted" class="text-sm text-slate-400">
         Clocked in at <span class="text-white font-medium">{{ clockInTimeFormatted }}</span>
       </p>
-      <p v-else class="text-sm text-slate-500">
-        Tap to start your shift
-      </p>
+      <p v-else class="text-sm text-slate-500">Tap to start your shift</p>
     </div>
 
     <p v-if="error" class="mt-3 text-xs text-red-400 text-center max-w-[220px]">{{ error }}</p>
