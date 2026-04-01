@@ -372,6 +372,161 @@ def punch(timestamp=None):
 		return {"status": "error", "error": str(e)}
 
 
+# ============ BREAK MANAGEMENT ============
+
+
+@frappe.whitelist()
+@user_rate_limit(limit=20, seconds=60)
+def start_break():
+	"""Start a break during the current shift.
+
+	Creates a BREAK_START Employee Checkin record.
+	Only allowed if clocked in and not already on break.
+	"""
+	employee = get_current_employee()
+	if not employee:
+		return {"success": False, "error": "Employee not found"}
+
+	today = nowdate()
+
+	# Must be clocked in
+	has_in = frappe.db.exists(
+		"Employee Checkin",
+		{"employee": employee, "log_type": "IN", "time": ["between", [today, f"{today} 23:59:59"]]},
+	)
+	if not has_in:
+		return {"success": False, "error": "You must clock in before taking a break"}
+
+	# Already clocked out?
+	has_out = frappe.db.exists(
+		"Employee Checkin",
+		{"employee": employee, "log_type": "OUT", "time": ["between", [today, f"{today} 23:59:59"]]},
+	)
+	if has_out:
+		return {"success": False, "error": "Your shift has already ended"}
+
+	# Check if already on break (has BREAK_START but no BREAK_END)
+	break_starts = frappe.db.count(
+		"Employee Checkin",
+		{"employee": employee, "device_id": "BREAK_START", "time": ["between", [today, f"{today} 23:59:59"]]},
+	)
+	break_ends = frappe.db.count(
+		"Employee Checkin",
+		{"employee": employee, "device_id": "BREAK_END", "time": ["between", [today, f"{today} 23:59:59"]]},
+	)
+	if break_starts > break_ends:
+		return {"success": False, "error": "You are already on break"}
+
+	try:
+		now = now_datetime()
+		checkin = frappe.get_doc(
+			{
+				"doctype": "Employee Checkin",
+				"employee": employee,
+				"time": now,
+				"log_type": "OUT",  # Using OUT so it doesn't conflict with main IN/OUT
+				"device_id": "BREAK_START",
+			}
+		)
+		checkin.insert(ignore_permissions=True)
+		frappe.db.commit()
+		return {"success": True, "time": now.isoformat()}
+	except Exception as e:
+		return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist()
+@user_rate_limit(limit=20, seconds=60)
+def end_break():
+	"""End the current break.
+
+	Creates a BREAK_END Employee Checkin record.
+	Only allowed if currently on break.
+	"""
+	employee = get_current_employee()
+	if not employee:
+		return {"success": False, "error": "Employee not found"}
+
+	today = nowdate()
+
+	# Must be on break
+	break_starts = frappe.db.count(
+		"Employee Checkin",
+		{"employee": employee, "device_id": "BREAK_START", "time": ["between", [today, f"{today} 23:59:59"]]},
+	)
+	break_ends = frappe.db.count(
+		"Employee Checkin",
+		{"employee": employee, "device_id": "BREAK_END", "time": ["between", [today, f"{today} 23:59:59"]]},
+	)
+	if break_starts <= break_ends:
+		return {"success": False, "error": "You are not on break"}
+
+	try:
+		now = now_datetime()
+		checkin = frappe.get_doc(
+			{
+				"doctype": "Employee Checkin",
+				"employee": employee,
+				"time": now,
+				"log_type": "IN",
+				"device_id": "BREAK_END",
+			}
+		)
+		checkin.insert(ignore_permissions=True)
+		frappe.db.commit()
+		return {"success": True, "time": now.isoformat()}
+	except Exception as e:
+		return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist()
+def get_break_status():
+	"""Get break status for today: total break time and whether currently on break."""
+	employee = get_current_employee()
+	if not employee:
+		return {"on_break": False, "total_break_minutes": 0, "break_count": 0}
+
+	today = nowdate()
+
+	break_logs = frappe.db.sql(
+		"""
+		SELECT time, device_id
+		FROM `tabEmployee Checkin`
+		WHERE employee = %s AND DATE(time) = %s
+		AND device_id IN ('BREAK_START', 'BREAK_END')
+		ORDER BY time ASC
+		""",
+		(employee, today),
+		as_dict=True,
+	)
+
+	total_break_seconds = 0
+	break_count = 0
+	on_break = False
+	current_break_start = None
+
+	for log in break_logs:
+		if log.device_id == "BREAK_START":
+			current_break_start = log.time
+			on_break = True
+		elif log.device_id == "BREAK_END" and current_break_start:
+			total_break_seconds += (log.time - current_break_start).total_seconds()
+			break_count += 1
+			current_break_start = None
+			on_break = False
+
+	# If still on break, include time since break start
+	if on_break and current_break_start:
+		total_break_seconds += (now_datetime() - current_break_start).total_seconds()
+
+	return {
+		"on_break": on_break,
+		"total_break_minutes": round(total_break_seconds / 60, 1),
+		"break_count": break_count + (1 if on_break else 0),
+		"break_start_time": current_break_start.isoformat() if current_break_start and on_break else None,
+	}
+
+
 # ============ LEAVE MANAGEMENT ============
 
 
@@ -930,6 +1085,144 @@ def get_attendance_records(month=None, year=None):
 		"period": {"start": str(start_date), "end": str(end_date), "month": month, "year": year},
 	}
 
+# ============ ROSTER ============
+
+
+@frappe.whitelist()
+def get_roster_data(month=None, year=None):
+	"""Get roster data for the current employee's department/team.
+
+	Returns a grid of employees × dates with shift assignments,
+	attendance status, holidays, and weekly offs.
+	"""
+	import calendar
+
+	employee = get_current_employee()
+	if not employee:
+		return {"employees": [], "dates": [], "holidays": []}
+
+	today = getdate(nowdate())
+	month = int(month) if month else today.month
+	year = int(year) if year else today.year
+
+	# Get employee's department
+	emp_info = frappe.db.get_value(
+		"Employee", employee, ["department", "company"], as_dict=True
+	)
+	department = emp_info.get("department") if emp_info else None
+
+	# Get employees in the same department (or all if no department)
+	filters = {"status": "Active"}
+	if department:
+		filters["department"] = department
+
+	employees = frappe.get_all(
+		"Employee",
+		filters=filters,
+		fields=["name", "employee_name", "designation", "default_shift"],
+		order_by="employee_name",
+		limit=50,
+	)
+
+	# Date range for the month
+	last_day_num = calendar.monthrange(year, month)[1]
+	start_date = getdate(f"{year}-{month:02d}-01")
+	end_date = getdate(f"{year}-{month:02d}-{last_day_num}")
+
+	# Generate dates list
+	dates = []
+	current = start_date
+	while current <= end_date:
+		dates.append({
+			"date": str(current),
+			"day": current.day,
+			"weekday": current.strftime("%a"),
+			"is_weekend": current.weekday() in (5, 6),
+		})
+		current = frappe.utils.add_days(current, 1)
+
+	# Get holidays
+	holiday_list = None
+	if emp_info and emp_info.get("company"):
+		holiday_list = frappe.db.get_value("Company", emp_info["company"], "default_holiday_list")
+
+	holidays = {}
+	if holiday_list:
+		holiday_records = frappe.get_all(
+			"Holiday",
+			filters={
+				"parent": holiday_list,
+				"holiday_date": ["between", [start_date, end_date]],
+			},
+			fields=["holiday_date", "description", "weekly_off"],
+		)
+		for h in holiday_records:
+			holidays[str(h.holiday_date)] = {
+				"description": h.description or "Holiday",
+				"weekly_off": bool(h.weekly_off),
+			}
+
+	# Get attendance for all employees in the period
+	emp_names = [e.name for e in employees]
+	attendance = {}
+	if emp_names:
+		att_records = frappe.db.sql(
+			"""
+			SELECT employee, attendance_date, status, working_hours
+			FROM `tabAttendance`
+			WHERE employee IN %s
+			AND attendance_date BETWEEN %s AND %s
+			AND docstatus = 1
+			""",
+			(emp_names, start_date, end_date),
+			as_dict=True,
+		)
+		for att in att_records:
+			key = f"{att.employee}_{att.attendance_date}"
+			attendance[key] = {
+				"status": att.status,
+				"hours": round(flt(att.working_hours), 1),
+			}
+
+	# Build roster grid
+	roster = []
+	for emp in employees:
+		emp_dates = []
+		for d in dates:
+			key = f"{emp.name}_{d['date']}"
+			att = attendance.get(key)
+			holiday = holidays.get(d["date"])
+
+			if att:
+				status = att["status"]
+			elif holiday:
+				status = "WO" if holiday["weekly_off"] else "H"
+			elif getdate(d["date"]) > today:
+				status = "-"  # Future date
+			else:
+				status = "A"  # No record = Absent
+
+			emp_dates.append({
+				"date": d["date"],
+				"status": status,
+				"hours": att["hours"] if att else 0,
+			})
+
+		roster.append({
+			"employee": emp.name,
+			"employee_name": emp.employee_name,
+			"designation": emp.designation or "",
+			"shift": emp.default_shift or "General",
+			"dates": emp_dates,
+		})
+
+	return {
+		"employees": roster,
+		"dates": dates,
+		"holidays": holidays,
+		"period": {"month": month, "year": year},
+	}
+
 
 # ============ ISSUES ============
 
@@ -1041,6 +1334,15 @@ def get_session_info():
 		)
 
 	user_type = frappe.db.get_value("User", user, "user_type") or ""
+	
+	has_desk_access = user_type == "System User"
+	if has_desk_access:
+		# Feature 3: If user ONLY has Employee and Employee Self Service roles,
+		# hide the Open Desk button.
+		roles = [r for r in frappe.get_roles(user) if r not in ["All", "Guest"]]
+		if set(roles).issubset({"Employee", "Employee Self Service"}):
+			has_desk_access = False
+
 	has_payroll_permission = frappe.has_permission(
 		"Payroll Entry", "create"
 	) or "HR Manager" in frappe.get_roles(user)
@@ -1054,7 +1356,7 @@ def get_session_info():
 		"user": user,
 		"full_name": frappe.utils.get_fullname(user),
 		"is_logged_in": True,
-		"has_desk_access": user_type == "System User",
+		"has_desk_access": has_desk_access,
 		"has_payroll_permission": bool(has_payroll_permission),
 		"is_manager": is_manager,
 		"employee": employee,

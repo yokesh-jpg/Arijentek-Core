@@ -18,6 +18,7 @@ import {
   Users,
   Lock,
   DollarSign,
+  CalendarDays,
 } from "lucide-vue-next";
 
 const route = useRoute();
@@ -34,6 +35,7 @@ const navItems = computed(() => {
   const items = [
     { name: "Dashboard", path: "/", icon: LayoutDashboard },
     { name: "Attendance", path: "/attendance", icon: CalendarCheck },
+    { name: "Roster", path: "/roster", icon: CalendarDays },
     { name: "Leave", path: "/leave", icon: Palmtree },
     { name: "Expense", path: "/expense", icon: DollarSign },
     { name: "Payroll", path: "/payroll", icon: Wallet },

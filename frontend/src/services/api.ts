@@ -115,6 +115,15 @@ export const attendanceApi = {
     get(
       `arijentek_core.api.get_attendance_records${month && year ? `?month=${month}&year=${year}` : ""}`,
     ),
+  // Break management
+  startBreak: () => post("arijentek_core.api.start_break"),
+  endBreak: () => post("arijentek_core.api.end_break"),
+  getBreakStatus: () => get("arijentek_core.api.get_break_status"),
+  // Roster
+  getRoster: (month?: number, year?: number) =>
+    get(
+      `arijentek_core.api.get_roster_data${month && year ? `?month=${month}&year=${year}` : ""}`,
+    ),
 };
 
 // ---------- Leave ----------

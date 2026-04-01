@@ -52,6 +52,12 @@ const router = createRouter({
       component: () => import("../views/ExpenseView.vue"),
       meta: { requiresAuth: true },
     },
+    {
+      path: "/roster",
+      name: "roster",
+      component: () => import("../views/RosterView.vue"),
+      meta: { requiresAuth: true },
+    },
     // Catch-all → dashboard
     {
       path: "/:pathMatch(.*)*",

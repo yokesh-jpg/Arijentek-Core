@@ -6,11 +6,29 @@
  *
  * Also adds to user dropdown and sidebar.
  * Loaded via app_include_js in hooks.py.
+ *
+ * Feature 3: Does NOT show for users whose only roles are
+ * Employee and Employee Self Service.
  */
 (function () {
 	'use strict';
 
 	var PORTAL_URL = '/employee-portal';
+
+	/**
+	 * Feature 3: Check if the current user has meaningful desk roles
+	 * beyond just Employee / Employee Self Service.
+	 */
+	function userHasDeskRoles() {
+		if (typeof frappe === 'undefined' || !frappe.user_roles) return true;
+		var skipRoles = ['All', 'Guest', 'Employee', 'Employee Self Service'];
+		for (var i = 0; i < frappe.user_roles.length; i++) {
+			if (skipRoles.indexOf(frappe.user_roles[i]) === -1) {
+				return true;
+			}
+		}
+		return false;
+	}
 
 	/* ── Theme styles: white in dark mode, black in light mode ── */
 	function injectPortalStyles() {
@@ -125,6 +143,7 @@
 	}
 
 	function setup() {
+		if (!userHasDeskRoles()) return;
 		addFloatingButton();
 		addToUserMenu();
 		addToSidebar();
@@ -132,6 +151,7 @@
 
 	function trySetup(attempts) {
 		if (attempts <= 0) return;
+		if (!userHasDeskRoles()) return;
 		addFloatingButton();
 		var sidebar = document.querySelector('.body-sidebar-top .sidebar-items');
 		var menu = document.getElementById('toolbar-user');
@@ -152,3 +172,4 @@
 		$(document).on('page-change', function () { setTimeout(setup, 200); });
 	}
 })();
+
