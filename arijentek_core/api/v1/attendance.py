@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 from frappe.utils import now_datetime, nowdate
-from frappe.rate_limiter import rate_limit
+from arijentek_core.api.rate_limiter import user_rate_limit
 
 ATTENDANCE_RATE_LIMIT = 10
 ATTENDANCE_RATE_LIMIT_SECONDS = 60
@@ -9,7 +9,7 @@ MAX_SHIFT_HOURS = 12
 
 
 @frappe.whitelist()
-@rate_limit(limit=ATTENDANCE_RATE_LIMIT, seconds=ATTENDANCE_RATE_LIMIT_SECONDS)
+@user_rate_limit(limit=ATTENDANCE_RATE_LIMIT, seconds=ATTENDANCE_RATE_LIMIT_SECONDS)
 def punch(employee=None, timestamp=None):
 	"""Punch endpoint with enforcement: one IN + one OUT per day, 12hr max."""
 	employee = _validate_and_get_employee(employee)
@@ -59,13 +59,14 @@ def punch(employee=None, timestamp=None):
 
 	# Auto-sync attendance after punch
 	from arijentek_core.attendance.auto_attendance import sync_attendance_after_clock
+
 	sync_attendance_after_clock(employee, timestamp)
 
 	return {"status": "success", "log_type": log_type, "time": str(timestamp), "employee": employee}
 
 
 @frappe.whitelist()
-@rate_limit(limit=ATTENDANCE_RATE_LIMIT, seconds=ATTENDANCE_RATE_LIMIT_SECONDS)
+@user_rate_limit(limit=ATTENDANCE_RATE_LIMIT, seconds=ATTENDANCE_RATE_LIMIT_SECONDS)
 def get_status(employee=None):
 	employee = _validate_and_get_employee(employee)
 
