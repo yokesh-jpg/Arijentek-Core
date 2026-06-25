@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
-import { dashboardApi, attendanceApi, leaveApi, useCachedFetch } from "../services/api";
+import { dashboardApi, leaveApi, useCachedFetch } from "../services/api";
 import ClockWidget from "../components/ClockWidget.vue";
 import {
   CalendarCheck,
@@ -153,7 +153,7 @@ onMounted(loadDashboard);
     <div class="mb-8 animate-fade-in">
       <h1 class="text-2xl sm:text-3xl font-bold text-white">
         {{ greeting }},
-        <span class="text-accent">{{ auth.fullName?.split(" ")[0] || "there" }}</span>
+        <span class="text-accent">{{ auth.fullName || "there" }}</span>
       </h1>
       <p class="text-sm text-slate-500 mt-1">{{ today }}</p>
     </div>

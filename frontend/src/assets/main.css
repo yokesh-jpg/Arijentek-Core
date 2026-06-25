@@ -186,6 +186,32 @@
 
 @layer components {
 
+  /* ── Dropdown menu ── */
+  .dropdown-menu {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--card-shadow);
+  }
+
+  .dropdown-item {
+    color: var(--text-secondary);
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  .dropdown-item:hover {
+    background: var(--row-hover);
+    color: var(--text-primary);
+  }
+
+  .dropdown-item-danger {
+    color: var(--danger-text) !important;
+  }
+
+  .dropdown-item-danger:hover {
+    background: var(--danger-bg) !important;
+    color: var(--danger-text) !important;
+  }
+
   /* ── Glass cards ── */
   .glass-card {
     background: var(--glass-bg);
@@ -287,6 +313,15 @@
   select.input-dark option {
     background-color: var(--surface);
     color: var(--text-primary);
+  }
+
+  .input-dark::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+  }
+
+  .light-mode .input-dark::-webkit-calendar-picker-indicator {
+    filter: none;
   }
 
   /* ── Status badges ── */
@@ -442,6 +477,15 @@
 
   .animate-slide-up {
     animation: slideUp 0.25s ease-out;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 
   @keyframes fadeIn {

@@ -99,15 +99,8 @@ def _handle_leave_rejection(doc):
 
 
 def _send_leave_notification(doc, subject, message):
-	"""Send notification to reporting manager and leave approver."""
+	"""Send notification to leave approver."""
 	recipients = set()
-
-	# Get reporting manager's user_id
-	reports_to = frappe.db.get_value("Employee", doc.employee, "reports_to")
-	if reports_to:
-		mgr_user = frappe.db.get_value("Employee", reports_to, "user_id")
-		if mgr_user:
-			recipients.add(mgr_user)
 
 	# Get leave approver
 	leave_approver = doc.leave_approver

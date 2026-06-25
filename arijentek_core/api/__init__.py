@@ -6,6 +6,36 @@ from frappe.utils import flt, get_first_day, get_last_day, getdate, now_datetime
 
 from arijentek_core.api.rate_limiter import user_rate_limit
 
+
+def to_utc_iso(dt):
+	if not dt:
+		return None
+	from zoneinfo import ZoneInfo
+	from frappe.utils import get_system_timezone, get_datetime
+	dt = get_datetime(dt)
+	if not dt.tzinfo:
+		dt = dt.replace(tzinfo=ZoneInfo(get_system_timezone()))
+	return dt.astimezone(ZoneInfo("UTC")).isoformat()
+
+
+def get_holiday_list_for_employee_or_company(employee: str | None, company: str | None = None) -> str | None:
+	"""Retrieve the holiday list for an employee, falling back to company's default list."""
+	holiday_list = None
+	if employee:
+		try:
+			from erpnext.setup.doctype.employee.employee import get_holiday_list_for_employee
+			holiday_list = get_holiday_list_for_employee(employee, raise_exception=False)
+		except Exception:
+			pass
+		if not holiday_list:
+			holiday_list = frappe.db.get_value("Employee", employee, "holiday_list")
+
+	if not holiday_list and company:
+		holiday_list = frappe.db.get_value("Company", company, "default_holiday_list")
+
+	return holiday_list
+
+
 # ============ DASHBOARD ============
 
 
@@ -48,9 +78,7 @@ def get_dashboard_data():
 	if last_checkin:
 		last_punch = {
 			"name": last_checkin[0].name,
-			"time": last_checkin[0].time.isoformat()
-			if hasattr(last_checkin[0].time, "isoformat")
-			else str(last_checkin[0].time),
+			"time": to_utc_iso(last_checkin[0].time),
 			"log_type": last_checkin[0].log_type,
 		}
 
@@ -120,7 +148,7 @@ def get_employee_info():
 	"""Get current employee details"""
 	user = frappe.session.user
 	employee = frappe.db.get_value(
-		"Employee", {"user_id": user}, ["name", "employee_name", "department", "designation"], as_dict=True
+		"Employee", {"user_id": user}, ["name", "employee_name", "department", "designation", "company"], as_dict=True
 	)
 
 	if not employee:
@@ -131,6 +159,7 @@ def get_employee_info():
 		"employee_name": employee.employee_name,
 		"department": employee.department,
 		"designation": employee.designation,
+		"company": employee.company,
 	}
 
 
@@ -159,7 +188,9 @@ def get_today_checkin():
 		"""
 		SELECT time, log_type
 		FROM `tabEmployee Checkin`
-		WHERE employee = %s AND DATE(time) = %s
+		WHERE employee = %s 
+		  AND DATE(time) = %s
+		  AND COALESCE(device_id, '') NOT IN ('BREAK_START', 'BREAK_END')
 		ORDER BY time ASC
 		""",
 		(employee, today),
@@ -180,12 +211,8 @@ def get_today_checkin():
 	completed = bool(in_log and out_log)
 
 	return {
-		"clock_in": in_log.time.isoformat()
-		if in_log and hasattr(in_log.time, "isoformat")
-		else (str(in_log.time) if in_log else None),
-		"clock_out": out_log.time.isoformat()
-		if out_log and hasattr(out_log.time, "isoformat")
-		else (str(out_log.time) if out_log else None),
+		"clock_in": to_utc_iso(in_log.time) if in_log else None,
+		"clock_out": to_utc_iso(out_log.time) if out_log else None,
 		"completed": completed,
 	}
 
@@ -215,12 +242,7 @@ def clock_in():
 		checkin.insert(ignore_permissions=True)
 		frappe.db.commit()
 
-		# Auto-sync attendance after clock in
-		from arijentek_core.attendance.auto_attendance import sync_attendance_after_clock
-
-		sync_attendance_after_clock(employee, checkin.time)
-
-		return {"success": True, "time": checkin.time.isoformat()}
+		return {"success": True, "time": to_utc_iso(checkin.time)}
 	except Exception as e:
 		return {"success": False, "error": str(e)}
 
@@ -239,7 +261,10 @@ def clock_out():
 	in_checkin = frappe.db.sql(
 		"""
 		SELECT time FROM `tabEmployee Checkin`
-		WHERE employee = %s AND DATE(time) = %s AND log_type = 'IN'
+		WHERE employee = %s 
+		  AND DATE(time) = %s 
+		  AND log_type = 'IN'
+		  AND COALESCE(device_id, '') NOT IN ('BREAK_START', 'BREAK_END')
 		ORDER BY time ASC LIMIT 1
 		""",
 		(employee, today),
@@ -249,9 +274,16 @@ def clock_out():
 		return {"success": False, "error": "You must clock in before clocking out"}
 
 	# Check if already clocked out today
-	existing_out = frappe.db.exists(
-		"Employee Checkin",
-		{"employee": employee, "log_type": "OUT", "time": ["between", [today, f"{today} 23:59:59"]]},
+	existing_out = frappe.db.sql(
+		"""
+		SELECT name FROM `tabEmployee Checkin`
+		WHERE employee = %s 
+		  AND log_type = 'OUT' 
+		  AND time BETWEEN %s AND %s
+		  AND COALESCE(device_id, '') NOT IN ('BREAK_START', 'BREAK_END')
+		LIMIT 1
+		""",
+		(employee, today, f"{today} 23:59:59"),
 	)
 	if existing_out:
 		return {"success": False, "error": "You have already clocked out today"}
@@ -270,12 +302,7 @@ def clock_out():
 		checkin.insert(ignore_permissions=True)
 		frappe.db.commit()
 
-		# Auto-sync attendance after clock out
-		from arijentek_core.attendance.auto_attendance import sync_attendance_after_clock
-
-		sync_attendance_after_clock(employee, checkin.time)
-
-		return {"success": True, "time": checkin.time.isoformat()}
+		return {"success": True, "time": to_utc_iso(checkin.time)}
 	except Exception as e:
 		return {"success": False, "error": str(e)}
 
@@ -316,7 +343,9 @@ def punch(timestamp: str | None = None):
 	today_checkins = frappe.db.sql(
 		"""
 		SELECT time, log_type FROM `tabEmployee Checkin`
-		WHERE employee = %s AND DATE(time) = %s
+		WHERE employee = %s 
+		  AND DATE(time) = %s
+		  AND COALESCE(device_id, '') NOT IN ('BREAK_START', 'BREAK_END')
 		ORDER BY time ASC
 		""",
 		(employee, punch_date),
@@ -360,15 +389,10 @@ def punch(timestamp: str | None = None):
 		checkin.insert(ignore_permissions=True)
 		frappe.db.commit()
 
-		# Auto-sync attendance after punch
-		from arijentek_core.attendance.auto_attendance import sync_attendance_after_clock
-
-		sync_attendance_after_clock(employee, checkin.time)
-
 		return {
 			"status": "success",
 			"log_type": log_type,
-			"time": checkin.time.isoformat() if hasattr(checkin.time, "isoformat") else str(checkin.time),
+			"time": to_utc_iso(checkin.time),
 		}
 	except Exception as e:
 		return {"status": "error", "error": str(e)}
@@ -392,17 +416,31 @@ def start_break():
 	today = nowdate()
 
 	# Must be clocked in
-	has_in = frappe.db.exists(
-		"Employee Checkin",
-		{"employee": employee, "log_type": "IN", "time": ["between", [today, f"{today} 23:59:59"]]},
+	has_in = frappe.db.sql(
+		"""
+		SELECT name FROM `tabEmployee Checkin`
+		WHERE employee = %s 
+		  AND log_type = 'IN'
+		  AND time BETWEEN %s AND %s
+		  AND COALESCE(device_id, '') NOT IN ('BREAK_START', 'BREAK_END')
+		LIMIT 1
+		""",
+		(employee, today, f"{today} 23:59:59"),
 	)
 	if not has_in:
 		return {"success": False, "error": "You must clock in before taking a break"}
 
 	# Already clocked out?
-	has_out = frappe.db.exists(
-		"Employee Checkin",
-		{"employee": employee, "log_type": "OUT", "time": ["between", [today, f"{today} 23:59:59"]]},
+	has_out = frappe.db.sql(
+		"""
+		SELECT name FROM `tabEmployee Checkin`
+		WHERE employee = %s 
+		  AND log_type = 'OUT'
+		  AND time BETWEEN %s AND %s
+		  AND COALESCE(device_id, '') NOT IN ('BREAK_START', 'BREAK_END')
+		LIMIT 1
+		""",
+		(employee, today, f"{today} 23:59:59"),
 	)
 	if has_out:
 		return {"success": False, "error": "Your shift has already ended"}
@@ -432,7 +470,7 @@ def start_break():
 		)
 		checkin.insert(ignore_permissions=True)
 		frappe.db.commit()
-		return {"success": True, "time": now.isoformat()}
+		return {"success": True, "time": to_utc_iso(now)}
 	except Exception as e:
 		return {"success": False, "error": str(e)}
 
@@ -476,7 +514,7 @@ def end_break():
 		)
 		checkin.insert(ignore_permissions=True)
 		frappe.db.commit()
-		return {"success": True, "time": now.isoformat()}
+		return {"success": True, "time": to_utc_iso(now)}
 	except Exception as e:
 		return {"success": False, "error": str(e)}
 
@@ -524,18 +562,104 @@ def get_break_status():
 	return {
 		"on_break": on_break,
 		"total_break_minutes": round(total_break_seconds / 60, 1),
+		"total_break_seconds": round(total_break_seconds),
 		"break_count": break_count + (1 if on_break else 0),
-		"break_start_time": current_break_start.isoformat() if current_break_start and on_break else None,
+		"break_start_time": to_utc_iso(current_break_start) if current_break_start and on_break else None,
 	}
+
+
+@frappe.whitelist()
+def get_attendance_breaks(employee: str | None = None, date: str | None = None):
+	"""Get BREAK_START and BREAK_END check-ins for the given employee and date."""
+	if not employee:
+		employee = get_current_employee()
+
+	if not employee or not date:
+		return []
+
+	# Permission check
+	from arijentek_core import get_shift_approver_employees
+	permitted_employees = [e["name"] for e in get_shift_approver_employees()]
+	if employee != get_current_employee() and employee not in permitted_employees:
+		frappe.throw(_("Not permitted to view records for this employee"), frappe.PermissionError)
+
+	# Fetch break logs
+	logs = frappe.db.sql(
+		"""
+		SELECT name, time, device_id
+		FROM `tabEmployee Checkin`
+		WHERE employee = %s 
+			AND DATE(time) = %s
+			AND device_id IN ('BREAK_START', 'BREAK_END')
+		ORDER BY time ASC
+		""",
+		(employee, date),
+		as_dict=True,
+	)
+
+	breaks = []
+	current_start = None
+	for log in logs:
+		if log.device_id == "BREAK_START":
+			if current_start:
+				breaks.append({
+					"break_in": to_utc_iso(current_start),
+					"break_out": None,
+					"duration": None
+				})
+			current_start = log.time
+		elif log.device_id == "BREAK_END":
+			if current_start:
+				duration = (log.time - current_start).total_seconds()
+				breaks.append({
+					"break_in": to_utc_iso(current_start),
+					"break_out": to_utc_iso(log.time),
+					"duration": round(duration / 60.0, 1) # duration in minutes
+				})
+				current_start = None
+			else:
+				breaks.append({
+					"break_in": None,
+					"break_out": to_utc_iso(log.time),
+					"duration": None
+				})
+	if current_start:
+		breaks.append({
+			"break_in": to_utc_iso(current_start),
+			"break_out": None,
+			"duration": None
+		})
+
+	return breaks
 
 
 # ============ LEAVE MANAGEMENT ============
 
 
 @frappe.whitelist()
-def get_leave_types():
-	"""Get available leave types from ERPNext (non-LWP leave types)"""
-	return frappe.get_all("Leave Type", filters={"is_lwp": 0}, pluck="name")
+def get_leave_types(employee: str | None = None):
+	"""Get available leave types allocated for the employee (non-LWP leave types)"""
+	if not employee:
+		employee = get_current_employee()
+	if not employee:
+		return []
+
+	allocated_types = frappe.get_all(
+		"Leave Allocation",
+		filters={"employee": employee, "docstatus": 1},
+		pluck="leave_type"
+	)
+
+	if not allocated_types:
+		return []
+
+	allocated_types = list(set(allocated_types))
+
+	return frappe.get_all(
+		"Leave Type",
+		filters={"is_lwp": 0, "name": ["in", allocated_types]},
+		pluck="name"
+	)
 
 
 @frappe.whitelist()
@@ -556,12 +680,8 @@ def get_holidays(
 	if not employee:
 		return []
 
-	try:
-		from erpnext.setup.doctype.employee.employee import get_holiday_list_for_employee
-	except ImportError:
-		return []
-
-	holiday_list = get_holiday_list_for_employee(employee, raise_exception=False)
+	company = frappe.db.get_value("Employee", employee, "company")
+	holiday_list = get_holiday_list_for_employee_or_company(employee, company)
 	if not holiday_list:
 		return []
 
@@ -593,6 +713,81 @@ def get_holidays(
 			h["holiday_date"] = dt.strftime("%Y-%m-%d")
 		desc = h.get("description") or ""
 		h["description"] = strip_html(desc).strip()
+
+	return holidays
+
+
+@frappe.whitelist()
+def get_employee_holiday(employee: str, month: int, year: int) -> dict:
+	"""Get holidays and weekly offs for a specific employee in a given month/year."""
+	import calendar
+
+	month = int(month)
+	year = int(year)
+
+	last_day_num = calendar.monthrange(year, month)[1]
+	start_date = getdate(f"{year}-{month:02d}-01")
+	end_date = getdate(f"{year}-{month:02d}-{last_day_num}")
+
+	holiday_list = None
+
+	# 1. Check Holiday List Assignment for Employee
+	HLA = frappe.qb.DocType("Holiday List Assignment")
+	hla_records = (
+		frappe.qb.from_(HLA)
+		.select(HLA.holiday_list)
+		.where(HLA.assigned_to == employee)
+		.where(HLA.from_date <= end_date)
+		.where(HLA.docstatus == 1)
+		.orderby(HLA.from_date, order=frappe.qb.desc)
+		.limit(1)
+	).run()
+	if hla_records:
+		holiday_list = hla_records[0][0]
+
+	# 2. Check direct holiday_list field on Employee doctype
+	if not holiday_list:
+		holiday_list = frappe.db.get_value("Employee", employee, "holiday_list")
+
+	# Get employee's company
+	company = frappe.db.get_value("Employee", employee, "company")
+
+	# 3. Check Holiday List Assignment for Company
+	if not holiday_list and company:
+		hla_records = (
+			frappe.qb.from_(HLA)
+			.select(HLA.holiday_list)
+			.where(HLA.assigned_to == company)
+			.where(HLA.from_date <= end_date)
+			.where(HLA.docstatus == 1)
+			.orderby(HLA.from_date, order=frappe.qb.desc)
+			.limit(1)
+		).run()
+		if hla_records:
+			holiday_list = hla_records[0][0]
+
+	# 4. Check default_holiday_list field on Company doctype
+	if not holiday_list and company:
+		holiday_list = frappe.db.get_value("Company", company, "default_holiday_list")
+
+	# Query holidays
+	holidays = {}
+	if holiday_list:
+		holiday_records = frappe.get_all(
+			"Holiday",
+			filters={
+				"parent": holiday_list,
+				"holiday_date": ["between", [start_date, end_date]],
+			},
+			fields=["holiday_date", "description", "weekly_off"],
+		)
+		for h in holiday_records:
+			dt = h.holiday_date
+			date_str = dt.strftime("%Y-%m-%d") if hasattr(dt, "strftime") else str(dt)
+			holidays[date_str] = {
+				"description": h.description or "Holiday",
+				"weekly_off": bool(h.weekly_off),
+			}
 
 	return holidays
 
@@ -679,7 +874,7 @@ def _get_earned_leave_balance(employee, today):
 
 @frappe.whitelist()
 def get_leave_balance():
-	"""Get leave balance for standard categories: Casual Leave, Sick Leave, Earned Leave, Regional Holidays, plus Total."""
+	"""Get leave balance for leave types allocated to the employee."""
 	employee = get_current_employee()
 	if not employee:
 		return []
@@ -689,27 +884,61 @@ def get_leave_balance():
 	today = nowdate()
 	balance_map = {}
 
-	# Get balances from ERPNext for leave types that exist
-	for leave_type in LEAVE_BALANCE_CATEGORIES:
+	# Get allocated leave types for the employee
+	allocated_types = get_leave_types(employee)
+
+	# Get balances from ERPNext for allocated leave types
+	for leave_type in allocated_types:
 		if leave_type == "Earned Leave":
 			balance_map[leave_type] = _get_earned_leave_balance(employee, today)
 		else:
-			if not frappe.db.exists("Leave Type", leave_type):
-				balance_map[leave_type] = 0
-			else:
-				try:
-					balance_map[leave_type] = get_leave_balance_on(employee, leave_type, today)
-				except Exception:
+			try:
+				latest_alloc = frappe.db.get_value(
+					"Leave Allocation",
+					{"employee": employee, "leave_type": leave_type, "docstatus": 1},
+					["from_date", "to_date", "new_leaves_allocated"],
+					order_by="from_date desc",
+					as_dict=True,
+				)
+				if latest_alloc:
+					allocated = flt(latest_alloc.new_leaves_allocated)
+					approved_result = frappe.db.sql(
+						"""
+						SELECT COALESCE(SUM(total_leave_days), 0) as approved_days
+						FROM `tabLeave Application`
+						WHERE employee = %s
+						AND leave_type = %s
+						AND status = 'Approved'
+						AND docstatus = 1
+						AND (
+							from_date BETWEEN %s AND %s
+							OR to_date BETWEEN %s AND %s
+						)
+						""",
+						(
+							employee,
+							leave_type,
+							latest_alloc.from_date,
+							latest_alloc.to_date,
+							latest_alloc.from_date,
+							latest_alloc.to_date,
+						),
+						as_dict=True,
+					)
+					approved = flt(approved_result[0].approved_days) if approved_result else 0.0
+					balance_map[leave_type] = max(0.0, allocated - approved)
+				else:
 					balance_map[leave_type] = 0
+			except Exception:
+				balance_map[leave_type] = 0
 
-	# Build result in fixed order (Total computed on frontend)
 	return [{"leave_type": k, "balance": flt(v)} for k, v in balance_map.items()]
 
 
 @frappe.whitelist()
 @user_rate_limit(limit=10, seconds=60)
-def apply_leave(leave_type: str, from_date: str, to_date: str, half_day: int = 0, reason: str = ""):
-	"""Submit leave application.
+def apply_leave(leave_type: str, from_date: str, to_date: str, half_day: int = 0, reason: str = "", name: str = None):
+	"""Submit or edit leave application.
 
 	Auto-creates a Leave Allocation for the calendar year if one does
 	not already exist, so employees can apply without HR manually
@@ -723,29 +952,47 @@ def apply_leave(leave_type: str, from_date: str, to_date: str, half_day: int = 0
 	_ensure_leave_allocation(employee, leave_type, from_date, to_date)
 
 	try:
-		leave = frappe.get_doc(
-			{
-				"doctype": "Leave Application",
-				"employee": employee,
-				"leave_type": leave_type,
-				"from_date": from_date,
-				"to_date": to_date,
-				"half_day": half_day,
-				"description": reason,
-				"status": "Open",
-			}
-		)
-		leave.insert(ignore_permissions=True)
+		if name:
+			# Edit mode
+			leave = frappe.get_doc("Leave Application", name)
+			if leave.employee != employee:
+				return {"success": False, "error": "Not authorized to edit this leave application"}
+			if leave.status != "Open" or leave.docstatus != 0:
+				return {"success": False, "error": "Cannot edit a leave application that is already processed or submitted"}
+
+			leave.leave_type = leave_type
+			leave.from_date = from_date
+			leave.to_date = to_date
+			leave.half_day = half_day
+			leave.description = reason
+			leave.save(ignore_permissions=True)
+		else:
+			# Create mode
+			leave = frappe.get_doc(
+				{
+					"doctype": "Leave Application",
+					"employee": employee,
+					"leave_type": leave_type,
+					"from_date": from_date,
+					"to_date": to_date,
+					"half_day": half_day,
+					"description": reason,
+					"status": "Open",
+				}
+			)
+			leave.insert(ignore_permissions=True)
+
 		frappe.db.commit()
 
-		# Notify Manager
-		try:
-			from arijentek_core.api.notifications import notify_leave_application
+		# Notify Manager (only on creation)
+		if not name:
+			try:
+				from arijentek_core.api.notifications import notify_leave_application
 
-			notify_leave_application(leave)
-		except Exception:
-			# Don't fail the application if notification fails
-			pass
+				notify_leave_application(leave)
+			except Exception:
+				# Don't fail the application if notification fails
+				pass
 
 		return {"success": True, "name": leave.name}
 	except Exception as e:
@@ -766,7 +1013,7 @@ def get_leave_applications():
 	apps = frappe.get_all(
 		"Leave Application",
 		filters={"employee": employee},
-		fields=["name", "leave_type", "from_date", "to_date", "total_leave_days", "status"],
+		fields=["name", "leave_type", "from_date", "to_date", "total_leave_days", "status", "half_day", "description"],
 		order_by="creation desc",
 		limit=20,
 	)
@@ -802,6 +1049,29 @@ def cancel_leave(leave_application: str):
 
 		leave.status = "Cancelled"
 		leave.save(ignore_permissions=True)
+		frappe.db.commit()
+
+		return {"success": True}
+	except Exception as e:
+		return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist()
+def delete_leave(leave_application: str):
+	employee = get_current_employee()
+	if not employee:
+		return {"success": False, "error": "Employee not found"}
+
+	try:
+		leave = frappe.get_doc("Leave Application", leave_application)
+
+		if leave.employee != employee:
+			return {"success": False, "error": "Not authorized"}
+
+		if leave.status != "Open" or leave.docstatus != 0:
+			return {"success": False, "error": "Cannot delete - leave already processed or submitted"}
+
+		frappe.delete_doc("Leave Application", leave_application, ignore_permissions=True)
 		frappe.db.commit()
 
 		return {"success": True}
@@ -849,6 +1119,12 @@ def delete_my_payslip(name: str):
 	from arijentek_core.payroll.payslip_generator import delete_my_payslip as _delete
 
 	return _delete(name)
+
+
+@frappe.whitelist()
+def can_delete_salary_slip():
+	"""Check if the current user has permission to delete Salary Slips."""
+	return frappe.has_permission("Salary Slip", "delete")
 
 
 @frappe.whitelist()
@@ -954,6 +1230,13 @@ def generate_my_payslip(month: int | None = None, year: int | None = None):
 		if month < 1:
 			month = 12
 			year -= 1
+
+		# Check if the selected month and year is in the future
+		if year > today.year or (year == today.year and month > today.month):
+			return {
+				"success": False,
+				"error": _("Cannot generate payslip for a future date.")
+			}
 	except (ValueError, TypeError) as e:
 		return {"success": False, "error": f"Invalid month or year: {e!s}"}
 
@@ -966,6 +1249,22 @@ def generate_my_payslip(month: int | None = None, year: int | None = None):
 		# Get pay period dates
 		start_date = get_first_day(f"{year}-{month:02d}-01")
 		end_date = get_last_day(f"{year}-{month:02d}-01")
+
+		# Check if Salary Slip already exists for this employee in the selected period
+		existing_slip = frappe.db.exists(
+			"Salary Slip",
+			{
+				"employee": employee,
+				"start_date": start_date,
+				"end_date": end_date,
+				"docstatus": ["!=", 2],
+			}
+		)
+		if existing_slip:
+			return {
+				"success": False,
+				"error": _("Salary Slip already generated for the selected month and year: {0}").format(existing_slip),
+			}
 
 		# Get company
 		company = frappe.db.get_value("Employee", employee, "company")
@@ -1034,18 +1333,64 @@ def get_attendance_summary():
 	return result
 
 
+def calculate_break_hours(logs, in_time, out_time, attendance_date, current_today_str, current_now):
+	"""Calculate break hours for an employee on a specific attendance date based on check-ins."""
+	from datetime import timedelta
+	from frappe.utils import get_datetime
+
+	in_datetime = get_datetime(in_time) if in_time else None
+	out_datetime = get_datetime(out_time) if out_time else None
+
+	if not in_datetime:
+		return 0.0
+
+	if not out_datetime:
+		if str(attendance_date) == current_today_str:
+			out_datetime = current_now
+		else:
+			out_datetime = in_datetime + timedelta(hours=12)
+
+	total_break_seconds = 0
+	current_break_start = None
+
+	for log in logs:
+		log_time = get_datetime(log.time)
+		if log_time < in_datetime or log_time > out_datetime:
+			continue
+
+		if log.device_id == "BREAK_START":
+			current_break_start = log_time
+		elif log.device_id == "BREAK_END" and current_break_start:
+			total_break_seconds += (log_time - current_break_start).total_seconds()
+			current_break_start = None
+
+	if current_break_start and out_datetime > current_break_start:
+		total_break_seconds += (out_datetime - current_break_start).total_seconds()
+
+	return round(total_break_seconds / 3600.0, 2)
+
+
 @frappe.whitelist()
-def get_attendance_records(month: int | None = None, year: int | None = None):
+def get_attendance_records(month: int | None = None, year: int | None = None, employee_id: str | None = None):
 	"""Get attendance records for a given month/year (defaults to current month).
 
 	Returns list of records with date, status, working_hours, in_time, out_time
 	plus a summary count.
 	"""
 	import calendar
+	from arijentek_core import get_shift_approver_employees
 
-	employee = get_current_employee()
-	if not employee:
-		return {"records": [], "summary": {}}
+	permitted_employees = [e["name"] for e in get_shift_approver_employees()]
+
+	if employee_id == "all":
+		if not permitted_employees:
+			return {"records": [], "summary": {"Present": 0, "Absent": 0, "Half Day": 0, "On Leave": 0}}
+	elif employee_id:
+		if employee_id != get_current_employee() and employee_id not in permitted_employees:
+			frappe.throw(_("Not permitted to view attendance records for this employee"), frappe.PermissionError)
+		employee = employee_id
+	else:
+		employee = get_current_employee()
 
 	today = getdate(nowdate())
 	month = int(month) if month else today.month
@@ -1055,31 +1400,102 @@ def get_attendance_records(month: int | None = None, year: int | None = None):
 	start_date = getdate(f"{year}-{month:02d}-01")
 	end_date = getdate(f"{year}-{month:02d}-{last_day}")
 
-	records = frappe.db.sql(
-		"""
-		SELECT attendance_date, status, working_hours, in_time, out_time
-		FROM `tabAttendance`
-		WHERE employee = %s
-			AND attendance_date BETWEEN %s AND %s
-			AND docstatus = 1
-		ORDER BY attendance_date
-		""",
-		(employee, start_date, end_date),
-		as_dict=True,
-	)
+	if employee_id == "all":
+		records = frappe.db.sql(
+			"""
+			SELECT 
+				a.name, a.attendance_date, a.status, a.working_hours, a.in_time, a.out_time, 
+				a.employee, e.employee_name
+			FROM `tabAttendance` a
+			LEFT JOIN `tabEmployee` e ON a.employee = e.name
+			WHERE a.employee IN ({})
+				AND a.attendance_date BETWEEN %s AND %s
+				AND a.docstatus = 1
+			ORDER BY a.attendance_date ASC, e.employee_name ASC
+			""".format(", ".join(["%s"] * len(permitted_employees))),
+			(*permitted_employees, start_date, end_date),
+			as_dict=True,
+		)
+	else:
+		if not employee:
+			return {"records": [], "summary": {}}
+		records = frappe.db.sql(
+			"""
+			SELECT 
+				a.name, a.attendance_date, a.status, a.working_hours, a.in_time, a.out_time, 
+				a.employee, e.employee_name
+			FROM `tabAttendance` a
+			LEFT JOIN `tabEmployee` e ON a.employee = e.name
+			WHERE a.employee = %s
+				AND a.attendance_date BETWEEN %s AND %s
+				AND a.docstatus = 1
+			ORDER BY a.attendance_date ASC
+			""",
+			(employee, start_date, end_date),
+			as_dict=True,
+		)
 
 	summary = {"Present": 0, "Absent": 0, "Half Day": 0, "On Leave": 0}
+
+	# Fetch all break check-ins for these employees in this period to calculate break hours
+	emp_ids = list(set(r.employee for r in records if r.employee))
+	break_logs_by_employee = {}
+	if emp_ids:
+		from frappe.utils import add_days
+		checkin_start = add_days(start_date, -1)
+		checkin_end = add_days(end_date, 2)
+		break_logs = frappe.db.sql(
+			"""
+			SELECT employee, time, device_id
+			FROM `tabEmployee Checkin`
+			WHERE employee IN %(employees)s
+				AND device_id IN ('BREAK_START', 'BREAK_END')
+				AND time BETWEEN %(start)s AND %(end)s
+			ORDER BY time ASC
+			""",
+			{
+				"employees": emp_ids,
+				"start": checkin_start,
+				"end": checkin_end
+			},
+			as_dict=True
+		)
+		for log in break_logs:
+			if log.employee not in break_logs_by_employee:
+				break_logs_by_employee[log.employee] = []
+			break_logs_by_employee[log.employee].append(log)
+
 	result_records = []
+	from frappe.utils import get_datetime, now_datetime
+	current_now = now_datetime()
+	current_today_str = str(nowdate())
+
 	for r in records:
 		if r.status in summary:
 			summary[r.status] += 1
+
+		# Calculate break hours
+		logs = break_logs_by_employee.get(r.employee, [])
+		break_hours = calculate_break_hours(
+			logs=logs,
+			in_time=r.in_time,
+			out_time=r.out_time,
+			attendance_date=r.attendance_date,
+			current_today_str=current_today_str,
+			current_now=current_now
+		)
+
 		result_records.append(
 			{
+				"name": r.name,
 				"date": str(r.attendance_date),
 				"status": r.status,
 				"working_hours": round(flt(r.working_hours), 2),
+				"break_hours": break_hours,
 				"in_time": str(r.in_time) if r.in_time else None,
 				"out_time": str(r.out_time) if r.out_time else None,
+				"employee": r.employee,
+				"employee_name": r.employee_name,
 			}
 		)
 
@@ -1094,7 +1510,7 @@ def get_attendance_records(month: int | None = None, year: int | None = None):
 
 
 @frappe.whitelist()
-def get_roster_data(month: int | None = None, year: int | None = None):
+def get_roster_data(month: int | None = None, year: int | None = None, employee: str | None = None):
 	"""Get roster data for the current employee's department/team.
 
 	Returns a grid of employees x dates with shift assignments,
@@ -1102,27 +1518,56 @@ def get_roster_data(month: int | None = None, year: int | None = None):
 	"""
 	import calendar
 
-	employee = get_current_employee()
-	if not employee:
+	current_employee = get_current_employee()
+	if not current_employee:
 		return {"employees": [], "dates": [], "holidays": []}
 
 	today = getdate(nowdate())
 	month = int(month) if month else today.month
 	year = int(year) if year else today.year
 
-	# Get employee's department
-	emp_info = frappe.db.get_value("Employee", employee, ["department", "company"], as_dict=True)
-	department = emp_info.get("department") if emp_info else None
+	# Check if current user is a manager (active reports) based on reports_to, leave_approver, shift_request_approver
+	reports = frappe.get_all(
+		"Employee",
+		filters={"status": "Active"},
+		or_filters={
+			"shift_request_approver": frappe.session.user
+		},
+		pluck="name",
+	)
 
-	# Get employees in the same department (or all if no department)
+	user_roles = frappe.get_roles(frappe.session.user)
+	is_system_user = "System Manager" in user_roles
+
+	allowed_employees = [current_employee] + reports if reports else []
+
 	filters = {"status": "Active"}
-	if department:
-		filters["department"] = department
+	if employee:
+		# If a specific employee filter is selected, check permission
+		if is_system_user:
+			filters["name"] = employee
+		elif reports and employee in allowed_employees:
+			filters["name"] = employee
+		elif employee == current_employee:
+			filters["name"] = employee
+		else:
+			return {"employees": [], "dates": [], "holidays": []}
+	else:
+		# No specific employee chosen
+		if is_system_user:
+			# System user has unrestricted access (defaults to showing active employees)
+			pass
+		elif reports:
+			# Manager defaults to showing themselves and their reporting employees
+			filters["name"] = ["in", allowed_employees]
+		else:
+			# Regular employee with restricted permissions only shows their own details
+			filters["name"] = current_employee
 
 	employees = frappe.get_all(
 		"Employee",
 		filters=filters,
-		fields=["name", "employee_name", "designation", "default_shift"],
+		fields=["name", "employee_name", "designation", "default_shift", "company", "holiday_list"],
 		order_by="employee_name",
 		limit=50,
 	)
@@ -1132,40 +1577,27 @@ def get_roster_data(month: int | None = None, year: int | None = None):
 	start_date = getdate(f"{year}-{month:02d}-01")
 	end_date = getdate(f"{year}-{month:02d}-{last_day_num}")
 
-	# Generate dates list
+	# Resolve holiday list and load holidays for the logged-in employee (used for column weekends)
+	logged_in_holidays = get_employee_holiday(current_employee, month, year)
+
+	# Generate dates list using logged-in user's weekends
 	dates = []
 	current = start_date
 	while current <= end_date:
+		date_str = str(current)
+		is_weekend = False
+		if date_str in logged_in_holidays:
+			is_weekend = logged_in_holidays[date_str].get("weekly_off", False)
+
 		dates.append(
 			{
-				"date": str(current),
+				"date": date_str,
 				"day": current.day,
 				"weekday": current.strftime("%a"),
-				"is_weekend": current.weekday() in (5, 6),
+				"is_weekend": is_weekend,
 			}
 		)
 		current = frappe.utils.add_days(current, 1)
-
-	# Get holidays
-	holiday_list = None
-	if emp_info and emp_info.get("company"):
-		holiday_list = frappe.db.get_value("Company", emp_info["company"], "default_holiday_list")
-
-	holidays = {}
-	if holiday_list:
-		holiday_records = frappe.get_all(
-			"Holiday",
-			filters={
-				"parent": holiday_list,
-				"holiday_date": ["between", [start_date, end_date]],
-			},
-			fields=["holiday_date", "description", "weekly_off"],
-		)
-		for h in holiday_records:
-			holidays[str(h.holiday_date)] = {
-				"description": h.description or "Holiday",
-				"weekly_off": bool(h.weekly_off),
-			}
 
 	# Get attendance for all employees in the period
 	emp_names = [e.name for e in employees]
@@ -1189,29 +1621,30 @@ def get_roster_data(month: int | None = None, year: int | None = None):
 				"hours": round(flt(att.working_hours), 1),
 			}
 
-	# Build roster grid
+	# Build roster grid using employee-specific holiday lists
 	roster = []
 	for emp in employees:
 		emp_dates = []
+		emp_holidays = get_employee_holiday(emp.name, month, year)
+
 		for d in dates:
 			key = f"{emp.name}_{d['date']}"
 			att = attendance.get(key)
-			holiday = holidays.get(d["date"])
+			holiday = emp_holidays.get(d["date"])
 
 			if att:
 				status = att["status"]
 			elif holiday:
 				status = "WO" if holiday["weekly_off"] else "H"
-			elif getdate(d["date"]) > today:
-				status = "-"  # Future date
 			else:
-				status = "A"  # No record = Absent
+				status = "-"  # No details = hyphen
 
 			emp_dates.append(
 				{
 					"date": d["date"],
 					"status": status,
 					"hours": att["hours"] if att else 0,
+					"is_weekend": d["is_weekend"],
 				}
 			)
 
@@ -1228,7 +1661,7 @@ def get_roster_data(month: int | None = None, year: int | None = None):
 	return {
 		"employees": roster,
 		"dates": dates,
-		"holidays": holidays,
+		"holidays": logged_in_holidays,
 		"period": {"month": month, "year": year},
 	}
 
@@ -1355,18 +1788,30 @@ def get_session_info():  # nosemgrep: guest access required for session detectio
 		"Payroll Entry", "create"
 	) or "HR Manager" in frappe.get_roles(user)
 
-	# Check if is manager (has direct reports)
+	# Check if is manager (has direct reports or is leave/shift approver)
 	is_manager = False
 	if employee:
-		is_manager = bool(frappe.db.count("Employee", filters={"reports_to": employee, "status": "Active"}))
+		has_reports = frappe.get_all(
+			"Employee",
+			filters={"status": "Active"},
+			or_filters={
+				"leave_approver": user,
+				"expense_approver": user,
+				"shift_request_approver": user,
+			},
+			limit=1,
+			pluck="name",
+		)
+		is_manager = bool(has_reports)
 
 	return {
 		"user": user,
-		"full_name": frappe.utils.get_fullname(user),
+		"full_name": emp_data.get("employee_name") or frappe.utils.get_fullname(user),
 		"is_logged_in": True,
 		"has_desk_access": has_desk_access,
 		"has_payroll_permission": bool(has_payroll_permission),
 		"is_manager": is_manager,
+		"is_system_manager": "System Manager" in frappe.get_roles(user),
 		"employee": employee,
 		"employee_name": emp_data.get("employee_name", ""),
 		"department": emp_data.get("department", ""),
@@ -1499,24 +1944,60 @@ def get_payroll_summary(month: int | None = None, year: int | None = None):
 
 
 @frappe.whitelist()
-def get_team_leaves():
-	"""Get pending leave applications for employees reporting to the current user"""
-	employee = get_current_employee()
-	if not employee:
+def get_team_leaves(status=None, from_date=None, to_date=None, employee=None):
+	"""Get pending leave applications for employees reporting to the current user with optional filters"""
+	current_employee = get_current_employee()
+	if not current_employee:
 		return []
 
-	# Find direct reports
-	reports = frappe.get_all("Employee", filters={"reports_to": employee, "status": "Active"}, pluck="name")
+	user_roles = frappe.get_roles(frappe.session.user)
+	if "System Manager" in user_roles or "HR Manager" in user_roles:
+		reports = frappe.get_all(
+			"Employee",
+			filters={"status": "Active"},
+			pluck="name",
+		)
+	else:
+		# Find active employees where current user is the leave approver
+		reports = frappe.get_all(
+			"Employee",
+			filters={"status": "Active", "leave_approver": frappe.session.user},
+			pluck="name",
+		)
 
 	if not reports:
 		return []
 
-	# Get Open applications for these employees
+	filters = {"docstatus": ["<", 2]}
+
+	if employee:
+		if employee in reports:
+			filters["employee"] = employee
+		else:
+			return []
+	else:
+		filters["employee"] = ["in", reports]
+
+	if status:
+		if status == "Draft" or status == "Open":
+			filters["status"] = "Open"
+			filters["docstatus"] = 0
+		else:
+			filters["status"] = status
+
+	if from_date and to_date:
+		filters["from_date"] = ["between", [from_date, to_date]]
+	elif from_date:
+		filters["from_date"] = [">=", from_date]
+	elif to_date:
+		filters["from_date"] = ["<=", to_date]
+
 	apps = frappe.get_all(
 		"Leave Application",
-		filters={"employee": ["in", reports], "status": "Open", "docstatus": 0},
+		filters=filters,
 		fields=[
 			"name",
+			"employee",
 			"employee_name",
 			"leave_type",
 			"from_date",
@@ -1524,8 +2005,9 @@ def get_team_leaves():
 			"total_leave_days",
 			"description",
 			"creation",
+			"status",
 		],
-		order_by="creation asc",
+		order_by="creation desc",
 	)
 
 	return apps
@@ -1549,12 +2031,20 @@ def process_leave(leave_application: str, status: str, rejection_reason: str | N
 	try:
 		doc = frappe.get_doc("Leave Application", leave_application)
 
-		# Verify permission: Current employee must be the manager (reports_to)
-		# or have HR Manager / System Manager role
-		applicant = frappe.get_value("Employee", doc.employee, "reports_to")
+		# Verify permission: Current user must be the leave approver or have HR/System Manager role
+		emp_approvers = frappe.db.get_value(
+			"Employee",
+			doc.employee,
+			["leave_approver"],
+			as_dict=True
+		) or {}
 		user_roles = frappe.get_roles()
 
-		if applicant != employee and "System Manager" not in user_roles and "HR Manager" not in user_roles:
+		is_approver = (
+			frappe.session.user == emp_approvers.get("leave_approver")
+		)
+
+		if not is_approver and "System Manager" not in user_roles and "HR Manager" not in user_roles:
 			return {"success": False, "error": "Not authorized to process this application"}
 
 		if doc.status != "Open":

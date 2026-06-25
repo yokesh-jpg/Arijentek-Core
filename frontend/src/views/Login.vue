@@ -2,7 +2,7 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
-import { LogIn, Loader2, AlertCircle } from "lucide-vue-next";
+import { LogIn, Loader2, AlertCircle, Eye, EyeOff } from "lucide-vue-next";
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -11,6 +11,7 @@ const username = ref("");
 const password = ref("");
 const error = ref("");
 const loading = ref(false);
+const showPassword = ref(false);
 
 async function handleLogin() {
   loading.value = true;
@@ -75,15 +76,25 @@ async function handleLogin() {
             <label for="password" class="block text-sm font-medium text-slate-400 mb-1.5">
               Password
             </label>
-            <input
-              id="password"
-              v-model="password"
-              type="password"
-              required
-              autocomplete="current-password"
-              class="input-dark"
-              placeholder="Enter your password"
-            />
+            <div class="relative group">
+              <input
+                id="password pr-10"
+                v-model="password"
+                :type="showPassword ? 'text' : 'password'"
+                required
+                autocomplete="current-password"
+              class="input-dark pr-10"
+                placeholder="Enter your password"
+              />
+              <button
+                type="button"
+                @click="showPassword = !showPassword"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors focus:outline-none"
+              >
+                <EyeOff v-if="showPassword" :size="18" />
+                <Eye v-else :size="18" />
+              </button>
+            </div>
           </div>
 
           <!-- Error -->

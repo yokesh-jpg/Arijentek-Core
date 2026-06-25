@@ -6,6 +6,7 @@ import {
   Wallet,
   Download,
   FileText,
+  FileCheck,
   TrendingUp,
   Calendar,
   Banknote,
@@ -128,7 +129,20 @@ const monthOptions = [
   { value: 12, label: "December" },
 ];
 
-onMounted(loadData);
+const canDelete = ref(false);
+
+async function checkPermission() {
+  try {
+    canDelete.value = await payrollApi.canDeleteSalarySlip();
+  } catch (e) {
+    console.error("Failed to check delete permission", e);
+  }
+}
+
+onMounted(async () => {
+  await loadData();
+  await checkPermission();
+});
 </script>
 
 <template>
@@ -246,6 +260,7 @@ onMounted(loadData);
             <!-- Right: Actions -->
             <div class="flex items-center gap-3">
               <button
+                v-if="canDelete"
                 @click="deleteSlip(slip.name)"
                 class="p-2 rounded-lg bg-white/[0.04] hover:bg-red-500/10 border border-white/[0.06] hover:border-red-500/20 text-slate-400 hover:text-red-400 transition-all"
                 title="Delete Payslip"

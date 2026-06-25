@@ -39,9 +39,10 @@ const dashOffset = computed(() => CIRCUMFERENCE * (1 - progress.value));
 
 // Timer display HH:MM:SS
 const timerDisplay = computed(() => {
-  const h = Math.floor(elapsed.value / 3600);
-  const m = Math.floor((elapsed.value % 3600) / 60);
-  const s = elapsed.value % 60;
+  const totalSeconds = Math.max(0, elapsed.value);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(
     2,
     "0"
@@ -50,7 +51,7 @@ const timerDisplay = computed(() => {
 
 // Break timer display MM:SS
 const breakTimerDisplay = computed(() => {
-  const total = breakElapsed.value;
+  const total = Math.max(0, breakElapsed.value);
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
@@ -94,11 +95,11 @@ const isButtonDisabled = computed(() => {
 function startTimer() {
   stopTimer();
   timerInterval = setInterval(() => {
-    if (clockInTime.value) {
-      elapsed.value = Math.floor((Date.now() - clockInTime.value.getTime()) / 1000);
+    if (isClockedIn.value && !onBreak.value) {
+      elapsed.value += 1;
     }
-    if (onBreak.value && breakStartTime.value) {
-      breakElapsed.value = Math.floor((Date.now() - breakStartTime.value.getTime()) / 1000);
+    if (onBreak.value) {
+      breakElapsed.value += 1;
     }
   }, 1000);
 }
@@ -111,8 +112,8 @@ function stopTimer() {
 }
 
 let fetchStatusCalled = false;
-async function fetchStatus() {
-  if (fetchStatusCalled) return;
+async function fetchStatus(force = false) {
+  if (fetchStatusCalled && !force) return;
   fetchStatusCalled = true;
   try {
     const [data, breakData] = await Promise.all([
@@ -120,39 +121,43 @@ async function fetchStatus() {
       attendanceApi.getBreakStatus(),
     ]);
 
+    // Break status
+    let totalBreakSecs = 0;
+    if (breakData) {
+      onBreak.value = breakData.on_break || false;
+      totalBreakMinutes.value = breakData.total_break_minutes || 0;
+      totalBreakSecs = breakData.total_break_seconds || 0;
+      breakCount.value = breakData.break_count || 0;
+      if (breakData.on_break && breakData.break_start_time) {
+        breakStartTime.value = new Date(breakData.break_start_time);
+        breakElapsed.value = Math.max(0, Math.floor((Date.now() - breakStartTime.value.getTime()) / 1000));
+      }
+    }
+
     if (data.clock_in && data.clock_out) {
       isCompleted.value = true;
       isClockedIn.value = false;
       clockInTime.value = new Date(data.clock_in);
-      elapsed.value = Math.floor(
-        (new Date(data.clock_out).getTime() - new Date(data.clock_in).getTime()) / 1000
-      );
+      const clockOutTime = new Date(data.clock_out);
+      elapsed.value = clockInTime.value && clockOutTime ? Math.max(0, Math.floor(
+        (clockOutTime.getTime() - clockInTime.value.getTime()) / 1000
+      ) - totalBreakSecs) : 0;
       stopTimer();
     } else if (data.clock_in && !data.clock_out) {
       isClockedIn.value = true;
       isCompleted.value = false;
       clockInTime.value = new Date(data.clock_in);
-      elapsed.value = Math.floor((Date.now() - clockInTime.value.getTime()) / 1000);
+      elapsed.value = Math.max(0, Math.floor((Date.now() - clockInTime.value.getTime()) / 1000) - totalBreakSecs);
       startTimer();
     } else {
       isClockedIn.value = false;
       isCompleted.value = false;
       clockInTime.value = null;
       elapsed.value = 0;
+      stopTimer();
     }
-
-    // Break status
-    if (breakData) {
-      onBreak.value = breakData.on_break || false;
-      totalBreakMinutes.value = breakData.total_break_minutes || 0;
-      breakCount.value = breakData.break_count || 0;
-      if (breakData.on_break && breakData.break_start_time) {
-        breakStartTime.value = new Date(breakData.break_start_time);
-        breakElapsed.value = Math.floor((Date.now() - breakStartTime.value.getTime()) / 1000);
-      }
-    }
-  } catch {
-    // Silently fail - will show default state
+  } catch (err: any) {
+    error.value = "Failed to fetch attendance status. Please check your internet connection.";
   }
 }
 
@@ -163,17 +168,8 @@ async function handlePunch() {
   try {
     // Offline check
     if (!navigator.onLine) {
-      offlineStore.addPunch();
+      error.value = "Internet connection required to clock in/out";
       loading.value = false;
-      if (isClockedIn.value) {
-        isClockedIn.value = false;
-        isCompleted.value = true;
-        stopTimer();
-      } else {
-        isClockedIn.value = true;
-        clockInTime.value = new Date();
-        startTimer();
-      }
       return;
     }
 
@@ -238,19 +234,22 @@ async function handleBreak() {
   }
 }
 
+async function syncOfflineQueue() {
+  if (navigator.onLine && offlineStore.pendingPunches.length) {
+    await offlineStore.sync();
+    // Allow fetchStatus to call the server by resetting fetchStatusCalled
+    fetchStatusCalled = false;
+    await fetchStatus();
+    emit("punched");
+  }
+}
+
 onMounted(() => {
   fetchStatus();
-  window.addEventListener("online", offlineStore.sync);
-  setInterval(() => {
-    if (navigator.onLine && offlineStore.pendingPunches.length) {
-      offlineStore.sync();
-    }
-  }, 60000);
 });
 
 onUnmounted(() => {
   stopTimer();
-  window.removeEventListener("online", offlineStore.sync);
 });
 
 const emit = defineEmits<{ punched: [] }>();
@@ -258,9 +257,9 @@ const emit = defineEmits<{ punched: [] }>();
 
 <template>
   <div class="flex flex-col items-center">
-    <!-- Offline Indicator -->
+    <!-- Offline Indicator (Disabled/Hidden) -->
     <div
-      v-if="offlineStore.pendingPunches.length > 0"
+      v-if="false && offlineStore.pendingPunches.length > 0"
       class="mb-4 px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full text-xs font-medium flex items-center gap-2 animate-pulse"
     >
       <WifiOff :size="12" />

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { useThemeStore } from "../stores/theme";
+import { managerApi } from "../services/api";
 import {
   LayoutDashboard,
   CalendarCheck,
@@ -26,10 +27,30 @@ const router = useRouter();
 const auth = useAuthStore();
 const theme = useThemeStore();
 const mobileOpen = ref(false);
+const pendingLeaveCount = ref(0);
+
+async function fetchPendingCount() {
+  if (auth.isManager) {
+    try {
+      const res = await managerApi.getPendingLeaveCount();
+      pendingLeaveCount.value = res?.count || 0;
+    } catch (e) {
+      console.error("Failed to fetch pending leave count:", e);
+    }
+  }
+}
 
 onMounted(() => {
   theme.init();
+  fetchPendingCount();
 });
+
+watch(
+  () => route.path,
+  () => {
+    fetchPendingCount();
+  }
+);
 
 const navItems = computed(() => {
   const items = [
@@ -112,7 +133,19 @@ const initials = computed(() => {
         >
           <component :is="item.icon" :size="20" :stroke-width="1.8" />
           <span>{{ item.name }}</span>
-          <ChevronRight v-if="route.path === item.path" :size="16" class="ml-auto opacity-60" />
+          <span
+            v-if="item.name === 'Team' && pendingLeaveCount > 0"
+            class="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white transition-all animate-pulse"
+            :class="{ 'mr-2': route.path === item.path }"
+          >
+            {{ pendingLeaveCount }}
+          </span>
+          <ChevronRight
+            v-if="route.path === item.path"
+            :size="16"
+            class="opacity-60"
+            :class="{ 'ml-auto': !(item.name === 'Team' && pendingLeaveCount > 0) }"
+          />
         </button>
 
         <!-- Desk link -->
@@ -266,6 +299,12 @@ const initials = computed(() => {
             >
               <component :is="item.icon" :size="20" :stroke-width="1.8" />
               <span>{{ item.name }}</span>
+              <span
+                v-if="item.name === 'Team' && pendingLeaveCount > 0"
+                class="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white transition-all animate-pulse"
+              >
+                {{ pendingLeaveCount }}
+              </span>
             </button>
             <button
               v-if="auth.hasDeskAccess"
@@ -340,13 +379,21 @@ const initials = computed(() => {
         class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all"
         :style="{ color: route.path === item.path ? 'var(--accent)' : 'var(--text-tertiary)' }"
       >
-        <component :is="item.icon" :size="20" :stroke-width="1.8" />
+        <div class="relative">
+          <component :is="item.icon" :size="20" :stroke-width="1.8" />
+          <span
+            v-if="item.name === 'Team' && pendingLeaveCount > 0"
+            class="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-bold text-white transition-all animate-pulse"
+          >
+            {{ pendingLeaveCount }}
+          </span>
+        </div>
         <span class="text-[10px] font-medium">{{ item.name }}</span>
       </button>
     </div>
 
     <!-- ====== Main content ====== -->
-    <main class="flex-1 lg:ml-[260px] pt-14 pb-20 lg:pt-0 lg:pb-0 min-h-screen">
+    <main class="flex-1 min-w-0 lg:ml-[260px] pt-14 pb-20 lg:pt-0 lg:pb-0 min-h-screen">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
         <slot />
       </div>

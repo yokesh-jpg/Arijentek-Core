@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, onBeforeUnmount } from "vue";
 import { leaveApi, dashboardApi, useCachedFetch } from "../services/api";
+import { useAuthStore } from "../stores/auth";
 import {
   Palmtree,
   Plus,
@@ -14,6 +15,8 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  Edit,
+  Trash2,
 } from "lucide-vue-next";
 
 const loading = ref(true);
@@ -22,6 +25,13 @@ const applications = ref<any[]>([]);
 const leaveTypes = ref<string[]>([]);
 const holidays = ref<{ holiday_date: string; description: string; weekly_off?: number }[]>([]);
 const manager = ref<any>(null);
+
+function getLeaveTypeLabel(leaveType: string): string {
+  const item = balance.value.find((b) => b.leave_type === leaveType);
+  return item ? `${leaveType} - ${item.balance}` : `${leaveType} - 0`;
+}
+
+const authStore = useAuthStore();
 
 let isMounted = true;
 onBeforeUnmount(() => {
@@ -39,6 +49,8 @@ const showApplyForm = ref(false);
 const applyLoading = ref(false);
 const applyError = ref("");
 const applySuccess = ref("");
+const isEditing = ref(false);
+const editLeaveName = ref("");
 const form = ref({
   leave_type: "",
   from_date: "",
@@ -131,7 +143,7 @@ async function loadData() {
   });
 
   // These are less critical to cache but might as well
-  useCachedFetch("leave_types", leaveApi.getTypes, (data) => {
+  useCachedFetch("leave_types", () => leaveApi.getTypes(authStore.employee || undefined), (data) => {
     if (isMounted && Array.isArray(data)) leaveTypes.value = data;
   });
 
@@ -149,6 +161,8 @@ async function loadData() {
 }
 
 function openApplyForm() {
+  isEditing.value = false;
+  editLeaveName.value = "";
   form.value = {
     leave_type: leaveTypes.value[0] || "",
     from_date: "",
@@ -161,15 +175,36 @@ function openApplyForm() {
   showApplyForm.value = true;
 }
 
+function editLeave(app: any) {
+  isEditing.value = true;
+  editLeaveName.value = app.name;
+  form.value = {
+    leave_type: app.leave_type,
+    from_date: app.from_date ? app.from_date.substring(0, 10) : "",
+    to_date: app.to_date ? app.to_date.substring(0, 10) : "",
+    half_day: app.half_day || 0,
+    reason: app.description || "",
+  };
+  applyError.value = "";
+  applySuccess.value = "";
+  showApplyForm.value = true;
+}
+
 async function submitLeave() {
   applyLoading.value = true;
   applyError.value = "";
   applySuccess.value = "";
   try {
-    const result = await leaveApi.apply(form.value);
+    const payload = {
+      ...form.value,
+      ...(isEditing.value ? { name: editLeaveName.value } : {}),
+    };
+    const result = await leaveApi.apply(payload);
     if (!isMounted) return;
     if (result.success) {
-      applySuccess.value = `Leave application ${result.name} submitted successfully!`;
+      applySuccess.value = isEditing.value
+        ? `Leave application ${result.name} updated successfully!`
+        : `Leave application ${result.name} submitted successfully!`;
       showApplyForm.value = false;
       await loadData();
     } else {
@@ -179,6 +214,20 @@ async function submitLeave() {
     if (isMounted) applyError.value = e.message || "Something went wrong";
   } finally {
     if (isMounted) applyLoading.value = false;
+  }
+}
+
+async function deleteLeave(name: string) {
+  if (!confirm("Are you sure you want to delete this leave application?")) return;
+  try {
+    const result = await leaveApi.delete(name);
+    if (result.success) {
+      await loadData();
+    } else {
+      alert(result.error || "Failed to delete");
+    }
+  } catch (e: any) {
+    alert(e.message || "Failed to delete");
   }
 }
 
@@ -359,7 +408,7 @@ onMounted(loadData);
           Leave Balance
         </h3>
         <p class="text-xs mb-4" :style="{ color: 'var(--text-tertiary)' }">
-          Casual Leave, Sick Leave, Earned Leave, Regional Holidays
+          Your allocated leave types
         </p>
         <div v-if="balance.length" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           <div
@@ -497,14 +546,24 @@ onMounted(loadData);
                     </span>
                   </td>
                   <td class="px-5 py-4 text-right">
-                    <button
-                      v-if="app.status === 'Open'"
-                      @click="cancelLeave(app.name)"
-                      class="text-xs transition-colors"
-                      :style="{ color: 'var(--danger-text)' }"
-                    >
-                      Cancel
-                    </button>
+                    <div v-if="app.status === 'Open'" class="flex justify-end gap-3 text-xs">
+                      <button
+                        @click="editLeave(app)"
+                        class="hover:text-[var(--accent)] transition-colors p-1"
+                        :style="{ color: 'var(--text-secondary)' }"
+                        title="Edit"
+                      >
+                        <Edit :size="16" />
+                      </button>
+                      <button
+                        @click="deleteLeave(app.name)"
+                        class="hover:text-[var(--danger-text)] transition-colors p-1"
+                        :style="{ color: 'var(--danger-text)' }"
+                        title="Delete"
+                      >
+                        <Trash2 :size="16" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -545,14 +604,24 @@ onMounted(loadData);
                 </template>
                 &middot; {{ app.total_leave_days }} day{{ app.total_leave_days !== 1 ? "s" : "" }}
               </p>
-              <button
-                v-if="app.status === 'Open'"
-                @click="cancelLeave(app.name)"
-                class="text-xs"
-                :style="{ color: 'var(--danger-text)' }"
-              >
-                Cancel
-              </button>
+              <div v-if="app.status === 'Open'" class="flex items-center gap-3 mt-1.5">
+                <button
+                  @click="editLeave(app)"
+                  class="transition-colors p-1 hover:text-[var(--accent)]"
+                  :style="{ color: 'var(--text-secondary)' }"
+                  title="Edit"
+                >
+                  <Edit :size="16" />
+                </button>
+                <button
+                  @click="deleteLeave(app.name)"
+                  class="transition-colors p-1 hover:text-[var(--danger-text)]"
+                  :style="{ color: 'var(--danger-text)' }"
+                  title="Delete"
+                >
+                  <Trash2 :size="16" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -576,7 +645,7 @@ onMounted(loadData);
         <div class="modal-content glass-card w-full max-w-md p-6 space-y-5">
           <div class="flex items-center justify-between">
             <h2 class="text-lg font-semibold" :style="{ color: 'var(--heading-color)' }">
-              Apply for Leave
+              {{ isEditing ? "Edit Leave Application" : "Apply for Leave" }}
             </h2>
             <button
               @click="showApplyForm = false"
@@ -592,7 +661,7 @@ onMounted(loadData);
               <label
                 class="block text-sm font-medium mb-1.5"
                 :style="{ color: 'var(--text-secondary)' }"
-                >Leave Type</label
+                >Leave Type <span :style="{ color: 'var(--danger-text)' }">*</span></label
               >
               <div class="relative">
                 <select
@@ -601,7 +670,9 @@ onMounted(loadData);
                   :disabled="!leaveTypes.length"
                 >
                   <option value="" disabled>Select leave type</option>
-                  <option v-for="t in leaveTypes" :key="t" :value="t">{{ t }}</option>
+                  <option v-for="t in leaveTypes" :key="t" :value="t">
+                    {{ getLeaveTypeLabel(t) }}
+                  </option>
                   <option v-if="!leaveTypes.length" value="" disabled>No leave types</option>
                 </select>
                 <ChevronDown
@@ -617,7 +688,7 @@ onMounted(loadData);
                 <label
                   class="block text-sm font-medium mb-1.5"
                   :style="{ color: 'var(--text-secondary)' }"
-                  >From</label
+                  >From <span :style="{ color: 'var(--danger-text)' }">*</span></label
                 >
                 <input type="date" v-model="form.from_date" required class="input-dark" />
               </div>
@@ -625,7 +696,7 @@ onMounted(loadData);
                 <label
                   class="block text-sm font-medium mb-1.5"
                   :style="{ color: 'var(--text-secondary)' }"
-                  >To</label
+                  >To <span :style="{ color: 'var(--danger-text)' }">*</span></label
                 >
                 <input type="date" v-model="form.to_date" required class="input-dark" />
               </div>
@@ -673,7 +744,7 @@ onMounted(loadData);
               class="btn-accent w-full flex items-center justify-center gap-2"
             >
               <Loader2 v-if="applyLoading" :size="18" class="animate-spin" />
-              <span>{{ applyLoading ? "Submitting..." : "Submit Application" }}</span>
+              <span>{{ applyLoading ? "Submitting..." : (isEditing ? "Update Application" : "Submit Application") }}</span>
             </button>
           </form>
         </div>
