@@ -30,6 +30,14 @@ def on_employee_checkin_insert(doc, method):
 	"""
 	if not doc.employee or not doc.time:
 		return
+	#For avoid issue while do manuall attendance with employee Checkin manually
+	from frappe.utils import cint
+	if cint(doc.skip_auto_attendance):
+		return
+
+	# Avoid cancelling and recreating attendance on break start/end checkins
+	if doc.device_id in ("BREAK_START", "BREAK_END"):
+		return
 
 	try:
 		checkin_date = getdate(doc.time)

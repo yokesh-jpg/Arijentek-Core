@@ -49,3 +49,95 @@ def _patch_hrms_app_permission():
 
 # Apply patch when module loads
 _patch_hrms_app_permission()
+
+
+import frappe
+
+
+@frappe.whitelist()
+def can_mark_attendance():
+	user = frappe.session.user
+	if "System Manager" in frappe.get_roles():
+		return True
+	count = frappe.db.count(
+		"Employee",
+		filters={"status": "Active", "shift_request_approver": user}
+	)
+	return bool(count)
+
+
+@frappe.whitelist()
+def get_leave_approver_employees():
+	"""Get list of active employees where current user is the leave_approver"""
+	user = frappe.session.user
+	if "System Manager" in frappe.get_roles():
+		return frappe.get_all(
+			"Employee",
+			filters={"status": "Active"},
+			fields=["name", "employee_name"],
+			order_by="employee_name asc",
+		)
+	reports = frappe.get_all(
+		"Employee",
+		filters={"status": "Active", "leave_approver": user},
+		fields=["name", "employee_name"],
+		order_by="employee_name asc",
+	)
+	return reports
+
+
+@frappe.whitelist()
+def get_shift_approver_employees():
+	"""Get list of active employees where current user is the shift_request_approver"""
+	user = frappe.session.user
+	if "System Manager" in frappe.get_roles():
+		return frappe.get_all(
+			"Employee",
+			filters={"status": "Active"},
+			fields=["name", "employee_name"],
+			order_by="employee_name asc",
+		)
+
+	reports = frappe.get_all(
+		"Employee",
+		filters={"status": "Active", "shift_request_approver": user},
+		fields=["name", "employee_name"],
+		order_by="employee_name asc",
+	)
+	if reports:
+		current_employee = frappe.db.get_value(
+			"Employee",
+			{"user_id": user, "status": "Active"},
+			["name", "employee_name"],
+			as_dict=True
+		)
+
+		if current_employee:
+			if not any(emp["name"] == current_employee["name"] for emp in reports):
+				reports.append(current_employee)
+				reports.sort(key=lambda x: x.get("employee_name") or "")
+
+	return reports
+
+
+@frappe.whitelist()
+def get_expense_approver_employees():
+	"""Get list of active employees where current user is the expense_approver"""
+	user = frappe.session.user
+	if "System Manager" in frappe.get_roles():
+		return frappe.get_all(
+			"Employee",
+			filters={"status": "Active"},
+			fields=["name", "employee_name"],
+			order_by="employee_name asc",
+		)
+	reports = frappe.get_all(
+		"Employee",
+		filters={"status": "Active", "expense_approver": user},
+		fields=["name", "employee_name"],
+		order_by="employee_name asc",
+	)
+	return reports
+
+
+

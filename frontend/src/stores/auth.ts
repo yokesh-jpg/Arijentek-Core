@@ -12,6 +12,7 @@ interface SessionInfo {
   department: string;
   designation: string;
   is_manager?: boolean;
+  is_system_manager?: boolean;
 }
 
 /**
@@ -50,6 +51,7 @@ export const useAuthStore = defineStore("auth", () => {
   const hasDeskAccess = ref(false);
   const hasPayrollPermission = ref(false);
   const isManager = ref(false);
+  const isSystemManager = ref(false);
   const employee = ref<string | null>(null);
   const employeeName = ref("");
   const department = ref("");
@@ -83,6 +85,7 @@ export const useAuthStore = defineStore("auth", () => {
         hasDeskAccess.value = info.has_desk_access;
         hasPayrollPermission.value = info.has_payroll_permission ?? false;
         isManager.value = !!info.is_manager;
+        isSystemManager.value = !!info.is_system_manager;
         employee.value = info.employee;
         employeeName.value = info.employee_name || "";
         department.value = info.department || "";
@@ -149,6 +152,7 @@ export const useAuthStore = defineStore("auth", () => {
           hasDeskAccess.value = info.has_desk_access;
           hasPayrollPermission.value = info.has_payroll_permission ?? false;
           isManager.value = !!info.is_manager;
+          isSystemManager.value = !!info.is_system_manager;
           employee.value = info.employee;
           employeeName.value = info.employee_name || "";
           department.value = info.department || "";
@@ -204,6 +208,7 @@ export const useAuthStore = defineStore("auth", () => {
     hasDeskAccess.value = false;
     hasPayrollPermission.value = false;
     isManager.value = false;
+    isSystemManager.value = false;
     employee.value = null;
     employeeName.value = "";
     department.value = "";
@@ -258,6 +263,7 @@ export const useAuthStore = defineStore("auth", () => {
     hasDeskAccess,
     hasPayrollPermission,
     isManager,
+    isSystemManager,
     employee,
     employeeName,
     department,

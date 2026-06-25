@@ -111,22 +111,58 @@ export const attendanceApi = {
   getTodayCheckin: () => get("arijentek_core.api.get_today_checkin"),
   getStatus: () => get("arijentek_core.api.v1.attendance.get_status"),
   getSummary: () => get("arijentek_core.api.get_attendance_summary"),
-  getRecords: (month?: number, year?: number) =>
-    get(
-      `arijentek_core.api.get_attendance_records${month && year ? `?month=${month}&year=${year}` : ""}`,
-    ),
+  getRecords: (month?: number, year?: number, employee_id?: string) => {
+    const params: string[] = [];
+    if (month && year) params.push(`month=${month}`, `year=${year}`);
+    if (employee_id) params.push(`employee_id=${encodeURIComponent(employee_id)}`);
+    const qs = params.length ? `?${params.join("&")}` : "";
+    return get(`arijentek_core.api.get_attendance_records${qs}`);
+  },
+
+  getShiftApproverEmployees: () => get("arijentek_core.get_shift_approver_employees"),
+  canMarkAttendance: () => get("arijentek_core.can_mark_attendance"),
+  getAttendanceStatusList: () => get("arijentek_core.api.v1.attendance.get_attendance_status"),
+  submitManualAttendance: (data: {
+    employee: string;
+    date: string;
+    status: string;
+    in_time?: string;
+    out_time?: string;
+    id?: string;
+  }) => post("arijentek_core.api.v1.attendance.manual_attendance", data),
+  deleteAttendance: (name: string) => post("arijentek_core.api.v1.attendance.delete_attendance", { name }),
+  createRequest: (data: {
+    from_date: string;
+    to_date: string;
+    reason: string;
+    explanation?: string;
+  }) => post("arijentek_core.api.v1.attendance.create_attendance_request", data),
   // Break management
   startBreak: () => post("arijentek_core.api.start_break"),
   endBreak: () => post("arijentek_core.api.end_break"),
   getBreakStatus: () => get("arijentek_core.api.get_break_status"),
+  getAttendanceBreaks: (employee?: string, date?: string) => {
+    const params: string[] = [];
+    if (employee) params.push(`employee=${encodeURIComponent(employee)}`);
+    if (date) params.push(`date=${encodeURIComponent(date)}`);
+    const qs = params.length ? `?${params.join("&")}` : "";
+    return get(`arijentek_core.api.get_attendance_breaks${qs}`);
+  },
   // Roster
-  getRoster: (month?: number, year?: number) =>
-    get(`arijentek_core.api.get_roster_data${month && year ? `?month=${month}&year=${year}` : ""}`),
+  getRoster: (month?: number, year?: number, employee?: string) => {
+    const params: string[] = [];
+    if (month && year) params.push(`month=${month}`, `year=${year}`);
+    if (employee) params.push(`employee=${encodeURIComponent(employee)}`);
+    const qs = params.length ? `?${params.join("&")}` : "";
+
+    return get(`arijentek_core.api.get_roster_data${qs}`);
+  },
 };
 
 // ---------- Leave ----------
 export const leaveApi = {
-  getTypes: () => get("arijentek_core.api.get_leave_types"),
+  getTypes: (employee?: string) =>
+    get(`arijentek_core.api.get_leave_types${employee ? `?employee=${encodeURIComponent(employee)}` : ""}`),
   getBalance: () => get("arijentek_core.api.get_leave_balance"),
   getApplications: () => get("arijentek_core.api.get_leave_applications"),
   getHolidays: (from_date?: string, to_date?: string, exclude_weekly_off?: boolean) => {
@@ -146,9 +182,12 @@ export const leaveApi = {
     to_date: string;
     half_day?: number;
     reason?: string;
+    name?: string;
   }) => post("arijentek_core.api.apply_leave", data),
   cancel: (leave_application: string) =>
     post("arijentek_core.api.cancel_leave", { leave_application }),
+  delete: (leave_application: string) =>
+    post("arijentek_core.api.delete_leave", { leave_application }),
 };
 
 // ---------- Payroll ----------
@@ -168,12 +207,34 @@ export const payrollApi = {
   generateMyPayslip: (month?: number, year?: number) =>
     post("arijentek_core.api.generate_my_payslip", { month, year }),
   deletePayslip: (name: string) => post("arijentek_core.api.delete_my_payslip", { name }),
+  canDeleteSalarySlip: () => get<boolean>("arijentek_core.api.can_delete_salary_slip"),
 };
 
 export const managerApi = {
-  getTeamLeaves: () => get("arijentek_core.api.get_team_leaves"),
+  getTeamLeaves: (status?: string, from_date?: string, to_date?: string, employee?: string) => {
+    const params: string[] = [];
+    if (status) params.push(`status=${encodeURIComponent(status)}`);
+    if (from_date) params.push(`from_date=${encodeURIComponent(from_date)}`);
+    if (to_date) params.push(`to_date=${encodeURIComponent(to_date)}`);
+    if (employee) params.push(`employee=${encodeURIComponent(employee)}`);
+    const qs = params.length ? `?${params.join("&")}` : "";
+    return get(`arijentek_core.api.get_team_leaves${qs}`);
+  },
+  getLeaveApproverEmployees: () => get("arijentek_core.get_leave_approver_employees"),
   processLeave: (application: string, status: "Approved" | "Rejected") =>
     post("arijentek_core.api.process_leave", { leave_application: application, status }),
+  getPendingLeaveCount: () => get("arijentek_core.api.notifications.get_pending_leave_count"),
+  getTeamAttendanceRequests: (status?: string, from_date?: string, to_date?: string, employee?: string) => {
+    const params: string[] = [];
+    if (status) params.push(`status=${encodeURIComponent(status)}`);
+    if (from_date) params.push(`from_date=${encodeURIComponent(from_date)}`);
+    if (to_date) params.push(`to_date=${encodeURIComponent(to_date)}`);
+    if (employee) params.push(`employee=${encodeURIComponent(employee)}`);
+    const qs = params.length ? `?${params.join("&")}` : "";
+    return get(`arijentek_core.api.v1.attendance.get_team_attendance_requests${qs}`);
+  },
+  processAttendanceRequest: (name: string, action: "Approve" | "Reject") =>
+    post("arijentek_core.api.v1.attendance.process_attendance_request", { name, action }),
 };
 
 export const authApi = {
@@ -183,10 +244,30 @@ export const authApi = {
 
 export const expensesApi = {
   getTypes: () => get("arijentek_core.api.expenses.get_expense_types"),
-  getMyExpenses: () => get("arijentek_core.api.expenses.get_my_expenses"),
+  getMyExpenses: (status?: string, fromDate?: string, toDate?: string) => {
+    const params: string[] = [];
+    if (status) params.push(`status=${encodeURIComponent(status)}`);
+    if (fromDate) params.push(`from_date=${encodeURIComponent(fromDate)}`);
+    if (toDate) params.push(`to_date=${encodeURIComponent(toDate)}`);
+    const qs = params.length ? `?${params.join("&")}` : "";
+    return get(`arijentek_core.api.expenses.get_my_expenses${qs}`);
+  },
   submit: (data: any) => post("arijentek_core.api.expenses.submit_expense_claim", data),
+  getApprovers: (employee: string) => get(`arijentek_core.api.expenses.get_expense_approvers?employee=${encodeURIComponent(employee)}`),
+  getCompanyDefaults: (company: string) => get(`arijentek_core.api.expenses.get_company_defaults?company=${encodeURIComponent(company)}`),
+  delete: (name: string) => post("arijentek_core.api.expenses.delete_expense_claim", { name }),
   // Manager
-  getTeamExpenses: () => get("arijentek_core.api.expenses.get_team_expenses"),
-  process: (name: string, action: "Approve" | "Reject") =>
-    post("arijentek_core.api.expenses.process_expense", { name, action }),
+  getTeamExpenses: (status?: string, fromDate?: string, toDate?: string, employee?: string) => {
+    const params: string[] = [];
+    if (status) params.push(`status=${encodeURIComponent(status)}`);
+    if (fromDate) params.push(`from_date=${encodeURIComponent(fromDate)}`);
+    if (toDate) params.push(`to_date=${encodeURIComponent(toDate)}`);
+    if (employee) params.push(`employee=${encodeURIComponent(employee)}`);
+    const qs = params.length ? `?${params.join("&")}` : "";
+    return get(`arijentek_core.api.expenses.get_team_expenses${qs}`);
+  },
+  getExpenseApproverEmployees: () => get("arijentek_core.get_expense_approver_employees"),
+  getPayableAccounts: (company: string) => get(`arijentek_core.api.expenses.get_payable_accounts?company=${encodeURIComponent(company)}`),
+  process: (name: string, action: "Approve" | "Reject", payable_account?: string) =>
+    post("arijentek_core.api.expenses.process_expense", { name, action, payable_account }),
 };

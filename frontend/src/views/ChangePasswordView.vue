@@ -82,18 +82,18 @@ async function handleChangePassword() {
               v-model="oldPassword"
               :type="showOld ? 'text' : 'password'"
               required
-              class="w-full bg-slate-900/50 border border-white/10 rounded-lg px-4 py-2.5 pl-10 pr-16 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50 transition-all placeholder:text-slate-600"
+              class="input-dark pl-10 pr-16"
               placeholder="Enter current password"
             />
             <Key
               :size="18"
-              class="absolute left-3 top-2.5 text-slate-500 group-focus-within:text-teal-400 transition-colors"
+              class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-teal-400 transition-colors"
             />
 
             <button
               type="button"
               @click="showOld = !showOld"
-              class="absolute right-12 top-2.5 text-slate-500 hover:text-white transition-colors focus:outline-none"
+              class="absolute right-12 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors focus:outline-none"
             >
               <EyeOff v-if="showOld" :size="18" />
               <Eye v-else :size="18" />
@@ -110,18 +110,18 @@ async function handleChangePassword() {
               v-model="newPassword"
               :type="showNew ? 'text' : 'password'"
               required
-              class="w-full bg-slate-900/50 border border-white/10 rounded-lg px-4 py-2.5 pl-10 pr-16 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50 transition-all placeholder:text-slate-600"
+              class="input-dark pl-10 pr-16"
               placeholder="Min 8 chars, uppercase, digit, special"
             />
             <Lock
               :size="18"
-              class="absolute left-3 top-2.5 text-slate-500 group-focus-within:text-teal-400 transition-colors"
+              class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-teal-400 transition-colors"
             />
 
             <button
               type="button"
               @click="showNew = !showNew"
-              class="absolute right-12 top-2.5 text-slate-500 hover:text-white transition-colors focus:outline-none"
+              class="absolute right-12 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors focus:outline-none"
             >
               <EyeOff v-if="showNew" :size="18" />
               <Eye v-else :size="18" />
@@ -138,18 +138,18 @@ async function handleChangePassword() {
               v-model="confirmPassword"
               :type="showConfirm ? 'text' : 'password'"
               required
-              class="w-full bg-slate-900/50 border border-white/10 rounded-lg px-4 py-2.5 pl-10 pr-16 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50 transition-all placeholder:text-slate-600"
+              class="input-dark pl-10 pr-16"
               placeholder="Confirm new password"
             />
             <Lock
               :size="18"
-              class="absolute left-3 top-2.5 text-slate-500 group-focus-within:text-teal-400 transition-colors"
+              class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-teal-400 transition-colors"
             />
 
             <button
               type="button"
               @click="showConfirm = !showConfirm"
-              class="absolute right-12 top-2.5 text-slate-500 hover:text-white transition-colors focus:outline-none"
+              class="absolute right-12 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors focus:outline-none"
             >
               <EyeOff v-if="showConfirm" :size="18" />
               <Eye v-else :size="18" />

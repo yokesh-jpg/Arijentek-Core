@@ -60,19 +60,41 @@ def create_or_update_attendance(employee, date, checkins, auto_commit=True):
 		"Attendance", {"employee": employee, "attendance_date": date, "docstatus": ["!=", 2]}
 	)
 
-	in_logs = [c for c in checkins if c.log_type == "IN"]
-	out_logs = [c for c in checkins if c.log_type == "OUT"]
+	# Filter out break check-ins to find the shift IN/OUT times
+	shift_in_logs = [c for c in checkins if c.log_type == "IN" and (c.device_id or "") not in ("BREAK_START", "BREAK_END")]
+	shift_out_logs = [c for c in checkins if c.log_type == "OUT" and (c.device_id or "") not in ("BREAK_START", "BREAK_END")]
 
-	if not in_logs:
+	if not shift_in_logs:
 		return None
 
-	first_in = min(in_logs, key=lambda x: x.time)
-	last_out = max(out_logs, key=lambda x: x.time) if out_logs else None
+	from frappe.utils import get_datetime
+
+	first_in = min(shift_in_logs, key=lambda x: get_datetime(x.time))
+	last_out = max(shift_out_logs, key=lambda x: get_datetime(x.time)) if shift_out_logs else None
 
 	working_hours = 0
 	if last_out:
-		pass  # Calculate via TimeDelta
-		working_hours = (last_out.time - first_in.time).total_seconds() / 3600
+		first_in_time = get_datetime(first_in.time)
+		last_out_time = get_datetime(last_out.time)
+		total_seconds = (last_out_time - first_in_time).total_seconds()
+
+		# Calculate break duration
+		sorted_checkins = sorted(checkins, key=lambda x: get_datetime(x.time))
+		total_break_seconds = 0
+		current_break_start = None
+		for log in sorted_checkins:
+			if log.device_id == "BREAK_START":
+				current_break_start = get_datetime(log.time)
+			elif log.device_id == "BREAK_END" and current_break_start:
+				total_break_seconds += (get_datetime(log.time) - current_break_start).total_seconds()
+				current_break_start = None
+
+		# Handle case where employee is still on break at the time of clock out
+		if current_break_start and last_out_time > current_break_start:
+			total_break_seconds += (last_out_time - current_break_start).total_seconds()
+
+		working_seconds = max(0.0, total_seconds - total_break_seconds)
+		working_hours = working_seconds / 3600
 
 	status = determine_attendance_status(employee, date, working_hours, first_in)
 
