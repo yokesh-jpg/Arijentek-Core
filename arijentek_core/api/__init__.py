@@ -664,7 +664,7 @@ def get_leave_types(employee: str | None = None):
 
 @frappe.whitelist()
 def get_holidays(
-	from_date: str | None = None, to_date: str | None = None, exclude_weekly_off: str | None = None
+	from_date: str | None = None, to_date: str | None = None, exclude_weekly_off: str | None = None, employee: str | None = None
 ):
 	"""Get holidays for the current employee's Holiday List from ERPNext.
 
@@ -673,12 +673,23 @@ def get_holidays(
 		to_date: End date (defaults to last day of current month)
 		exclude_weekly_off: If "1" or True, exclude Saturday/Sunday weekly-off entries
 			and only return gazetted/public holidays (Jan 1, Jan 26, May 1, etc.)
+		employee: Optional employee ID to get holidays for
 
 	Returns list of {holiday_date, description, weekly_off} for the given date range.
 	"""
-	employee = get_current_employee()
+	if not employee:
+		employee = get_current_employee()
 	if not employee:
 		return []
+
+	# Check permissions: if employee != current_employee, user must be system manager/HR manager or leave approver
+	current_user_employee = get_current_employee()
+	if employee != current_user_employee:
+		user_roles = frappe.get_roles(frappe.session.user)
+		if not ("System Manager" in user_roles or "HR Manager" in user_roles):
+			is_approver = frappe.db.exists("Employee", {"name": employee, "status": "Active", "leave_approver": frappe.session.user})
+			if not is_approver:
+				return []
 
 	company = frappe.db.get_value("Employee", employee, "company")
 	holiday_list = get_holiday_list_for_employee_or_company(employee, company)
@@ -869,15 +880,25 @@ def _get_earned_leave_balance(employee, today):
 	used = flt(used_result[0].used) if used_result else 0
 
 	balance = earned - used
-	return max(0, balance)
+	return {"balance": max(0, balance), "allocated": earned}
 
 
 @frappe.whitelist()
-def get_leave_balance():
+def get_leave_balance(employee=None):
 	"""Get leave balance for leave types allocated to the employee."""
-	employee = get_current_employee()
+	if not employee:
+		employee = get_current_employee()
 	if not employee:
 		return []
+
+	# Check permissions: if employee != current_employee, user must be system manager/HR manager or leave approver
+	current_user_employee = get_current_employee()
+	if employee != current_user_employee:
+		user_roles = frappe.get_roles(frappe.session.user)
+		if not ("System Manager" in user_roles or "HR Manager" in user_roles):
+			is_approver = frappe.db.exists("Employee", {"name": employee, "status": "Active", "leave_approver": frappe.session.user})
+			if not is_approver:
+				return []
 
 	from hrms.hr.doctype.leave_application.leave_application import get_leave_balance_on
 
@@ -926,13 +947,16 @@ def get_leave_balance():
 						as_dict=True,
 					)
 					approved = flt(approved_result[0].approved_days) if approved_result else 0.0
-					balance_map[leave_type] = max(0.0, allocated - approved)
+					balance_map[leave_type] = {
+						"balance": max(0.0, allocated - approved),
+						"allocated": allocated
+					}
 				else:
-					balance_map[leave_type] = 0
+					balance_map[leave_type] = {"balance": 0.0, "allocated": 0.0}
 			except Exception:
-				balance_map[leave_type] = 0
+				balance_map[leave_type] = {"balance": 0.0, "allocated": 0.0}
 
-	return [{"leave_type": k, "balance": flt(v)} for k, v in balance_map.items()]
+	return [{"leave_type": k, "balance": flt(v["balance"]), "allocated": flt(v["allocated"])} for k, v in balance_map.items()]
 
 
 @frappe.whitelist()
@@ -1004,18 +1028,41 @@ def apply_leave(leave_type: str, from_date: str, to_date: str, half_day: int = 0
 
 
 @frappe.whitelist()
-def get_leave_applications():
-	"""Get employee's leave applications"""
-	employee = get_current_employee()
+def get_leave_applications(employee=None, status=None, from_date=None, to_date=None):
+	"""Get employee's leave applications with optional filters"""
+	if not employee:
+		employee = get_current_employee()
 	if not employee:
 		return []
 
+	# Check permissions: if employee != current_employee, user must be system manager/HR manager or leave approver
+	current_user_employee = get_current_employee()
+	if employee != current_user_employee:
+		user_roles = frappe.get_roles(frappe.session.user)
+		if not ("System Manager" in user_roles or "HR Manager" in user_roles):
+			is_approver = frappe.db.exists("Employee", {"name": employee, "status": "Active", "leave_approver": frappe.session.user})
+			if not is_approver:
+				return []
+
+	filters = {"employee": employee}
+	if status:
+		if status == "Draft" or status == "Open":
+			filters["status"] = "Open"
+		else:
+			filters["status"] = status
+
+	if from_date and to_date:
+		filters["from_date"] = ["between", [from_date, to_date]]
+	elif from_date:
+		filters["from_date"] = [">=", from_date]
+	elif to_date:
+		filters["from_date"] = ["<=", to_date]
+
 	apps = frappe.get_all(
 		"Leave Application",
-		filters={"employee": employee},
-		fields=["name", "leave_type", "from_date", "to_date", "total_leave_days", "status", "half_day", "description"],
-		order_by="creation desc",
-		limit=20,
+		filters=filters,
+		fields=["name", "employee", "employee_name", "leave_type", "from_date", "to_date", "total_leave_days", "status", "half_day", "description"],
+		order_by="name desc",
 	)
 
 	# Convert to plain dicts with string dates (handle Frappe Document objects)
@@ -1076,6 +1123,47 @@ def delete_leave(leave_application: str):
 
 		return {"success": True}
 	except Exception as e:
+		return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist()
+def delete_approved_rejected_leave(leave_application):
+	"""Delete approved/rejected leave application and its related attendance entries."""
+	user = frappe.session.user
+	leave = frappe.get_doc("Leave Application", leave_application)
+
+	is_system_manager = "System Manager" in frappe.get_roles(user)
+	is_approver = frappe.db.exists("Employee", {"name": leave.employee, "status": "Active", "leave_approver": user})
+
+	if not (is_system_manager or is_approver):
+		return {"success": False, "error": "Not authorized to delete this leave application"}
+
+	try:
+		# 1. Get and delete related attendance records
+		attendances = frappe.get_all(
+			"Attendance",
+			filters={
+				"employee": leave.employee,
+				"attendance_date": ["between", [leave.from_date, leave.to_date]]
+			},
+			fields=["name", "docstatus"]
+		)
+		for att in attendances:
+			if att.docstatus == 1:
+				att_doc = frappe.get_doc("Attendance", att.name)
+				att_doc.cancel()
+			frappe.delete_doc("Attendance", att.name, ignore_permissions=True)
+
+		# 2. Cancel Leave Application if submitted
+		if leave.docstatus == 1:
+			leave.cancel()
+
+		# 3. Delete the Leave Application
+		frappe.delete_doc("Leave Application", leave.name, ignore_permissions=True)
+		frappe.db.commit()
+		return {"success": True}
+	except Exception as e:
+		frappe.db.rollback()
 		return {"success": False, "error": str(e)}
 
 
@@ -1699,11 +1787,21 @@ def create_issue(issue_type: str, description: str):
 
 
 @frappe.whitelist()
-def get_reporting_info():
-	"""Get reporting manager and leave approver details for the current employee."""
-	employee = get_current_employee()
+def get_reporting_info(employee=None):
+	"""Get reporting manager and leave approver details for the employee."""
+	if not employee:
+		employee = get_current_employee()
 	if not employee:
 		return {}
+
+	# Check permissions: if employee != current_employee, user must be system manager/HR manager or leave approver
+	current_user_employee = get_current_employee()
+	if employee != current_user_employee:
+		user_roles = frappe.get_roles(frappe.session.user)
+		if not ("System Manager" in user_roles or "HR Manager" in user_roles):
+			is_approver = frappe.db.exists("Employee", {"name": employee, "status": "Active", "leave_approver": frappe.session.user})
+			if not is_approver:
+				return {}
 
 	emp = frappe.get_doc("Employee", employee)
 	result = {}
@@ -2007,7 +2105,7 @@ def get_team_leaves(status=None, from_date=None, to_date=None, employee=None):
 			"creation",
 			"status",
 		],
-		order_by="creation desc",
+		order_by="name desc",
 	)
 
 	return apps

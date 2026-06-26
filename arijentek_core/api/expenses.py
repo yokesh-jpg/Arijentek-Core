@@ -43,7 +43,7 @@ def get_my_expenses(status=None, from_date=None, to_date=None):
 		"Expense Claim",
 		filters=filters,
 		fields=["name", "employee", "employee_name", "posting_date", "total_claimed_amount", "approval_status", "status", "company", "remark", "expense_approver", "payable_account"],
-		order_by="posting_date desc",
+		order_by="name desc",
 	)
 	for exp in expenses:
 		exp.proofs = frappe.get_all(
@@ -125,7 +125,19 @@ def submit_expense_claim(
 		if name:
 			doc = frappe.get_doc("Expense Claim", name)
 			if doc.employee != employee:
-				return {"success": False, "error": "Unauthorized"}
+				user_roles = frappe.get_roles()
+				emp_approvers = frappe.db.get_value(
+					"Employee",
+					doc.employee,
+					["leave_approver", "shift_request_approver", "reports_to"],
+					as_dict=True
+				) or {}
+				is_approver = (
+					frappe.session.user in [emp_approvers.get("leave_approver"), emp_approvers.get("shift_request_approver")]
+					or emp_approvers.get("reports_to") == employee
+				)
+				if not is_approver and "System Manager" not in user_roles and "HR Manager" not in user_roles:
+					return {"success": False, "error": "Unauthorized to edit this expense claim"}
 			if doc.docstatus != 0:
 				return {"success": False, "error": "Only Draft expense claims can be updated"}
 			doc.posting_date = posting_date
@@ -254,8 +266,8 @@ def get_team_expenses(status=None, from_date=None, to_date=None, employee=None):
 	expenses = frappe.get_all(
 		"Expense Claim",
 		filters=filters,
-		fields=["name", "employee", "employee_name", "total_claimed_amount", "posting_date", "status", "approval_status", "company", "remark"],
-		order_by="posting_date desc",
+		fields=["name", "employee", "employee_name", "total_claimed_amount", "posting_date", "status", "approval_status", "company", "remark", "expense_approver", "payable_account"],
+		order_by="name desc",
 	)
 
 	for exp in expenses:

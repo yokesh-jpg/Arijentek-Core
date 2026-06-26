@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { useThemeStore } from "../stores/theme";
@@ -27,28 +27,52 @@ const router = useRouter();
 const auth = useAuthStore();
 const theme = useThemeStore();
 const mobileOpen = ref(false);
-const pendingLeaveCount = ref(0);
 
-async function fetchPendingCount() {
+const pendingCounts = ref({
+  leaves: 0,
+  expenses: 0,
+  attendance: 0,
+  total: 0
+});
+
+async function fetchPendingCounts() {
   if (auth.isManager) {
     try {
-      const res = await managerApi.getPendingLeaveCount();
-      pendingLeaveCount.value = res?.count || 0;
+      const res = await managerApi.getPendingCounts();
+      pendingCounts.value = {
+        leaves: res?.leaves || 0,
+        expenses: res?.expenses || 0,
+        attendance: res?.attendance || 0,
+        total: res?.total || 0,
+      };
     } catch (e) {
-      console.error("Failed to fetch pending leave count:", e);
+      console.error("Failed to fetch pending counts:", e);
     }
   }
 }
 
+let pollInterval: ReturnType<typeof setInterval> | null = null;
+
 onMounted(() => {
   theme.init();
-  fetchPendingCount();
+  fetchPendingCounts();
+  window.addEventListener("refresh-pending-counts", fetchPendingCounts);
+  pollInterval = setInterval(() => {
+    fetchPendingCounts();
+  }, 60000);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("refresh-pending-counts", fetchPendingCounts);
+  if (pollInterval) {
+    clearInterval(pollInterval);
+  }
 });
 
 watch(
   () => route.path,
   () => {
-    fetchPendingCount();
+    fetchPendingCounts();
   }
 );
 
@@ -134,17 +158,17 @@ const initials = computed(() => {
           <component :is="item.icon" :size="20" :stroke-width="1.8" />
           <span>{{ item.name }}</span>
           <span
-            v-if="item.name === 'Team' && pendingLeaveCount > 0"
+            v-if="item.name === 'Team' && pendingCounts.total > 0"
             class="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white transition-all animate-pulse"
             :class="{ 'mr-2': route.path === item.path }"
           >
-            {{ pendingLeaveCount }}
+            {{ pendingCounts.total }}
           </span>
           <ChevronRight
             v-if="route.path === item.path"
             :size="16"
             class="opacity-60"
-            :class="{ 'ml-auto': !(item.name === 'Team' && pendingLeaveCount > 0) }"
+            :class="{ 'ml-auto': !(item.name === 'Team' && pendingCounts.total > 0) }"
           />
         </button>
 
@@ -300,10 +324,10 @@ const initials = computed(() => {
               <component :is="item.icon" :size="20" :stroke-width="1.8" />
               <span>{{ item.name }}</span>
               <span
-                v-if="item.name === 'Team' && pendingLeaveCount > 0"
+                v-if="item.name === 'Team' && pendingCounts.total > 0"
                 class="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white transition-all animate-pulse"
               >
-                {{ pendingLeaveCount }}
+                {{ pendingCounts.total }}
               </span>
             </button>
             <button
@@ -382,10 +406,10 @@ const initials = computed(() => {
         <div class="relative">
           <component :is="item.icon" :size="20" :stroke-width="1.8" />
           <span
-            v-if="item.name === 'Team' && pendingLeaveCount > 0"
+            v-if="item.name === 'Team' && pendingCounts.total > 0"
             class="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-bold text-white transition-all animate-pulse"
           >
-            {{ pendingLeaveCount }}
+            {{ pendingCounts.total }}
           </span>
         </div>
         <span class="text-[10px] font-medium">{{ item.name }}</span>

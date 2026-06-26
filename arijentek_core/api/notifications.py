@@ -85,4 +85,104 @@ def get_pending_leave_count():
 	return {"count": count}
 
 
+@frappe.whitelist()
+def get_team_pending_counts():
+	user = frappe.session.user
+	user_roles = frappe.get_roles(user)
+	is_system_or_hr_manager = "System Manager" in user_roles or "HR Manager" in user_roles
+
+	# 1. Leave Applications
+	if is_system_or_hr_manager:
+		leave_employees = frappe.get_all(
+			"Employee",
+			filters={"status": "Active"},
+			pluck="name",
+		)
+	else:
+		leave_employees = frappe.get_all(
+			"Employee",
+			filters={"status": "Active", "leave_approver": user},
+			pluck="name",
+		)
+
+	leave_count = 0
+	if leave_employees:
+		leave_count = frappe.db.count(
+			"Leave Application",
+			filters={
+				"employee": ["in", leave_employees],
+				"status": "Open",
+				"docstatus": 0
+			}
+		)
+
+	# 2. Expense Claims
+	if is_system_or_hr_manager:
+		expense_employees = frappe.get_all(
+			"Employee",
+			filters={"status": "Active"},
+			pluck="name",
+		)
+	else:
+		current_employee = frappe.db.get_value("Employee", {"user_id": user}, "name")
+		if current_employee:
+			expense_employees = frappe.get_all(
+				"Employee",
+				filters={"status": "Active"},
+				or_filters={
+					"reports_to": current_employee,
+					"leave_approver": user,
+					"shift_request_approver": user,
+				},
+				pluck="name",
+			)
+		else:
+			expense_employees = []
+
+	expense_count = 0
+	if expense_employees:
+		expense_count = frappe.db.count(
+			"Expense Claim",
+			filters={
+				"employee": ["in", expense_employees],
+				"approval_status": "Draft",
+				"docstatus": ["<", 2]
+			}
+		)
+
+	# 3. Attendance Requests
+	if is_system_or_hr_manager:
+		attendance_employees = frappe.get_all(
+			"Employee",
+			filters={"status": "Active"},
+			pluck="name"
+		)
+	else:
+		try:
+			from arijentek_core import get_shift_approver_employees
+			attendance_employees = [e["name"] for e in get_shift_approver_employees()]
+		except Exception:
+			attendance_employees = []
+
+	attendance_count = 0
+	if attendance_employees:
+		attendance_count = frappe.db.count(
+			"Attendance Request",
+			filters={
+				"employee": ["in", attendance_employees],
+				"docstatus": 0
+			}
+		)
+
+	total = leave_count + expense_count + attendance_count
+
+	return {
+		"leaves": leave_count,
+		"expenses": expense_count,
+		"attendance": attendance_count,
+		"total": total
+	}
+
+
+
 

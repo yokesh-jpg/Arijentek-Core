@@ -598,5 +598,192 @@ def process_attendance_request(name, action):
 	return {"status": "success"}
 
 
+@frappe.whitelist()
+def get_my_attendance_requests(status=None, from_date=None, to_date=None):
+	"""Get attendance requests for the current logged-in employee."""
+	employee = _validate_and_get_employee()
+
+	filters = {"employee": employee}
+
+	# Map status filter to docstatus
+	if status == "Open" or status == "Draft" or status == "Pending":
+		filters["docstatus"] = 0
+	elif status == "Approved":
+		filters["docstatus"] = 1
+	elif status == "Rejected":
+		filters["docstatus"] = 2
+	else:
+		filters["docstatus"] = ["<", 3]
+
+	# Date filters
+	if from_date and to_date:
+		filters["from_date"] = ["between", [from_date, to_date]]
+	elif from_date:
+		filters["from_date"] = [">=", from_date]
+	elif to_date:
+		filters["from_date"] = ["<=", to_date]
+
+	requests = frappe.get_all(
+		"Attendance Request",
+		filters=filters,
+		fields=[
+			"name",
+			"employee",
+			"employee_name",
+			"from_date",
+			"to_date",
+			"reason",
+			"explanation",
+			"creation",
+			"docstatus",
+		],
+		order_by="creation desc",
+	)
+
+	# Format dates and map docstatus to status string
+	for r in requests:
+		r["from_date"] = str(r["from_date"]) if r["from_date"] else ""
+		r["to_date"] = str(r["to_date"]) if r["to_date"] else ""
+		r["creation"] = str(r["creation"]) if r["creation"] else ""
+		if r["docstatus"] == 0:
+			r["status"] = "Open"
+		elif r["docstatus"] == 1:
+			r["status"] = "Approved"
+		elif r["docstatus"] == 2:
+			r["status"] = "Rejected"
+
+	return requests
 
 
+@frappe.whitelist()
+def update_attendance_request(name, from_date=None, to_date=None, reason=None, explanation=None):
+	"""Update a draft Attendance Request owned by the current employee."""
+	employee = _validate_and_get_employee()
+
+	if not name:
+		return {"status": "failed", "message": _("Attendance Request name is required.")}
+
+	if not frappe.db.exists("Attendance Request", name):
+		return {"status": "failed", "message": _("Attendance Request {0} not found.").format(name)}
+
+	doc = frappe.get_doc("Attendance Request", name)
+
+	# Ownership check
+	if doc.employee != employee:
+		return {"status": "failed", "message": _("You can only edit your own attendance requests.")}
+
+	# Only draft requests can be edited
+	if doc.docstatus != 0:
+		return {"status": "failed", "message": _("Only Open/Draft requests can be edited.")}
+
+	# Update fields if provided
+	update_from = from_date or str(doc.from_date)
+	update_to = to_date or str(doc.to_date)
+
+	# Validate dates
+	valid, message = validate_attendance_request_for_update(employee, update_from, update_to, name)
+	if not valid:
+		return {"status": "failed", "message": message}
+
+	if from_date:
+		doc.from_date = from_date
+	if to_date:
+		doc.to_date = to_date
+	if reason:
+		doc.reason = reason
+	if explanation is not None:
+		doc.explanation = explanation
+
+	doc.save(ignore_permissions=True)
+	frappe.db.commit()
+
+	return {"status": "success", "name": doc.name}
+
+
+def validate_attendance_request_for_update(employee, from_date, to_date, exclude_name=None):
+	"""Validate attendance request dates for update, excluding the current request from overlap check."""
+	from frappe.utils import getdate, nowdate
+
+	# 1. Check active employee
+	status = frappe.db.get_value("Employee", employee, "status")
+	if not status:
+		return False, _("Employee record not found.")
+	if status == "Inactive":
+		return False, _("Cannot request attendance for an Inactive Employee.")
+
+	# 2. Date range validation
+	try:
+		fd = getdate(from_date)
+		td = getdate(to_date)
+	except Exception:
+		return False, _("Invalid date format.")
+
+	if fd > td:
+		return False, _("To date cannot be less than from date.")
+
+	today = getdate(nowdate())
+	if fd > today or td > today:
+		return False, _("Future dates not allowed.")
+
+	# 3. Date of joining and Relieving date checks
+	date_of_joining, relieving_date = frappe.db.get_value(
+		"Employee", employee, ["date_of_joining", "relieving_date"]
+	)
+	if date_of_joining and fd < getdate(date_of_joining):
+		return False, _("From date cannot be less than employee's joining date ({0}).").format(
+			frappe.utils.format_date(date_of_joining)
+		)
+	if relieving_date and td > getdate(relieving_date):
+		return False, _("To date cannot be greater than employee's relieving date ({0}).").format(
+			frappe.utils.format_date(relieving_date)
+		)
+
+	# 4. Overlap check (excluding current request)
+	overlap_filters = {
+		"employee": employee,
+		"docstatus": ["<", 2],
+		"to_date": [">=", from_date],
+		"from_date": ["<=", to_date],
+	}
+	if exclude_name:
+		overlap_filters["name"] = ["!=", exclude_name]
+
+	overlapping = frappe.db.get_all(
+		"Attendance Request",
+		filters=overlap_filters,
+		fields=["name"],
+		limit=1,
+	)
+	if overlapping:
+		return False, _("An overlapping Attendance Request ({0}) already exists for this period.").format(
+			overlapping[0].name
+		)
+
+	return True, ""
+
+
+@frappe.whitelist()
+def delete_attendance_request(name):
+	"""Delete a draft Attendance Request owned by the current employee."""
+	employee = _validate_and_get_employee()
+
+	if not name:
+		return {"status": "failed", "message": _("Attendance Request name is required.")}
+
+	if not frappe.db.exists("Attendance Request", name):
+		return {"status": "failed", "message": _("Attendance Request {0} not found.").format(name)}
+
+	doc = frappe.get_doc("Attendance Request", name)
+
+	# Ownership check
+	if doc.employee != employee:
+		return {"status": "failed", "message": _("You can only delete your own attendance requests.")}
+
+	# Only draft requests can be deleted
+	if doc.docstatus != 0:
+		return {"status": "failed", "message": _("Only Open/Draft requests can be deleted.")}
+
+	frappe.delete_doc("Attendance Request", name, ignore_permissions=True)
+	frappe.db.commit()
+
+	return {"status": "success", "message": _("Attendance request deleted successfully.")}

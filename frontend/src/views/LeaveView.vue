@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, onBeforeUnmount } from "vue";
-import { leaveApi, dashboardApi, useCachedFetch } from "../services/api";
+import { ref, onMounted, computed, onBeforeUnmount, watch } from "vue";
+import { leaveApi, dashboardApi, managerApi, useCachedFetch } from "../services/api";
 import { useAuthStore } from "../stores/auth";
 import {
   Palmtree,
@@ -17,10 +17,12 @@ import {
   Loader2,
   Edit,
   Trash2,
+  MoreVertical,
+  FileText,
 } from "lucide-vue-next";
 
 const loading = ref(true);
-const balance = ref<{ leave_type: string; balance: number }[]>([]);
+const balance = ref<{ leave_type: string; balance: number; allocated: number }[]>([]);
 const applications = ref<any[]>([]);
 const leaveTypes = ref<string[]>([]);
 const holidays = ref<{ holiday_date: string; description: string; weekly_off?: number }[]>([]);
@@ -34,9 +36,6 @@ function getLeaveTypeLabel(leaveType: string): string {
 const authStore = useAuthStore();
 
 let isMounted = true;
-onBeforeUnmount(() => {
-  isMounted = false;
-});
 
 // Holidays month filter
 const _today = new Date();
@@ -123,41 +122,223 @@ function getDefaultDateRange() {
   return { from: `${year}-01-01`, to: `${year}-12-31` };
 }
 
-async function loadData() {
+// Filters & Employee state
+const isSystemManager = computed(() => authStore.isSystemManager);
+const leaveEmployees = ref<any[]>([]);
+const selectedEmployee = ref<string>("");
+
+const filterStatus = ref("");
+const filterFromDate = ref("");
+const filterToDate = ref("");
+const selectedPreset = ref("All Time");
+const showDropdown = ref(false);
+
+const activeDropdown = ref<string | null>(null);
+
+// Leave detail popup modal state
+const showLeaveDetailModal = ref(false);
+const selectedLeave = ref<any>(null);
+
+function openLeaveDetail(app: any) {
+  selectedLeave.value = app;
+  showLeaveDetailModal.value = true;
+}
+
+function formatDate(dateStr: string) {
+  if (!dateStr) return "";
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+// Delete popup confirmation state
+const showDeletePopup = ref(false);
+const deleteLoading = ref(false);
+const leaveToDelete = ref<any>(null);
+const deleteError = ref("");
+
+const processing = ref<string | null>(null);
+
+async function fetchLeaveEmployees() {
+  try {
+    const data = await managerApi.getLeaveApproverEmployees();
+    leaveEmployees.value = Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.error("Failed to load leave employees:", e);
+  }
+}
+
+function applyPreset(preset: string) {
+  selectedPreset.value = preset;
+  if (preset === "Custom Range") {
+    return;
+  }
+  
+  const today = new Date();
+  let from: Date | null = null;
+  let to: Date | null = null;
+  
+  switch (preset) {
+    case "Today":
+      from = new Date(today);
+      to = new Date(today);
+      break;
+    case "Yesterday":
+      from = new Date(today);
+      from.setDate(today.getDate() - 1);
+      to = new Date(from);
+      break;
+    case "Last 7 Days":
+      from = new Date(today);
+      from.setDate(today.getDate() - 6);
+      to = new Date(today);
+      break;
+    case "Last 30 Days":
+      from = new Date(today);
+      from.setDate(today.getDate() - 29);
+      to = new Date(today);
+      break;
+    case "This Month":
+      from = new Date(today.getFullYear(), today.getMonth(), 1);
+      to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      break;
+    case "Last Month":
+      from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      to = new Date(today.getFullYear(), today.getMonth(), 0);
+      break;
+    case "All Time":
+    default:
+      from = null;
+      to = null;
+      break;
+  }
+  
+  filterFromDate.value = from ? formatDateToISO(from) : "";
+  filterToDate.value = to ? formatDateToISO(to) : "";
+  showDropdown.value = false;
+}
+
+function formatDateToISO(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function handleWindowClick(e: MouseEvent) {
+  const target = e.target as HTMLElement;
+  if (!target.closest(".date-picker-container")) {
+    showDropdown.value = false;
+  }
+  if (!target.closest(".action-dropdown-container")) {
+    activeDropdown.value = null;
+  }
+}
+
+async function handleProcessLeave(appId: string, status: "Approved" | "Rejected") {
+  if (processing.value) return;
+  processing.value = appId;
+  try {
+    const res = await managerApi.processLeave(appId, status);
+    if (res.status === "success" || res.success) {
+      applySuccess.value = `Leave application ${status.toLowerCase()} successfully!`;
+      await loadData();
+    } else {
+      alert(res.error || "Action failed");
+    }
+  } catch (e: any) {
+    alert(e.message || "Error processing leave request");
+  } finally {
+    processing.value = null;
+    activeDropdown.value = null;
+  }
+}
+
+function confirmDeleteApprovedRejected(app: any) {
+  leaveToDelete.value = app;
+  deleteError.value = "";
+  showDeletePopup.value = true;
+  activeDropdown.value = null;
+}
+
+async function handleApprovedRejectedDelete() {
+  if (!leaveToDelete.value) return;
+  deleteLoading.value = true;
+  deleteError.value = "";
+  try {
+    const res = await leaveApi.deleteApprovedRejected(leaveToDelete.value.name);
+    if (res.success) {
+      applySuccess.value = "Leave application and attendance records deleted successfully!";
+      showDeletePopup.value = false;
+      leaveToDelete.value = null;
+      await loadData();
+    } else {
+      deleteError.value = res.error || "Failed to delete";
+    }
+  } catch (e: any) {
+    deleteError.value = e.message || "Error deleting leave application";
+  } finally {
+    deleteLoading.value = false;
+  }
+}
+
+function getEmployeeName(empId: string): string {
+  const emp = leaveEmployees.value.find((e) => e.name === empId);
+  return emp ? emp.employee_name : empId;
+}
+
+async function loadData(onlyApplications = false) {
   // loading.value = true;
   const { from, to } = getDefaultDateRange();
+  const empKey = selectedEmployee.value || "self";
 
-  useCachedFetch("leave_balance", leaveApi.getBalance, (data) => {
-    if (!isMounted) return;
-    const list = Array.isArray(data) ? data : data || [];
-    if (Array.isArray(list)) {
-      balance.value = list;
+  if (!onlyApplications) {
+    if (selectedEmployee.value === "all") {
+      balance.value = [];
+      leaveTypes.value = [];
+      manager.value = null;
+      holidays.value = [];
       loading.value = false;
-    }
-  });
+    } else {
+      useCachedFetch(`leave_balance_${empKey}`, () => leaveApi.getBalance(selectedEmployee.value || undefined), (data) => {
+        if (!isMounted) return;
+        const list = Array.isArray(data) ? data : data || [];
+        if (Array.isArray(list)) {
+          balance.value = list;
+          loading.value = false;
+        }
+      });
 
-  useCachedFetch("leave_applications", leaveApi.getApplications, (data) => {
+      useCachedFetch(`leave_types_${empKey}`, () => leaveApi.getTypes(selectedEmployee.value || authStore.employee || undefined), (data) => {
+        if (isMounted && Array.isArray(data)) leaveTypes.value = data;
+      });
+
+      useCachedFetch(`reporting_info_${empKey}`, () => dashboardApi.getReportingInfo(selectedEmployee.value || undefined), (data) => {
+        if (isMounted && data) manager.value = data;
+      });
+
+      useCachedFetch(
+        `holidays_${empKey}`,
+        () => leaveApi.getHolidays(from, to, true, selectedEmployee.value || undefined),
+        (data) => {
+          if (isMounted && Array.isArray(data)) holidays.value = data;
+        }
+      );
+    }
+  }
+
+  const appKey = `leave_applications_${empKey}_${filterStatus.value}_${filterFromDate.value}_${filterToDate.value}`;
+  const fetchFn = selectedEmployee.value === "all"
+    ? () => managerApi.getTeamLeaves(filterStatus.value || undefined, filterFromDate.value || undefined, filterToDate.value || undefined)
+    : () => leaveApi.getApplications(selectedEmployee.value || undefined, filterStatus.value || undefined, filterFromDate.value || undefined, filterToDate.value || undefined);
+
+  useCachedFetch(appKey, fetchFn, (data) => {
     if (!isMounted) return;
     const list = Array.isArray(data) ? data : data || [];
     if (Array.isArray(list)) applications.value = list;
   });
-
-  // These are less critical to cache but might as well
-  useCachedFetch("leave_types", () => leaveApi.getTypes(authStore.employee || undefined), (data) => {
-    if (isMounted && Array.isArray(data)) leaveTypes.value = data;
-  });
-
-  useCachedFetch("reporting_info", dashboardApi.getReportingInfo, (data) => {
-    if (isMounted && data) manager.value = data;
-  });
-
-  useCachedFetch(
-    "holidays",
-    () => leaveApi.getHolidays(from, to, true),
-    (data) => {
-      if (isMounted && Array.isArray(data)) holidays.value = data;
-    }
-  );
 }
 
 function openApplyForm() {
@@ -191,9 +372,15 @@ function editLeave(app: any) {
 }
 
 async function submitLeave() {
-  applyLoading.value = true;
   applyError.value = "";
   applySuccess.value = "";
+
+  if (form.value.half_day && form.value.from_date !== form.value.to_date) {
+    applyError.value = "For a half-day leave, the From Date and To Date must be the same.";
+    return;
+  }
+
+  applyLoading.value = true;
   try {
     const payload = {
       ...form.value,
@@ -241,7 +428,40 @@ async function cancelLeave(name: string) {
   }
 }
 
-onMounted(loadData);
+onMounted(async () => {
+  await fetchLeaveEmployees();
+  if (isSystemManager.value || leaveEmployees.value.length > 0) {
+    selectedEmployee.value = "all";
+  } else {
+    loadData();
+  }
+  window.addEventListener("click", handleWindowClick);
+});
+
+onBeforeUnmount(() => {
+  isMounted = false;
+  window.removeEventListener("click", handleWindowClick);
+});
+
+watch(selectedEmployee, () => {
+  loadData(false);
+});
+
+watch([filterStatus, filterFromDate, filterToDate], () => {
+  loadData(true);
+});
+
+watch(() => form.value.half_day, (val) => {
+  if (val && form.value.from_date) {
+    form.value.to_date = form.value.from_date;
+  }
+});
+
+watch(() => form.value.from_date, (val) => {
+  if (form.value.half_day && val) {
+    form.value.to_date = val;
+  }
+});
 </script>
 
 <template>
@@ -255,13 +475,96 @@ onMounted(loadData);
           Leave Management
         </h1>
         <p class="text-sm mt-1" :style="{ color: 'var(--text-tertiary)' }">
-          Track, apply and manage your leaves
+          Track, apply and manage leaves
         </p>
       </div>
       <button @click="openApplyForm" class="btn-accent flex items-center gap-2 self-start">
         <Plus :size="18" />
         Apply Leave
       </button>
+    </div>
+
+    <!-- Filters (visible if leave_approver/system manager) -->
+    <div v-if="isSystemManager || leaveEmployees.length" class="flex flex-col sm:flex-row gap-4 p-4 bg-white/5 border border-white/10 rounded-2xl animate-fade-in relative z-20 mb-6">
+      <!-- Employee List Filter -->
+      <div class="flex-1">
+        <label class="block text-[10px] font-semibold text-slate-400 uppercase mb-1.5 tracking-wider">Employee</label>
+        <div class="relative w-full">
+          <select v-model="selectedEmployee" class="input-dark appearance-none pr-10 text-xs py-2 px-3">
+            <option value="all">All Employees</option>
+            <option v-for="emp in leaveEmployees" :key="emp.name" :value="emp.name">
+              {{ emp.employee_name }}
+            </option>
+          </select>
+          <ChevronDown class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" :size="14" />
+        </div>
+      </div>
+
+      <!-- Status Filter -->
+      <div class="flex-1">
+        <label class="block text-[10px] font-semibold text-slate-400 uppercase mb-1.5 tracking-wider">Status</label>
+        <div class="relative w-full">
+          <select v-model="filterStatus" class="input-dark appearance-none pr-10 text-xs py-2 px-3">
+            <option value="">All Statuses</option>
+            <option value="Open">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
+          <ChevronDown class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" :size="14" />
+        </div>
+      </div>
+
+      <!-- Date Range Filter -->
+      <div class="flex-1 date-picker-container relative">
+        <label class="block text-[10px] font-semibold text-slate-400 uppercase mb-1.5 tracking-wider">Date Range</label>
+        <button
+          type="button"
+          @click="showDropdown = !showDropdown"
+          class="input-dark text-xs py-2 px-3 flex items-center justify-between gap-2 text-left cursor-pointer w-full"
+        >
+          <span>{{ selectedPreset }}</span>
+          <ChevronDown :size="14" class="text-slate-400" />
+        </button>
+
+        <div
+          v-if="showDropdown"
+          class="absolute left-0 mt-2 z-40 bg-[var(--surface)] border border-[var(--border-color)] rounded-xl shadow-2xl p-3 flex gap-4 min-w-[160px]"
+        >
+          <!-- Presets List -->
+          <div class="w-36 flex flex-col gap-1 text-xs">
+            <button
+              v-for="preset in ['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'This Month', 'Last Month', 'Custom Range']"
+              :key="preset"
+              type="button"
+              @click="applyPreset(preset)"
+              class="w-full text-left px-2.5 py-1.5 rounded-lg transition-colors font-medium text-white"
+              :class="selectedPreset === preset ? 'bg-teal-500/20 text-teal-500' : 'text-[var(--text-secondary)] hover:bg-[var(--row-hover)] hover:text-[var(--text-primary)]'"
+            >
+              {{ preset }}
+            </button>
+          </div>
+
+          <!-- Custom Range Date Inputs -->
+          <div v-if="selectedPreset === 'Custom Range'" class="w-48 pl-4 border-l border-[var(--border-color)] space-y-3 text-xs flex flex-col justify-center">
+            <div class="space-y-1">
+              <span class="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold">From</span>
+              <input type="date" v-model="filterFromDate" class="input-dark text-xs py-1.5 px-2.5" />
+            </div>
+            <div class="space-y-1">
+              <span class="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold">To</span>
+              <input type="date" v-model="filterToDate" class="input-dark text-xs py-1.5 px-2.5" />
+            </div>
+            <button
+              type="button"
+              @click="showDropdown = false"
+              class="w-full py-1.5 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-lg font-medium text-xs shadow-lg active:scale-95 transition-all text-center cursor-pointer mt-1"
+            >
+              Apply Range
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Loading -->
@@ -330,7 +633,7 @@ onMounted(loadData);
               Company Holidays
             </h3>
             <p class="text-xs mt-1" :style="{ color: 'var(--text-tertiary)' }">
-              From your assigned Holiday List
+              From assigned Holiday List
             </p>
           </div>
           <div class="flex items-center gap-2 shrink-0">
@@ -400,7 +703,7 @@ onMounted(loadData);
       </div>
 
       <!-- Leave Balance Cards -->
-      <div>
+      <div v-if="selectedEmployee !== 'all'">
         <h3
           class="text-sm font-semibold uppercase tracking-wider mb-4"
           :style="{ color: 'var(--text-secondary)' }"
@@ -408,7 +711,7 @@ onMounted(loadData);
           Leave Balance
         </h3>
         <p class="text-xs mb-4" :style="{ color: 'var(--text-tertiary)' }">
-          Your allocated leave types
+          {{ selectedEmployee ? `Allocated leave types for ${getEmployeeName(selectedEmployee)}` : 'Your allocated leave types' }}
         </p>
         <div v-if="balance.length" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           <div
@@ -427,9 +730,9 @@ onMounted(loadData);
               {{ b.leave_type }}
             </p>
             <p class="text-3xl font-bold" :style="{ color: getTypeColor(idx).text }">
-              {{ b.balance }}
+              {{ b.balance }}<span class="text-lg font-normal opacity-50">/{{ b.allocated }}</span>
             </p>
-            <p class="text-xs mt-1" :style="{ color: 'var(--text-tertiary)' }">days</p>
+            <p class="text-xs mt-1" :style="{ color: 'var(--text-tertiary)' }">days remaining</p>
           </div>
           <div
             class="glass-card p-5"
@@ -456,7 +759,7 @@ onMounted(loadData);
           class="text-sm font-semibold uppercase tracking-wider mb-4"
           :style="{ color: 'var(--text-secondary)' }"
         >
-          My Applications
+          {{ selectedEmployee === 'all' ? 'Team Applications' : (selectedEmployee ? `${getEmployeeName(selectedEmployee)}'s Applications` : 'My Applications') }}
         </h3>
         <div v-if="applications.length" class="glass-card overflow-hidden">
           <!-- Desktop table -->
@@ -464,6 +767,12 @@ onMounted(loadData);
             <table class="w-full">
               <thead>
                 <tr :style="{ borderBottom: '1px solid var(--border-color)' }">
+                  <th
+                    class="text-left text-xs font-semibold uppercase tracking-wider px-5 py-3"
+                    :style="{ color: 'var(--text-tertiary)' }"
+                  >
+                    Employee
+                  </th>
                   <th
                     class="text-left text-xs font-semibold uppercase tracking-wider px-5 py-3"
                     :style="{ color: 'var(--text-tertiary)' }"
@@ -500,9 +809,15 @@ onMounted(loadData);
                 <tr
                   v-for="app in applications"
                   :key="app.name"
-                  class="transition-colors"
+                  class="transition-colors cursor-pointer hover:bg-white/[0.02]"
                   :style="{ borderBottom: '1px solid var(--border-color)' }"
+                  @click="openLeaveDetail(app)"
                 >
+                  <td class="px-5 py-4">
+                    <p class="text-sm font-medium" :style="{ color: 'var(--text-secondary)' }">
+                      {{ app.employee_name || app.employee || authStore.employeeName }}
+                    </p>
+                  </td>
                   <td class="px-5 py-4">
                     <p class="text-sm font-medium" :style="{ color: 'var(--heading-color)' }">
                       {{ app.leave_type }}
@@ -545,24 +860,73 @@ onMounted(loadData);
                       {{ app.status }}
                     </span>
                   </td>
-                  <td class="px-5 py-4 text-right">
-                    <div v-if="app.status === 'Open'" class="flex justify-end gap-3 text-xs">
+                  <td class="px-5 py-4 text-right" @click.stop>
+                    <div
+                      v-if="app.status === 'Open' || ((app.status === 'Approved' || app.status === 'Rejected') && (isSystemManager || leaveEmployees.length))"
+                      class="relative inline-block text-left action-dropdown-container"
+                    >
                       <button
-                        @click="editLeave(app)"
-                        class="hover:text-[var(--accent)] transition-colors p-1"
-                        :style="{ color: 'var(--text-secondary)' }"
-                        title="Edit"
+                        @click.stop="activeDropdown = activeDropdown === app.name ? null : app.name"
+                        class="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs text-slate-300 hover:text-white cursor-pointer transition-colors"
                       >
-                        <Edit :size="16" />
+                        More
+                        <ChevronDown :size="12" />
                       </button>
-                      <button
-                        @click="deleteLeave(app.name)"
-                        class="hover:text-[var(--danger-text)] transition-colors p-1"
-                        :style="{ color: 'var(--danger-text)' }"
-                        title="Delete"
+
+                      <div
+                        v-if="activeDropdown === app.name"
+                        class="absolute right-0 mt-1 w-36 rounded-xl shadow-2xl bg-[var(--surface)] border border-[var(--border-color)] z-30 py-1"
                       >
-                        <Trash2 :size="16" />
-                      </button>
+                        <!-- Edit Action (Own leaves only) -->
+                        <button
+                          v-if="app.status === 'Open' && app.employee === authStore.employee"
+                          @click="editLeave(app); activeDropdown = null;"
+                          class="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors text-slate-300 hover:text-white flex items-center gap-2 cursor-pointer"
+                        >
+                          <Edit :size="14" />
+                          Edit
+                        </button>
+
+                        <!-- Delete (Open) Action (Own leaves only) -->
+                        <button
+                          v-if="app.status === 'Open' && app.employee === authStore.employee"
+                          @click="deleteLeave(app.name); activeDropdown = null;"
+                          class="w-full text-left px-3 py-2 text-xs hover:bg-red-500/10 transition-colors text-red-400 flex items-center gap-2 cursor-pointer font-medium"
+                        >
+                          <Trash2 :size="14" />
+                          Delete
+                        </button>
+
+                        <!-- Approve Action (Manager only for others' leaves) -->
+                        <button
+                          v-if="app.status === 'Open' && app.employee !== authStore.employee && (isSystemManager || leaveEmployees.length)"
+                          @click="handleProcessLeave(app.name, 'Approved')"
+                          class="w-full text-left px-3 py-2 text-xs hover:bg-emerald-500/10 transition-colors text-emerald-400 flex items-center gap-2 cursor-pointer font-medium"
+                        >
+                          <CheckCircle2 :size="14" />
+                          Approve
+                        </button>
+
+                        <!-- Reject Action (Manager only for others' leaves) -->
+                        <button
+                          v-if="app.status === 'Open' && app.employee !== authStore.employee && (isSystemManager || leaveEmployees.length)"
+                          @click="handleProcessLeave(app.name, 'Rejected')"
+                          class="w-full text-left px-3 py-2 text-xs hover:bg-red-500/10 transition-colors text-red-500 flex items-center gap-2 cursor-pointer font-medium"
+                        >
+                          <XCircle :size="14" />
+                          Reject
+                        </button>
+
+                        <!-- Delete (Approved/Rejected) Action (Manager only) -->
+                        <button
+                          v-if="(app.status === 'Approved' || app.status === 'Rejected') && (isSystemManager || leaveEmployees.length)"
+                          @click="confirmDeleteApprovedRejected(app)"
+                          class="w-full text-left px-3 py-2 text-xs hover:bg-red-500/10 transition-colors text-red-400 flex items-center gap-2 cursor-pointer font-medium"
+                        >
+                          <Trash2 :size="14" />
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -571,11 +935,21 @@ onMounted(loadData);
           </div>
           <!-- Mobile cards -->
           <div class="sm:hidden divide-y" :style="{ borderColor: 'var(--border-color)' }">
-            <div v-for="app in applications" :key="app.name" class="p-4 space-y-2">
+            <div
+              v-for="app in applications"
+              :key="app.name"
+              class="p-4 space-y-2 cursor-pointer hover:bg-white/[0.01] active:bg-white/[0.02] transition-colors"
+              @click="openLeaveDetail(app)"
+            >
               <div class="flex items-center justify-between">
-                <p class="text-sm font-medium" :style="{ color: 'var(--heading-color)' }">
-                  {{ app.leave_type }}
-                </p>
+                <div>
+                  <p class="text-[10px] font-semibold tracking-wide uppercase mb-0.5" :style="{ color: 'var(--text-secondary)' }">
+                    {{ app.employee_name || app.employee || authStore.employeeName }}
+                  </p>
+                  <p class="text-sm font-medium" :style="{ color: 'var(--heading-color)' }">
+                    {{ app.leave_type }}
+                  </p>
+                </div>
                 <span
                   class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold"
                   :style="{
@@ -604,23 +978,74 @@ onMounted(loadData);
                 </template>
                 &middot; {{ app.total_leave_days }} day{{ app.total_leave_days !== 1 ? "s" : "" }}
               </p>
-              <div v-if="app.status === 'Open'" class="flex items-center gap-3 mt-1.5">
+              <!-- Mobile Actions Dropdown -->
+              <div
+                v-if="app.status === 'Open' || ((app.status === 'Approved' || app.status === 'Rejected') && (isSystemManager || leaveEmployees.length))"
+                class="relative inline-block text-left action-dropdown-container mt-1.5"
+                @click.stop
+              >
                 <button
-                  @click="editLeave(app)"
-                  class="transition-colors p-1 hover:text-[var(--accent)]"
-                  :style="{ color: 'var(--text-secondary)' }"
-                  title="Edit"
+                  @click.stop="activeDropdown = activeDropdown === app.name ? null : app.name"
+                  class="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs text-slate-300 hover:text-white cursor-pointer transition-colors"
                 >
-                  <Edit :size="16" />
+                  Actions
+                  <ChevronDown :size="12" />
                 </button>
-                <button
-                  @click="deleteLeave(app.name)"
-                  class="transition-colors p-1 hover:text-[var(--danger-text)]"
-                  :style="{ color: 'var(--danger-text)' }"
-                  title="Delete"
+
+                <div
+                  v-if="activeDropdown === app.name"
+                  class="absolute left-0 mt-1 w-36 rounded-xl shadow-2xl bg-[var(--surface)] border border-[var(--border-color)] z-30 py-1"
                 >
-                  <Trash2 :size="16" />
-                </button>
+                  <!-- Edit Action (Own leaves only) -->
+                  <button
+                    v-if="app.status === 'Open' && app.employee === authStore.employee"
+                    @click="editLeave(app); activeDropdown = null;"
+                    class="w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors text-slate-300 hover:text-white flex items-center gap-2 cursor-pointer"
+                  >
+                    <Edit :size="14" />
+                    Edit
+                  </button>
+
+                  <!-- Delete (Open) Action (Own leaves only) -->
+                  <button
+                    v-if="app.status === 'Open' && app.employee === authStore.employee"
+                    @click="deleteLeave(app.name); activeDropdown = null;"
+                    class="w-full text-left px-3 py-2 text-xs hover:bg-red-500/10 transition-colors text-red-400 flex items-center gap-2 cursor-pointer font-medium"
+                  >
+                    <Trash2 :size="14" />
+                    Delete
+                  </button>
+
+                  <!-- Approve Action (Manager only for others' leaves) -->
+                  <button
+                    v-if="app.status === 'Open' && app.employee !== authStore.employee && (isSystemManager || leaveEmployees.length)"
+                    @click="handleProcessLeave(app.name, 'Approved')"
+                    class="w-full text-left px-3 py-2 text-xs hover:bg-emerald-500/10 transition-colors text-emerald-400 flex items-center gap-2 cursor-pointer font-medium"
+                  >
+                    <CheckCircle2 :size="14" />
+                    Approve
+                  </button>
+
+                  <!-- Reject Action (Manager only for others' leaves) -->
+                  <button
+                    v-if="app.status === 'Open' && app.employee !== authStore.employee && (isSystemManager || leaveEmployees.length)"
+                    @click="handleProcessLeave(app.name, 'Rejected')"
+                    class="w-full text-left px-3 py-2 text-xs hover:bg-red-500/10 transition-colors text-red-500 flex items-center gap-2 cursor-pointer font-medium"
+                  >
+                    <XCircle :size="14" />
+                    Reject
+                  </button>
+
+                  <!-- Delete (Approved/Rejected) Action (Manager only) -->
+                  <button
+                    v-if="(app.status === 'Approved' || app.status === 'Rejected') && (isSystemManager || leaveEmployees.length)"
+                    @click="confirmDeleteApprovedRejected(app)"
+                    class="w-full text-left px-3 py-2 text-xs hover:bg-red-500/10 transition-colors text-red-400 flex items-center gap-2 cursor-pointer font-medium"
+                  >
+                    <Trash2 :size="14" />
+                    Delete
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -633,6 +1058,121 @@ onMounted(loadData);
         </div>
       </div>
     </div>
+
+    <!-- Leave Detail Modal -->
+    <transition name="modal">
+      <div
+        v-if="showLeaveDetailModal && selectedLeave"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+        style="background-color: var(--overlay-bg);"
+        @click.self="showLeaveDetailModal = false"
+      >
+        <div class="modal-content glass-card w-full max-w-lg p-6 space-y-6">
+          <!-- Header -->
+          <div class="flex items-center justify-between border-b border-white/[0.06] pb-4">
+            <div>
+              <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                <FileText :size="20" class="text-teal-400" />
+                Leave Application Details
+              </h2>
+              <p class="text-xs text-slate-400 mt-1">
+                {{ selectedLeave.employee_name || selectedLeave.employee || authStore.employeeName }}
+              </p>
+            </div>
+            <button
+              @click="showLeaveDetailModal = false"
+              class="p-1 transition-colors text-slate-500 hover:text-white"
+            >
+              <X :size="20" />
+            </button>
+          </div>
+
+          <!-- Details Grid -->
+          <div class="space-y-5">
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span class="block text-xs text-slate-500 font-medium uppercase tracking-wider mb-0.5">Application ID</span>
+                <span class="text-white font-medium font-mono text-xs">{{ selectedLeave.name }}</span>
+              </div>
+              <div>
+                <span class="block text-xs text-slate-500 font-medium uppercase tracking-wider mb-0.5">Status</span>
+                <span
+                  class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
+                  :style="{
+                    backgroundColor: getStatusStyle(selectedLeave.status).bg,
+                    color: getStatusStyle(selectedLeave.status).text,
+                  }"
+                >
+                  {{ selectedLeave.status }}
+                </span>
+              </div>
+              <div>
+                <span class="block text-xs text-slate-500 font-medium uppercase tracking-wider mb-0.5">Leave Type</span>
+                <span class="text-white font-medium">{{ selectedLeave.leave_type }}</span>
+              </div>
+              <div>
+                <span class="block text-xs text-slate-500 font-medium uppercase tracking-wider mb-0.5">Total Days</span>
+                <span class="text-white font-medium">{{ selectedLeave.total_leave_days }} day{{ selectedLeave.total_leave_days !== 1 ? 's' : '' }}</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span class="block text-xs text-slate-500 font-medium uppercase tracking-wider mb-0.5">From Date</span>
+                <span class="text-white font-medium">{{ formatDate(selectedLeave.from_date) }}</span>
+              </div>
+              <div>
+                <span class="block text-xs text-slate-500 font-medium uppercase tracking-wider mb-0.5">To Date</span>
+                <span class="text-white font-medium">{{ formatDate(selectedLeave.to_date) }}</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span class="block text-xs text-slate-500 font-medium uppercase tracking-wider mb-0.5">Half Day</span>
+                <span class="text-white font-medium">{{ selectedLeave.half_day ? 'Yes' : 'No' }}</span>
+              </div>
+            </div>
+
+            <div v-if="selectedLeave.description" class="bg-white/[0.03] p-4 rounded-xl border border-white/[0.06]">
+              <p class="text-xs text-slate-500 uppercase mb-1 font-semibold">Reason</p>
+              <p class="text-slate-300 text-sm whitespace-pre-wrap">{{ selectedLeave.description }}</p>
+            </div>
+
+            <!-- Approve/Reject buttons for managers on Open requests of others -->
+            <div v-if="selectedLeave.status === 'Open' && selectedLeave.employee !== authStore.employee && (isSystemManager || leaveEmployees.length)" class="flex items-center gap-3 border-t border-white/[0.06] pt-5">
+              <button
+                @click="handleProcessLeave(selectedLeave.name, 'Approved'); showLeaveDetailModal = false;"
+                :disabled="!!processing"
+                class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium rounded-lg shadow-lg active:scale-95 transition-all text-sm cursor-pointer"
+              >
+                <CheckCircle2 :size="16" />
+                Approve
+              </button>
+              <button
+                @click="handleProcessLeave(selectedLeave.name, 'Rejected'); showLeaveDetailModal = false;"
+                :disabled="!!processing"
+                class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-rose-500 text-white font-medium rounded-lg shadow-lg active:scale-95 transition-all text-sm cursor-pointer"
+              >
+                <XCircle :size="16" />
+                Reject
+              </button>
+            </div>
+          </div>
+
+          <!-- Close button -->
+          <div class="flex pt-2">
+            <button
+              type="button"
+              @click="showLeaveDetailModal = false"
+              class="w-full px-4 py-2.5 text-sm font-medium rounded-lg text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/[0.08] transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
 
     <!-- Apply Leave Modal -->
     <transition name="modal">
@@ -747,6 +1287,69 @@ onMounted(loadData);
               <span>{{ applyLoading ? "Submitting..." : (isEditing ? "Update Application" : "Submit Application") }}</span>
             </button>
           </form>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Delete Confirmation Modal -->
+    <transition name="modal">
+      <div
+        v-if="showDeletePopup"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+        :style="{ backgroundColor: 'var(--overlay-bg)' }"
+        @click.self="showDeletePopup = false"
+      >
+        <div class="modal-content glass-card w-full max-w-md p-6 space-y-5">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-white">
+              Confirm Delete
+            </h2>
+            <button
+              @click="showDeletePopup = false"
+              class="p-1 transition-colors"
+              :style="{ color: 'var(--text-tertiary)' }"
+            >
+              <X :size="20" />
+            </button>
+          </div>
+
+          <div class="space-y-3">
+            <p class="text-sm text-slate-300">
+              Are you sure you want to delete this approved/rejected leave application?
+            </p>
+            <div class="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 flex items-start gap-2">
+              <AlertCircle :size="16" class="shrink-0 mt-0.5" />
+              <span>
+                <strong>Warning:</strong> This action will delete the attendance records for the leave period and delete the leave application itself.
+              </span>
+            </div>
+          </div>
+
+          <div
+            v-if="deleteError"
+            class="flex items-start gap-2 text-sm p-3 rounded-xl animate-fade-in"
+            :style="{ backgroundColor: 'var(--danger-bg)', color: 'var(--danger-text)' }"
+          >
+            <AlertCircle :size="16" class="mt-0.5 shrink-0" />
+            {{ deleteError }}
+          </div>
+
+          <div class="flex justify-end gap-3">
+            <button
+              @click="showDeletePopup = false"
+              class="px-4 py-2 rounded-xl text-sm font-medium border border-[var(--border-color)] text-slate-300 hover:bg-white/5 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              @click="handleApprovedRejectedDelete"
+              :disabled="deleteLoading"
+              class="px-4 py-2 rounded-xl text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center gap-2 cursor-pointer"
+            >
+              <Loader2 v-if="deleteLoading" :size="16" class="animate-spin" />
+              Done
+            </button>
+          </div>
         </div>
       </div>
     </transition>
