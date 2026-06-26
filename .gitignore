@@ -54,3 +54,6 @@ jspm_packages/
 # Aider AI Chat
 .aider*
 frappe-semgrep-rules/
+
+# Test results
+test_results/

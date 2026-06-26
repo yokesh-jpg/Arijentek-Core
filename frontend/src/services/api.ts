@@ -102,7 +102,8 @@ export async function useCachedFetch<T>(
 export const dashboardApi = {
   getData: () => get("arijentek_core.api.get_dashboard_data"),
   getEmployeeInfo: () => get("arijentek_core.api.get_employee_info"),
-  getReportingInfo: () => get("arijentek_core.api.get_reporting_info"),
+  getReportingInfo: (employee?: string) =>
+    get(`arijentek_core.api.get_reporting_info${employee ? `?employee=${encodeURIComponent(employee)}` : ""}`),
 };
 
 // ---------- Attendance / Clock ----------
@@ -137,7 +138,24 @@ export const attendanceApi = {
     reason: string;
     explanation?: string;
   }) => post("arijentek_core.api.v1.attendance.create_attendance_request", data),
-  // Break management
+  getMyRequests: (status?: string, from_date?: string, to_date?: string) => {
+    const params: string[] = [];
+    if (status) params.push(`status=${encodeURIComponent(status)}`);
+    if (from_date) params.push(`from_date=${encodeURIComponent(from_date)}`);
+    if (to_date) params.push(`to_date=${encodeURIComponent(to_date)}`);
+    const qs = params.length ? `?${params.join("&")}` : "";
+    return get(`arijentek_core.api.v1.attendance.get_my_attendance_requests${qs}`);
+  },
+  updateRequest: (data: {
+    name: string;
+    from_date?: string;
+    to_date?: string;
+    reason?: string;
+    explanation?: string;
+  }) => post("arijentek_core.api.v1.attendance.update_attendance_request", data),
+  deleteRequest: (name: string) =>
+    post("arijentek_core.api.v1.attendance.delete_attendance_request", { name }),
+
   startBreak: () => post("arijentek_core.api.start_break"),
   endBreak: () => post("arijentek_core.api.end_break"),
   getBreakStatus: () => get("arijentek_core.api.get_break_status"),
@@ -163,15 +181,27 @@ export const attendanceApi = {
 export const leaveApi = {
   getTypes: (employee?: string) =>
     get(`arijentek_core.api.get_leave_types${employee ? `?employee=${encodeURIComponent(employee)}` : ""}`),
-  getBalance: () => get("arijentek_core.api.get_leave_balance"),
-  getApplications: () => get("arijentek_core.api.get_leave_applications"),
-  getHolidays: (from_date?: string, to_date?: string, exclude_weekly_off?: boolean) => {
+  getBalance: (employee?: string) =>
+    get(`arijentek_core.api.get_leave_balance${employee ? `?employee=${encodeURIComponent(employee)}` : ""}`),
+  getApplications: (employee?: string, status?: string, from_date?: string, to_date?: string) => {
+    const params: string[] = [];
+    if (employee) params.push(`employee=${encodeURIComponent(employee)}`);
+    if (status) params.push(`status=${encodeURIComponent(status)}`);
+    if (from_date) params.push(`from_date=${encodeURIComponent(from_date)}`);
+    if (to_date) params.push(`to_date=${encodeURIComponent(to_date)}`);
+    const qs = params.length ? `?${params.join("&")}` : "";
+    return get(`arijentek_core.api.get_leave_applications${qs}`);
+  },
+  getHolidays: (from_date?: string, to_date?: string, exclude_weekly_off?: boolean, employee?: string) => {
     const params: string[] = [];
     if (from_date && to_date) {
       params.push(`from_date=${from_date}`, `to_date=${to_date}`);
     }
     if (exclude_weekly_off) {
       params.push("exclude_weekly_off=1");
+    }
+    if (employee) {
+      params.push(`employee=${encodeURIComponent(employee)}`);
     }
     const qs = params.length ? `?${params.join("&")}` : "";
     return get(`arijentek_core.api.get_holidays${qs}`);
@@ -188,6 +218,8 @@ export const leaveApi = {
     post("arijentek_core.api.cancel_leave", { leave_application }),
   delete: (leave_application: string) =>
     post("arijentek_core.api.delete_leave", { leave_application }),
+  deleteApprovedRejected: (leave_application: string) =>
+    post("arijentek_core.api.delete_approved_rejected_leave", { leave_application }),
 };
 
 // ---------- Payroll ----------
@@ -224,6 +256,7 @@ export const managerApi = {
   processLeave: (application: string, status: "Approved" | "Rejected") =>
     post("arijentek_core.api.process_leave", { leave_application: application, status }),
   getPendingLeaveCount: () => get("arijentek_core.api.notifications.get_pending_leave_count"),
+  getPendingCounts: () => get("arijentek_core.api.notifications.get_team_pending_counts"),
   getTeamAttendanceRequests: (status?: string, from_date?: string, to_date?: string, employee?: string) => {
     const params: string[] = [];
     if (status) params.push(`status=${encodeURIComponent(status)}`);

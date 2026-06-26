@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
-import { attendanceApi, leaveApi, useCachedFetch } from "../services/api";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { attendanceApi, leaveApi, managerApi, useCachedFetch } from "../services/api";
 import ClockWidget from "../components/ClockWidget.vue";
 import {
   CalendarCheck,
@@ -14,6 +14,10 @@ import {
   X,
   Pencil,
   Trash2,
+  Eye,
+  CheckCircle,
+  XCircle,
+  FileText,
 } from "lucide-vue-next";
 
 const loading = ref(true);
@@ -101,6 +105,7 @@ function openAddModal() {
 const showRequestModal = ref(false);
 const requestSubmitting = ref(false);
 const requestFormError = ref("");
+const editingRequestId = ref<string | null>(null);
 const requestForm = ref({
   from_date: "",
   to_date: "",
@@ -109,6 +114,7 @@ const requestForm = ref({
 });
 
 function openRequestModal() {
+  editingRequestId.value = null;
   requestForm.value = {
     from_date: "",
     to_date: "",
@@ -120,7 +126,7 @@ function openRequestModal() {
 }
 
 watch(() => requestForm.value.from_date, (newFromDate) => {
-  if (newFromDate) {
+  if (newFromDate && !editingRequestId.value) {
     requestForm.value.to_date = newFromDate;
   }
 });
@@ -130,15 +136,27 @@ async function submitRequestForm() {
   requestSubmitting.value = true;
   requestFormError.value = "";
   try {
-    const res = await attendanceApi.createRequest({
-      from_date: requestForm.value.from_date,
-      to_date: requestForm.value.to_date,
-      reason: "On Duty",
-      explanation: requestForm.value.explanation,
-    });
+    let res;
+    if (editingRequestId.value) {
+      res = await attendanceApi.updateRequest({
+        name: editingRequestId.value,
+        from_date: requestForm.value.from_date,
+        to_date: requestForm.value.to_date,
+        reason: "On Duty",
+        explanation: requestForm.value.explanation,
+      });
+    } else {
+      res = await attendanceApi.createRequest({
+        from_date: requestForm.value.from_date,
+        to_date: requestForm.value.to_date,
+        reason: "On Duty",
+        explanation: requestForm.value.explanation,
+      });
+    }
     if (res && res.status === "success") {
       showRequestModal.value = false;
       loadData();
+      loadMyRequests();
     } else {
       requestFormError.value = res.message || "Failed to submit attendance request";
     }
@@ -147,6 +165,125 @@ async function submitRequestForm() {
   } finally {
     requestSubmitting.value = false;
   }
+}
+
+// ===== My Attendance Requests =====
+interface AttendanceRequestRecord {
+  name: string;
+  employee: string;
+  employee_name: string;
+  from_date: string;
+  to_date: string;
+  reason: string;
+  explanation: string;
+  creation: string;
+  status: string;
+}
+
+const myRequests = ref<AttendanceRequestRecord[]>([]);
+const loadingRequests = ref(false);
+const showRequestDetailModal = ref(false);
+const selectedRequest = ref<AttendanceRequestRecord | null>(null);
+const requestProcessing = ref<string | null>(null);
+const requestSuccessMessage = ref("");
+const requestErrorMessage = ref("");
+
+async function loadMyRequests() {
+  loadingRequests.value = true;
+  try {
+    let allRequests: AttendanceRequestRecord[] = [];
+
+    const mStr = String(selectedMonth.value).padStart(2, "0");
+    const lastDay = new Date(selectedYear.value, selectedMonth.value, 0).getDate();
+    const fromDate = `${selectedYear.value}-${mStr}-01`;
+    const toDate = `${selectedYear.value}-${mStr}-${String(lastDay).padStart(2, "0")}`;
+    const empFilter = selectedEmployee.value;
+
+    // Try fetching own requests (if no specific employee is selected or if "all" is selected)
+    if (!empFilter || empFilter === "all") {
+      try {
+        const myData = await attendanceApi.getMyRequests(undefined, fromDate, toDate);
+        if (Array.isArray(myData)) {
+          allRequests = [...myData];
+        }
+      } catch (e) {
+        console.warn("Could not load own requests", e);
+      }
+    }
+
+    // If manager, fetch team requests based on filters
+    if (canMark.value) {
+      try {
+        const teamEmp = empFilter === "all" ? undefined : empFilter;
+        const teamData = await managerApi.getTeamAttendanceRequests(undefined, fromDate, toDate, teamEmp);
+        if (Array.isArray(teamData)) {
+          // Merge by name to avoid duplicates
+          const existingNames = new Set(allRequests.map((r) => r.name));
+          for (const req of teamData) {
+            if (!existingNames.has(req.name)) {
+              allRequests.push(req);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Could not load team requests", e);
+      }
+    }
+
+    // Sort by creation desc
+    allRequests.sort((a, b) => {
+      const dA = new Date(a.creation || 0).getTime();
+      const dB = new Date(b.creation || 0).getTime();
+      return dB - dA;
+    });
+
+    myRequests.value = allRequests;
+  } catch (e) {
+    console.error("Failed to load attendance requests", e);
+  } finally {
+    loadingRequests.value = false;
+  }
+}
+
+function openRequestDetail(req: AttendanceRequestRecord) {
+  selectedRequest.value = req;
+  showRequestDetailModal.value = true;
+}
+
+
+
+async function handleApproveReject(name: string, action: "Approve" | "Reject") {
+  if (requestProcessing.value) return;
+  requestProcessing.value = name;
+  requestErrorMessage.value = "";
+  requestSuccessMessage.value = "";
+  try {
+    const res = await managerApi.processAttendanceRequest(name, action);
+    if (res.status === "success") {
+      requestSuccessMessage.value = `Attendance request ${action === "Approve" ? "approved" : "rejected"} successfully`;
+      loadMyRequests();
+      window.dispatchEvent(new CustomEvent("refresh-pending-counts"));
+    } else {
+      requestErrorMessage.value = res.message || "Action failed";
+    }
+  } catch (e: any) {
+    requestErrorMessage.value = e.message || "Error processing request";
+  } finally {
+    requestProcessing.value = null;
+    setTimeout(() => {
+      requestSuccessMessage.value = "";
+      requestErrorMessage.value = "";
+    }, 3000);
+  }
+}
+
+function requestStatusBadge(status: string) {
+  const map: Record<string, string> = {
+    Open: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    Approved: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    Rejected: "bg-red-500/10 text-red-400 border-red-500/20",
+  };
+  return map[status] || "bg-slate-500/10 text-slate-400 border-slate-500/20";
 }
 
 function extractTime(dtStr: string | null | undefined): string {
@@ -364,6 +501,7 @@ async function loadData() {
 // Reload when month or employee changes
 watch([selectedMonth, selectedYear, selectedEmployee], () => {
   loadData();
+  loadMyRequests();
 });
 
 function onPunched() {
@@ -404,6 +542,11 @@ onMounted(async () => {
   if (!listFetched) {
     await loadData();
   }
+
+  loadMyRequests();
+});
+
+onUnmounted(() => {
 });
 </script>
 
@@ -710,6 +853,156 @@ onMounted(async () => {
           <p class="text-slate-500 text-sm">No attendance records for this month</p>
         </div>
       </div>
+
+      <!-- Attendance Requests Section -->
+      <div>
+        <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
+          {{ canMark ? "Attendance Requests (My & Team)" : "My Attendance Requests" }}
+        </h3>
+
+        <!-- Success / Error Messages -->
+        <div
+          v-if="requestSuccessMessage"
+          class="mb-4 p-3 text-sm rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+        >
+          {{ requestSuccessMessage }}
+        </div>
+        <div
+          v-if="requestErrorMessage"
+          class="mb-4 p-3 text-sm rounded-lg bg-red-500/10 text-red-400 border border-red-500/20"
+        >
+          {{ requestErrorMessage }}
+        </div>
+
+        <!-- Loading -->
+        <div v-if="loadingRequests" class="flex items-center justify-center py-8">
+          <div class="w-8 h-8 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+        </div>
+
+        <div v-else-if="myRequests.length" class="glass-card overflow-hidden">
+          <!-- Desktop Table -->
+          <div class="hidden sm:block overflow-x-auto">
+            <table class="w-full">
+              <thead>
+                <tr class="border-b border-white/[0.06]">
+                  <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-5 py-3">Employee</th>
+                  <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-5 py-3">From Date</th>
+                  <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-5 py-3">To Date</th>
+                  <th class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-5 py-3">Reason</th>
+                  <th class="text-center text-xs font-semibold text-slate-500 uppercase tracking-wider px-5 py-3">Status</th>
+                  <th v-if="canMark" class="text-right text-xs font-semibold text-slate-500 uppercase tracking-wider px-5 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="req in myRequests"
+                  :key="req.name"
+                  class="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors cursor-pointer"
+                  @click="openRequestDetail(req)"
+                >
+                  <td class="px-5 py-4">
+                    <span class="text-sm font-medium text-white">{{ req.employee_name }}</span>
+                  </td>
+                  <td class="px-5 py-4">
+                    <span class="text-sm font-medium text-white">{{ formatDate(req.from_date) }}</span>
+                  </td>
+                  <td class="px-5 py-4">
+                    <span class="text-sm font-medium text-white">{{ formatDate(req.to_date) }}</span>
+                  </td>
+                  <td class="px-5 py-4">
+                    <span class="text-sm text-slate-300">{{ req.reason }}</span>
+                  </td>
+                  <td class="px-5 py-4 text-center">
+                    <span
+                      class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium border"
+                      :class="requestStatusBadge(req.status)"
+                    >
+                      {{ req.status }}
+                    </span>
+                  </td>
+                  <td v-if="canMark" class="px-5 py-4 text-right" @click.stop>
+                    <div class="flex items-center justify-end gap-2">
+                      <button
+                        v-if="req.status === 'Open'"
+                        @click="handleApproveReject(req.name, 'Approve')"
+                        :disabled="!!requestProcessing"
+                        class="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                        title="Approve"
+                      >
+                        <CheckCircle :size="16" />
+                      </button>
+                      <button
+                        v-if="req.status === 'Open'"
+                        @click="handleApproveReject(req.name, 'Reject')"
+                        :disabled="!!requestProcessing"
+                        class="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                        title="Reject"
+                      >
+                        <XCircle :size="16" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Mobile Cards -->
+          <div class="sm:hidden divide-y divide-white/[0.04]">
+            <div
+              v-for="req in myRequests"
+              :key="req.name"
+              class="p-4 space-y-2 cursor-pointer hover:bg-white/[0.01] active:bg-white/[0.02] transition-colors"
+              @click="openRequestDetail(req)"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm font-medium text-white mb-0.5">{{ req.employee_name }}</p>
+                  <p class="text-sm font-medium text-slate-300">{{ formatDate(req.from_date) }} — {{ formatDate(req.to_date) }}</p>
+                  <p class="text-xs text-slate-500 mt-0.5">{{ req.reason }}</p>
+                </div>
+                <span
+                  class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium border"
+                  :class="requestStatusBadge(req.status)"
+                >
+                  {{ req.status }}
+                </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span v-if="req.explanation" class="text-xs text-slate-500 truncate max-w-[200px]">
+                  {{ req.explanation }}
+                </span>
+                <span v-else class="text-xs text-slate-600">—</span>
+                <div v-if="canMark" class="flex items-center gap-2" @click.stop>
+                  <button
+                    v-if="req.status === 'Open'"
+                    @click="handleApproveReject(req.name, 'Approve')"
+                    :disabled="!!requestProcessing"
+                    class="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                    title="Approve"
+                  >
+                    <CheckCircle :size="14" />
+                  </button>
+                  <button
+                    v-if="req.status === 'Open'"
+                    @click="handleApproveReject(req.name, 'Reject')"
+                    :disabled="!!requestProcessing"
+                    class="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                    title="Reject"
+                  >
+                    <XCircle :size="14" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="glass-card p-8 text-center">
+          <FileText :size="32" class="mx-auto text-slate-600 mb-2" />
+          <p class="text-slate-500 text-sm">No attendance requests found</p>
+        </div>
+      </div>
     </div>
 
     <!-- Add Attendance Modal -->
@@ -830,7 +1123,7 @@ onMounted(async () => {
       </div>
     </transition>
 
-    <!-- Request Attendance Modal -->
+    <!-- Request Attendance Modal (Create / Edit) -->
     <transition name="modal">
       <div
         v-if="showRequestModal"
@@ -841,7 +1134,7 @@ onMounted(async () => {
         <div class="modal-content glass-card w-full max-w-md p-6 space-y-5">
           <div class="flex items-center justify-between">
             <h2 class="text-lg font-semibold text-white">
-              Request Attendance
+              {{ editingRequestId ? "Edit Attendance Request" : "Request Attendance" }}
             </h2>
             <button
               @click="showRequestModal = false"
@@ -1044,5 +1337,111 @@ onMounted(async () => {
         </div>
       </div>
     </transition>
+
+    <!-- Request Detail Modal -->
+    <transition name="modal">
+      <div
+        v-if="showRequestDetailModal && selectedRequest"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+        style="background-color: var(--overlay-bg);"
+        @click.self="showRequestDetailModal = false"
+      >
+        <div class="modal-content glass-card w-full max-w-lg p-6 space-y-6">
+          <!-- Header -->
+          <div class="flex items-center justify-between border-b border-white/[0.06] pb-4">
+            <div>
+              <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                <FileText :size="20" class="text-teal-400" />
+                Attendance Request Details
+              </h2>
+              <p class="text-xs text-slate-400 mt-1">
+                {{ selectedRequest.employee_name }}
+              </p>
+            </div>
+            <button
+              @click="showRequestDetailModal = false"
+              class="p-1 transition-colors text-slate-500 hover:text-white"
+            >
+              <X :size="20" />
+            </button>
+          </div>
+
+          <!-- Details Grid -->
+          <div class="space-y-5">
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span class="block text-xs text-slate-500 font-medium uppercase tracking-wider mb-0.5">Reference ID</span>
+                <span class="text-white font-medium font-mono text-xs">{{ selectedRequest.name }}</span>
+              </div>
+              <div>
+                <span class="block text-xs text-slate-500 font-medium uppercase tracking-wider mb-0.5">Status</span>
+                <span
+                  class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium border"
+                  :class="requestStatusBadge(selectedRequest.status)"
+                >
+                  {{ selectedRequest.status }}
+                </span>
+              </div>
+              <div>
+                <span class="block text-xs text-slate-500 font-medium uppercase tracking-wider mb-0.5">Applied Date</span>
+                <span class="text-white font-medium">{{ formatDate(selectedRequest.creation) }}</span>
+              </div>
+              <div>
+                <span class="block text-xs text-slate-500 font-medium uppercase tracking-wider mb-0.5">Reason</span>
+                <span class="text-white font-medium">{{ selectedRequest.reason }}</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span class="block text-xs text-slate-500 font-medium uppercase tracking-wider mb-0.5">From Date</span>
+                <span class="text-white font-medium">{{ formatDate(selectedRequest.from_date) }}</span>
+              </div>
+              <div>
+                <span class="block text-xs text-slate-500 font-medium uppercase tracking-wider mb-0.5">To Date</span>
+                <span class="text-white font-medium">{{ formatDate(selectedRequest.to_date) }}</span>
+              </div>
+            </div>
+
+            <div v-if="selectedRequest.explanation" class="bg-white/[0.03] p-4 rounded-xl border border-white/[0.06]">
+              <p class="text-xs text-slate-500 uppercase mb-1 font-semibold">Explanation</p>
+              <p class="text-slate-300 text-sm whitespace-pre-wrap">{{ selectedRequest.explanation }}</p>
+            </div>
+
+            <!-- Approve/Reject buttons for managers on Open requests -->
+            <div v-if="canMark && selectedRequest.status === 'Open'" class="flex items-center gap-3 border-t border-white/[0.06] pt-5">
+              <button
+                @click="handleApproveReject(selectedRequest.name, 'Approve'); showRequestDetailModal = false;"
+                :disabled="!!requestProcessing"
+                class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium rounded-lg shadow-lg active:scale-95 transition-all text-sm cursor-pointer"
+              >
+                <CheckCircle :size="16" />
+                Approve
+              </button>
+              <button
+                @click="handleApproveReject(selectedRequest.name, 'Reject'); showRequestDetailModal = false;"
+                :disabled="!!requestProcessing"
+                class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-rose-500 text-white font-medium rounded-lg shadow-lg active:scale-95 transition-all text-sm cursor-pointer"
+              >
+                <XCircle :size="16" />
+                Reject
+              </button>
+            </div>
+          </div>
+
+          <!-- Close button -->
+          <div class="flex pt-2">
+            <button
+              type="button"
+              @click="showRequestDetailModal = false"
+              class="w-full px-4 py-2.5 text-sm font-medium rounded-lg text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/[0.08] transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
+
 </template>

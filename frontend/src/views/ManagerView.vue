@@ -40,6 +40,7 @@ interface ExpenseClaim {
   approval_status: string;
   company: string;
   payable_account?: string;
+  expense_approver?: string;
   remark?: string;
   expense_type?: string;
   amount?: number;
@@ -66,6 +67,38 @@ const loading = ref(true);
 const processing = ref<string | null>(null);
 const error = ref("");
 const successMessage = ref("");
+
+const pendingCounts = ref({
+  leaves: 0,
+  expenses: 0,
+  attendance: 0,
+  total: 0
+});
+
+async function fetchTabCounts() {
+  try {
+    const res = await managerApi.getPendingCounts();
+    pendingCounts.value = {
+      leaves: res?.leaves || 0,
+      expenses: res?.expenses || 0,
+      attendance: res?.attendance || 0,
+      total: res?.total || 0,
+    };
+  } catch (e) {
+    console.error("Failed to load counts:", e);
+  }
+}
+
+function handleRefreshCounts() {
+  fetchTabCounts();
+  if (activeTab.value === "leave") {
+    loadLeaves(true);
+  } else if (activeTab.value === "expense") {
+    loadExpenses(true);
+  } else if (activeTab.value === "attendance") {
+    loadAttendanceRequests(true);
+  }
+}
 
 // Approval Modal State
 const showApproveModal = ref(false);
@@ -182,6 +215,7 @@ function handleWindowClick(e: MouseEvent) {
 onUnmounted(() => {
   document.body.classList.remove("overflow-hidden");
   window.removeEventListener("click", handleWindowClick);
+  window.removeEventListener("refresh-pending-counts", handleRefreshCounts);
 });
 
 async function fetchLeaveEmployees() {
@@ -240,6 +274,8 @@ async function handleProcessAttendanceRequest(name: string, action: "Approve" | 
     if (res.status === "success") {
       successMessage.value = `Attendance request ${action === "Approve" ? "approved" : "rejected"} successfully`;
       attendanceRequests.value = attendanceRequests.value.filter((r) => r.name !== name);
+      fetchTabCounts();
+      window.dispatchEvent(new CustomEvent("refresh-pending-counts"));
     } else {
       error.value = res.message || "Action failed";
     }
@@ -311,8 +347,8 @@ function formatDateToISO(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-async function loadLeaves() {
-  loading.value = true;
+async function loadLeaves(silent = false) {
+  if (!silent) loading.value = true;
   try {
     const leavesData = await managerApi.getTeamLeaves(
       filterStatus.value,
@@ -329,8 +365,8 @@ async function loadLeaves() {
   }
 }
 
-async function loadExpenses() {
-  loading.value = true;
+async function loadExpenses(silent = false) {
+  if (!silent) loading.value = true;
   try {
     const expensesData = await expensesApi.getTeamExpenses(
       filterStatus.value,
@@ -420,6 +456,8 @@ async function handleProcessLeave(appId: string, status: "Approved" | "Rejected"
     if (res.status === "success" || res.success) {
       successMessage.value = `Leave ${status} successfully`;
       leaves.value = leaves.value.filter((a) => a.name !== appId);
+      fetchTabCounts();
+      window.dispatchEvent(new CustomEvent("refresh-pending-counts"));
     } else {
       error.value = res.error || "Action failed";
     }
@@ -445,6 +483,8 @@ async function handleProcessExpense(appId: string, status: "Approve" | "Reject")
     if (res.status === "success" || res.success) {
       successMessage.value = `Expense ${status}d successfully`;
       expenses.value = expenses.value.filter((a) => a.name !== appId);
+      fetchTabCounts();
+      window.dispatchEvent(new CustomEvent("refresh-pending-counts"));
     } else {
       error.value = res.error || "Action failed";
     }
@@ -494,6 +534,8 @@ async function submitProcess() {
       expenses.value = expenses.value.filter((a) => a.name !== selectedClaim.value?.name);
       showApproveModal.value = false;
       selectedClaim.value = null;
+      fetchTabCounts();
+      window.dispatchEvent(new CustomEvent("refresh-pending-counts"));
     } else {
       approvalError.value = res.error || "Action failed";
     }
@@ -538,7 +580,9 @@ function statusColor(status: string) {
 
 onMounted(() => {
   loadData();
+  fetchTabCounts();
   window.addEventListener("click", handleWindowClick);
+  window.addEventListener("refresh-pending-counts", handleRefreshCounts);
 });
 </script>
 
@@ -553,10 +597,17 @@ onMounted(() => {
     <div class="flex gap-4 mb-6 border-b border-white/5">
       <button
         @click="activeTab = 'leave'"
-        class="pb-2 text-sm font-medium transition-colors relative"
+        class="pb-2 text-sm font-medium transition-colors relative flex items-center gap-1.5"
         :class="activeTab === 'leave' ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'"
       >
-        Leave Requests
+        <span>Leave Requests</span>
+        <span
+          v-if="pendingCounts.leaves > 0"
+          class="px-1.5 py-0.5 text-[10px] font-bold rounded-full transition-colors"
+          :class="activeTab === 'leave' ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'"
+        >
+          {{ pendingCounts.leaves }}
+        </span>
         <span
           v-if="activeTab === 'leave'"
           class="absolute bottom-0 left-0 w-full h-0.5 bg-teal-500 rounded-full"
@@ -564,10 +615,17 @@ onMounted(() => {
       </button>
       <button
         @click="activeTab = 'expense'"
-        class="pb-2 text-sm font-medium transition-colors relative"
+        class="pb-2 text-sm font-medium transition-colors relative flex items-center gap-1.5"
         :class="activeTab === 'expense' ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'"
       >
-        Expense Claims
+        <span>Expense Claims</span>
+        <span
+          v-if="pendingCounts.expenses > 0"
+          class="px-1.5 py-0.5 text-[10px] font-bold rounded-full transition-colors"
+          :class="activeTab === 'expense' ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'"
+        >
+          {{ pendingCounts.expenses }}
+        </span>
         <span
           v-if="activeTab === 'expense'"
           class="absolute bottom-0 left-0 w-full h-0.5 bg-teal-500 rounded-full"
@@ -576,10 +634,17 @@ onMounted(() => {
       <button
         v-if="isSystemManager"
         @click="activeTab = 'attendance'"
-        class="pb-2 text-sm font-medium transition-colors relative"
+        class="pb-2 text-sm font-medium transition-colors relative flex items-center gap-1.5"
         :class="activeTab === 'attendance' ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'"
       >
-        Attendance Requests
+        <span>Attendance Requests</span>
+        <span
+          v-if="pendingCounts.attendance > 0"
+          class="px-1.5 py-0.5 text-[10px] font-bold rounded-full transition-colors"
+          :class="activeTab === 'attendance' ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'"
+        >
+          {{ pendingCounts.attendance }}
+        </span>
         <span
           v-if="activeTab === 'attendance'"
           class="absolute bottom-0 left-0 w-full h-0.5 bg-teal-500 rounded-full"
@@ -1126,6 +1191,15 @@ onMounted(() => {
                 class="input-dark opacity-60 cursor-not-allowed py-2 px-3"
               />
             </div>
+            <div class="col-span-2">
+              <label class="block text-xs font-medium text-slate-400 mb-1.5 uppercase">Expense Approver</label>
+              <input
+                type="text"
+                disabled
+                :value="selectedClaim.expense_approver || '-'"
+                class="input-dark opacity-60 cursor-not-allowed py-2 px-3"
+              />
+            </div>
           </div>
 
           <!-- Expense Lines Table -->
@@ -1260,6 +1334,10 @@ onMounted(() => {
             <div>
               <p class="text-slate-500 text-xs font-semibold">Employee</p>
               <p class="text-white font-medium mt-1">{{ selectedDetail.employee_name }}</p>
+            </div>
+            <div>
+              <p class="text-slate-500 text-xs font-semibold">Expense Approver</p>
+              <p class="text-white font-medium mt-1">{{ selectedDetail.expense_approver || '-' }}</p>
             </div>
             <div v-if="selectedDetail.payable_account">
               <p class="text-slate-500 text-xs font-semibold">Payable Account</p>

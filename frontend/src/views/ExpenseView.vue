@@ -10,6 +10,7 @@ import {
   IndianRupee,
   FileText,
   CheckCircle,
+  XCircle,
   AlertCircle,
   Clock,
   Trash2,
@@ -53,10 +54,24 @@ const loading = ref(true);
 const showModal = ref(false);
 const showDetailModal = ref(false);
 const selectedDetail = ref<Expense | null>(null);
-const viewMode = ref<"card" | "list">("card");
+const viewMode = ref<"card" | "list">("list");
 
 const employeeInfo = ref<any>(null);
 const approvers = ref<any[]>([]);
+const myApprovers = ref<any[]>([]);
+
+const isSystemManager = computed(() => authStore.isSystemManager);
+const expenseEmployees = ref<any[]>([]);
+const selectedEmployee = ref<string>("");
+
+// Approval Modal State
+const showApproveModal = ref(false);
+const approvingClaim = ref<Expense | null>(null);
+const payableAccounts = ref<{ value: string; label: string }[]>([]);
+const selectedPayableAccount = ref("");
+const processingAction = ref(false);
+const actionError = ref("");
+const modalAction = ref<"Approve" | "Reject">("Approve");
 
 // Form states
 const isEditing = ref(false);
@@ -69,6 +84,8 @@ const form = ref({
   remark: "",
   expenses: [] as ExpenseLine[],
   proofs: [] as string[],
+  employee: "",
+  employee_name: "",
 });
 
 const submitting = ref(false);
@@ -147,18 +164,27 @@ function formatDateToISO(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-watch([filterStatus, filterFromDate, filterToDate], () => {
+watch([filterStatus, filterFromDate, filterToDate, selectedEmployee], () => {
   loadData();
 });
 
 async function loadData() {
   loading.value = true;
   try {
-    const [myExp, types] = await Promise.all([
-      expensesApi.getMyExpenses(filterStatus.value, filterFromDate.value, filterToDate.value),
+    const fetchExpenses = selectedEmployee.value
+      ? expensesApi.getTeamExpenses(
+          filterStatus.value,
+          filterFromDate.value,
+          filterToDate.value,
+          selectedEmployee.value === "all" ? undefined : selectedEmployee.value
+        )
+      : expensesApi.getMyExpenses(filterStatus.value, filterFromDate.value, filterToDate.value);
+
+    const [expData, types] = await Promise.all([
+      fetchExpenses,
       expensesApi.getTypes()
     ]);
-    expenses.value = Array.isArray(myExp) ? myExp : [];
+    expenses.value = Array.isArray(expData) ? expData : [];
     expenseTypes.value = Array.isArray(types) ? types : [];
   } catch (e) {
     console.error(e);
@@ -173,7 +199,8 @@ async function fetchEmployeeAndApprovers() {
     employeeInfo.value = emp;
     if (emp && emp.employee_id) {
       const apprData = await expensesApi.getApprovers(emp.employee_id);
-      approvers.value = apprData?.department_approvers || [];
+      myApprovers.value = apprData?.department_approvers || [];
+      approvers.value = [...myApprovers.value];
       // Set default approver if available
       if (!form.value.expense_approver && apprData?.expense_approver) {
         form.value.expense_approver = apprData.expense_approver;
@@ -181,6 +208,69 @@ async function fetchEmployeeAndApprovers() {
     }
   } catch (e) {
     console.error("Failed to load employee info / approvers:", e);
+  }
+}
+
+async function fetchExpenseEmployees() {
+  try {
+    const data = await expensesApi.getExpenseApproverEmployees();
+    expenseEmployees.value = Array.isArray(data) ? data : [];
+    if (isSystemManager.value || expenseEmployees.value.length > 0) {
+      selectedEmployee.value = "all";
+    }
+  } catch (e) {
+    console.error("Failed to load expense employees:", e);
+  }
+}
+
+async function openApproveModal(exp: Expense, action: "Approve" | "Reject") {
+  approvingClaim.value = exp;
+  modalAction.value = action;
+  selectedPayableAccount.value = "";
+  actionError.value = "";
+  payableAccounts.value = [];
+  showApproveModal.value = true;
+  
+  if (action === "Approve" && exp.company) {
+    try {
+      const accounts = await expensesApi.getPayableAccounts(exp.company);
+      payableAccounts.value = Array.isArray(accounts) ? accounts : [];
+      if (payableAccounts.value.length > 0) {
+        selectedPayableAccount.value = payableAccounts.value[0].value;
+      }
+    } catch (e) {
+      console.error("Failed to load payable accounts:", e);
+    }
+  }
+}
+
+async function submitProcess() {
+  if (!approvingClaim.value) return;
+  if (modalAction.value === "Approve" && !selectedPayableAccount.value) {
+    actionError.value = "Please select a Payable Account.";
+    return;
+  }
+
+  processingAction.value = true;
+  actionError.value = "";
+  try {
+    const res = await expensesApi.process(
+      approvingClaim.value.name,
+      modalAction.value,
+      modalAction.value === "Approve" ? selectedPayableAccount.value : undefined
+    );
+    if (res.success) {
+      success.value = `Expense claim ${modalAction.value === "Approve" ? "approved" : "rejected"} successfully`;
+      showApproveModal.value = false;
+      approvingClaim.value = null;
+      loadData();
+    } else {
+      actionError.value = res.error || "Action failed";
+    }
+  } catch (e: any) {
+    actionError.value = e.message || "An error occurred during process";
+  } finally {
+    processingAction.value = false;
   }
 }
 
@@ -229,6 +319,7 @@ async function uploadFile(file: File): Promise<string> {
 function openNewClaimModal() {
   isEditing.value = false;
   editClaimName.value = "";
+  approvers.value = [...myApprovers.value];
   form.value = {
     posting_date: new Date().toISOString().substring(0, 10),
     expense_approver: approvers.value.length > 0 ? (employeeInfo.value?.expense_approver || approvers.value[0].name) : "",
@@ -237,20 +328,24 @@ function openNewClaimModal() {
       { expense_date: new Date().toISOString().substring(0, 10), expense_type: "", amount: 0, description: "" }
     ],
     proofs: [],
+    employee: "",
+    employee_name: "",
   };
   error.value = "";
   success.value = "";
   showModal.value = true;
 }
 
-function handleEdit(exp: Expense) {
+async function handleEdit(exp: Expense) {
   activeActionMenu.value = "";
   isEditing.value = true;
   editClaimName.value = exp.name;
   
+  const targetApprover = exp.expense_approver || "";
+
   form.value = {
     posting_date: exp.posting_date || new Date().toISOString().substring(0, 10),
-    expense_approver: exp.expense_approver || "",
+    expense_approver: targetApprover,
     remark: exp.remark || "",
     expenses: exp.expenses && exp.expenses.length > 0
       ? exp.expenses.map((line) => ({
@@ -261,7 +356,20 @@ function handleEdit(exp: Expense) {
         }))
       : [{ expense_date: exp.posting_date || new Date().toISOString().substring(0, 10), expense_type: "", amount: 0, description: "" }],
     proofs: exp.proofs ? [...exp.proofs] : (exp.proof ? [exp.proof] : []),
+    employee: exp.employee || "",
+    employee_name: exp.employee_name || "",
   };
+
+  if (exp.employee) {
+    try {
+      const apprData = await expensesApi.getApprovers(exp.employee);
+      approvers.value = apprData?.department_approvers || [];
+      // Re-assign targetApprover to model once options are loaded into dropdown
+      form.value.expense_approver = targetApprover;
+    } catch (e) {
+      console.error("Failed to load approvers for employee:", exp.employee, e);
+    }
+  }
   
   error.value = "";
   success.value = "";
@@ -325,7 +433,17 @@ watch(showDetailModal, (val) => {
   if (val) {
     document.body.classList.add("overflow-hidden");
   } else {
-    if (!showModal.value) {
+    if (!showModal.value && !showApproveModal.value) {
+      document.body.classList.remove("overflow-hidden");
+    }
+  }
+});
+
+watch(showApproveModal, (val) => {
+  if (val) {
+    document.body.classList.add("overflow-hidden");
+  } else {
+    if (!showModal.value && !showDetailModal.value) {
       document.body.classList.remove("overflow-hidden");
     }
   }
@@ -419,7 +537,8 @@ function formatDate(dateStr: string) {
   return `${day}/${month}/${year}`;
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await fetchExpenseEmployees();
   loadData();
   fetchEmployeeAndApprovers();
   
@@ -447,20 +566,20 @@ onMounted(() => {
         <!-- View Toggle -->
         <div class="flex items-center bg-white/5 border border-white/10 rounded-xl p-1">
           <button
-            @click="viewMode = 'card'"
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-            :class="viewMode === 'card' ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'"
-          >
-            <LayoutGrid :size="14" />
-            Card
-          </button>
-          <button
             @click="viewMode = 'list'"
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
             :class="viewMode === 'list' ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'"
           >
             <List :size="14" />
             List
+          </button>
+          <button
+            @click="viewMode = 'card'"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+            :class="viewMode === 'card' ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'"
+          >
+            <LayoutGrid :size="14" />
+            Card
           </button>
         </div>
         <!-- New Claim Button -->
@@ -476,6 +595,20 @@ onMounted(() => {
 
     <!-- Filters -->
     <div class="flex flex-col sm:flex-row gap-4 p-4 bg-white/5 border border-white/10 rounded-2xl animate-fade-in relative z-20">
+      <!-- Employee List Filter (visible if expense_approver/system manager) -->
+      <div v-if="isSystemManager || expenseEmployees.length" class="flex-1">
+        <label class="block text-[10px] font-semibold text-slate-400 uppercase mb-1.5 tracking-wider">Employee</label>
+        <div class="relative w-full">
+          <select v-model="selectedEmployee" class="input-dark appearance-none pr-10 text-xs py-2 px-3">
+            <option value="all">All Employees</option>
+            <option v-for="emp in expenseEmployees" :key="emp.name" :value="emp.name">
+              {{ emp.employee_name }}
+            </option>
+          </select>
+          <ChevronDown class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" :size="14" />
+        </div>
+      </div>
+
       <!-- Status Filter -->
       <div class="flex-1">
         <label class="block text-[10px] font-semibold text-slate-400 uppercase mb-1.5 tracking-wider">Status</label>
@@ -588,28 +721,48 @@ onMounted(() => {
             <div v-if="exp.approval_status === 'Draft'" class="relative inline-block text-left">
               <button
                 @click.stop="toggleActionMenu(exp.name)"
-                class="more-btn p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                class="more-btn flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs text-slate-300 hover:text-white cursor-pointer transition-colors"
                 title="More actions"
               >
-                <MoreVertical :size="16" />
+                More
+                <ChevronDown :size="12" />
               </button>
               
               <div
                 v-if="activeActionMenu === exp.name"
                 class="dropdown-menu absolute right-0 mt-1 z-30 w-32 rounded-lg shadow-xl overflow-hidden text-xs"
               >
-                <button
-                  @click.stop="handleEdit(exp)"
-                  class="dropdown-item w-full px-3 py-2 text-left flex items-center gap-1.5"
-                >
-                  <Edit :size="12" /> Edit
-                </button>
-                <button
-                  @click.stop="handleDelete(exp.name)"
-                  class="dropdown-item dropdown-item-danger w-full px-3 py-2 text-left flex items-center gap-1.5"
-                >
-                  <Trash2 :size="12" /> Delete
-                </button>
+                <!-- Approve / Reject for Manager (if team member's claim) -->
+                <template v-if="exp.employee && exp.employee !== authStore.employee">
+                  <button
+                    @click.stop="openApproveModal(exp, 'Approve')"
+                    class="dropdown-item w-full px-3 py-2 text-left flex items-center gap-1.5 text-emerald-400 hover:bg-emerald-500/10 font-medium cursor-pointer"
+                  >
+                    <CheckCircle :size="12" /> Approve
+                  </button>
+                  <button
+                    @click.stop="openApproveModal(exp, 'Reject')"
+                    class="dropdown-item dropdown-item-danger w-full px-3 py-2 text-left flex items-center gap-1.5 font-medium cursor-pointer"
+                  >
+                    <XCircle :size="12" /> Reject
+                  </button>
+                </template>
+
+                <!-- Edit / Delete (Only available for own claims) -->
+                <template v-else>
+                  <button
+                    @click.stop="handleEdit(exp)"
+                    class="dropdown-item w-full px-3 py-2 text-left flex items-center gap-1.5 text-slate-300 hover:bg-white/5 cursor-pointer"
+                  >
+                    <Edit :size="12" /> Edit
+                  </button>
+                  <button
+                    @click.stop="handleDelete(exp.name)"
+                    class="dropdown-item dropdown-item-danger w-full px-3 py-2 text-left flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 :size="12" /> Delete
+                  </button>
+                </template>
               </div>
             </div>
           </div>
@@ -619,7 +772,10 @@ onMounted(() => {
           <p class="text-2xl font-bold text-white">
             ₹{{ Number(exp.total_claimed_amount).toLocaleString() }}
           </p>
-          <p class="text-xs text-slate-500 mt-1">{{ exp.name }}</p>
+          <div class="flex flex-col gap-0.5 mt-1">
+            <p class="text-xs text-slate-500">{{ exp.name }}</p>
+            <p v-if="selectedEmployee" class="text-xs font-medium text-slate-400">{{ exp.employee_name || exp.employee }}</p>
+          </div>
         </div>
 
         <div
@@ -663,21 +819,52 @@ onMounted(() => {
               </td>
               <td class="px-6 py-4 text-xs text-slate-400">{{ formatDate(exp.posting_date) }}</td>
               <td class="px-6 py-4 text-center" @click.stop>
-                <div v-if="exp.approval_status === 'Draft'" class="flex items-center justify-center gap-1.5">
+                <div v-if="exp.approval_status === 'Draft'" class="relative inline-block text-left">
                   <button
-                    @click="handleEdit(exp)"
-                    class="p-1.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-                    title="Edit"
+                    @click.stop="toggleActionMenu(exp.name)"
+                    class="more-btn flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs text-slate-300 hover:text-white cursor-pointer transition-colors"
+                    title="More actions"
                   >
-                    <Edit :size="14" />
+                    More
+                    <ChevronDown :size="12" />
                   </button>
-                  <button
-                    @click="handleDelete(exp.name)"
-                    class="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                    title="Delete"
+                  
+                  <div
+                    v-if="activeActionMenu === exp.name"
+                    class="dropdown-menu absolute right-0 mt-1 z-30 w-32 rounded-lg shadow-xl overflow-hidden text-xs"
                   >
-                    <Trash2 :size="14" />
-                  </button>
+                    <!-- Approve / Reject for Manager (if team member's claim) -->
+                    <template v-if="exp.employee && exp.employee !== authStore.employee">
+                      <button
+                        @click.stop="openApproveModal(exp, 'Approve')"
+                        class="dropdown-item w-full px-3 py-2 text-left flex items-center gap-1.5 text-emerald-400 hover:bg-emerald-500/10 font-medium cursor-pointer"
+                      >
+                        <CheckCircle :size="12" /> Approve
+                      </button>
+                      <button
+                        @click.stop="openApproveModal(exp, 'Reject')"
+                        class="dropdown-item dropdown-item-danger w-full px-3 py-2 text-left flex items-center gap-1.5 font-medium cursor-pointer"
+                      >
+                        <XCircle :size="12" /> Reject
+                      </button>
+                    </template>
+
+                    <!-- Edit / Delete (Only available for own claims) -->
+                    <template v-else>
+                      <button
+                        @click.stop="handleEdit(exp)"
+                        class="dropdown-item w-full px-3 py-2 text-left flex items-center gap-1.5 text-slate-300 hover:bg-white/5 cursor-pointer"
+                      >
+                        <Edit :size="12" /> Edit
+                      </button>
+                      <button
+                        @click.stop="handleDelete(exp.name)"
+                        class="dropdown-item dropdown-item-danger w-full px-3 py-2 text-left flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Trash2 :size="12" /> Delete
+                      </button>
+                    </template>
+                  </div>
                 </div>
               </td>
             </tr>
@@ -717,7 +904,7 @@ onMounted(() => {
               <input
                 type="text"
                 disabled
-                :value="employeeInfo?.employee_name || authStore.employeeName"
+                :value="isEditing ? form.employee_name : (employeeInfo?.employee_name || authStore.employeeName)"
                 class="input-dark opacity-60 cursor-not-allowed"
               />
             </div>
@@ -999,7 +1186,112 @@ onMounted(() => {
             <span class="text-sm text-[var(--text-secondary)] font-semibold">Total Claim Amount</span>
             <span class="text-xl font-bold text-[var(--text-primary)]">₹{{ Number(selectedDetail.total_claimed_amount).toLocaleString() }}</span>
           </div>
+
+          <!-- Actions at bottom of details modal -->
+          <div v-if="selectedDetail.approval_status === 'Draft'" class="flex justify-end gap-3 border-t border-[var(--border-color)] pt-4">
+            <!-- Approve / Reject (only for team members' claims) -->
+            <template v-if="selectedDetail.employee && selectedDetail.employee !== authStore.employee">
+              <button
+                @click="openApproveModal(selectedDetail, 'Approve'); showDetailModal = false;"
+                class="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-500 text-white rounded-xl text-xs font-semibold shadow-lg hover:shadow-green-500/20 transition-all cursor-pointer"
+              >
+                <CheckCircle :size="14" /> Approve
+              </button>
+              <button
+                @click="openApproveModal(selectedDetail, 'Reject'); showDetailModal = false;"
+                class="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl text-xs font-semibold shadow-lg transition-all cursor-pointer"
+              >
+                <XCircle :size="14" /> Reject
+              </button>
+            </template>
+
+            <!-- Edit / Delete (Only available for own claims) -->
+            <template v-else>
+              <button
+                @click="handleEdit(selectedDetail); showDetailModal = false;"
+                class="flex items-center gap-1.5 px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              >
+                <Edit :size="14" /> Edit Claim
+              </button>
+              <button
+                @click="handleDelete(selectedDetail.name); showDetailModal = false;"
+                class="flex items-center gap-1.5 px-4 py-2 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              >
+                <Trash2 :size="14" /> Delete Claim
+              </button>
+            </template>
+          </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Approval Confirmation Modal -->
+    <div v-if="showApproveModal && approvingClaim" class="fixed inset-0 z-50 flex items-center justify-center p-4 !mt-0">
+      <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showApproveModal = false"></div>
+      <div class="glass-card w-full max-w-md p-6 relative animate-scale-in">
+        <button
+          @click="showApproveModal = false"
+          class="absolute right-4 top-4 text-slate-500 hover:text-white cursor-pointer"
+        >
+          <X :size="20" />
+        </button>
+
+        <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          <CheckCircle v-if="modalAction === 'Approve'" class="text-emerald-400" />
+          <XCircle v-else class="text-red-400" />
+          {{ modalAction === 'Approve' ? 'Approve Expense Claim' : 'Reject Expense Claim' }}
+        </h2>
+
+        <form @submit.prevent="submitProcess" class="space-y-4">
+          <p class="text-xs text-slate-305 leading-relaxed">
+            Are you sure you want to {{ modalAction.toLowerCase() }} the expense claim <strong>{{ approvingClaim.name }}</strong> for <strong>{{ approvingClaim.employee_name || approvingClaim.employee }}</strong> in the amount of <strong>₹{{ Number(approvingClaim.total_claimed_amount).toLocaleString() }}</strong>?
+          </p>
+
+          <!-- Error Alert -->
+          <div
+            v-if="actionError"
+            class="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2"
+          >
+            <AlertCircle :size="16" /> {{ actionError }}
+          </div>
+
+          <!-- Payable Account Dropdown (only for Approve action) -->
+          <div v-if="modalAction === 'Approve'">
+            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5 tracking-wider">Payable Account</label>
+            <div class="relative w-full">
+              <select v-model="selectedPayableAccount" required class="input-dark appearance-none pr-10 text-xs py-2 px-3">
+                <option value="" disabled>Select Payable Account</option>
+                <option v-for="acc in payableAccounts" :key="acc.value" :value="acc.value">
+                  {{ acc.label || acc.value }}
+                </option>
+              </select>
+              <ChevronDown class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" :size="14" />
+            </div>
+            <p class="text-[10px] text-slate-500 mt-1">Select the account from which this claim will be paid</p>
+          </div>
+
+          <div class="flex justify-end gap-3 border-t border-white/5 pt-4">
+            <button
+              type="button"
+              @click="showApproveModal = false"
+              class="px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              :disabled="processingAction"
+              class="flex items-center gap-1.5 px-4 py-2 text-white rounded-xl text-xs font-semibold shadow-lg transition-all cursor-pointer"
+              :class="modalAction === 'Approve' ? 'bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 hover:shadow-green-500/20' : 'bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-400 hover:to-rose-400 hover:shadow-red-500/20'"
+            >
+              <span
+                v-if="processingAction"
+                class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"
+              ></span>
+              {{ modalAction === 'Approve' ? 'Approve' : 'Reject' }}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
