@@ -1,0 +1,65 @@
+{
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "use_defaults",
+  "preferences"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "use_defaults",
+   "fieldtype": "Check",
+   "label": "Use Store Defaults",
+   "default": "1"
+  },
+  {
+   "fieldname": "preferences",
+   "fieldtype": "JSON",
+   "label": "Preferences"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-17 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Employee Portal",
+ "owner": "Administrator",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "actions": [],
+ "creation": "2026-08-17 00:00:00.000000",
+ "doctype": "DocType",
+ "issingle": 0,
+ "name": "Zevar Notification Preference",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "delete": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "All",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ]
+}

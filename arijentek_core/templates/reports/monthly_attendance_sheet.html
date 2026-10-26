@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>{{ report_title }}</title>
+	<style>
+		@page {
+			size: A4 landscape;
+			margin: 10mm 8mm 10mm 8mm;
+		}
+
+		body {
+			font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+			font-size: 10px;
+			color: #1f2937;
+			margin: 0;
+			padding: 0;
+			background-color: #ffffff;
+		}
+
+		/* Header Section */
+		.report-header {
+			margin-bottom: 12px;
+			border-bottom: 2px solid #059669;
+			padding-bottom: 8px;
+		}
+		.header-title-container {
+			display: table;
+			width: 100%;
+		}
+		.header-left {
+			display: table-cell;
+			vertical-align: middle;
+		}
+		.header-right {
+			display: table-cell;
+			text-align: right;
+			vertical-align: middle;
+			font-size: 9px;
+			color: #6b7280;
+		}
+		.report-title {
+			font-size: 18px;
+			font-weight: bold;
+			color: #065f46;
+			margin: 0;
+			text-transform: uppercase;
+			letter-spacing: 0.5px;
+		}
+		.company-name {
+			font-size: 11px;
+			font-weight: bold;
+			color: #374151;
+			margin: 2px 0 0 0;
+		}
+
+		/* Meta Filters Bar */
+		.filter-bar {
+			background-color: #f8fafc;
+			border: 1px solid #e2e8f0;
+			border-radius: 4px;
+			padding: 6px 10px;
+			margin-bottom: 10px;
+			font-size: 9px;
+		}
+		.filter-item {
+			display: inline-block;
+			margin-right: 15px;
+		}
+		.filter-label {
+			font-weight: bold;
+			color: #475569;
+		}
+		.filter-value {
+			color: #0f172a;
+		}
+
+		/* Legend Bar */
+		.legend-bar {
+			margin-bottom: 10px;
+			font-size: 8.5px;
+			color: #334155;
+		}
+		.legend-title {
+			font-weight: bold;
+			text-transform: uppercase;
+			margin-right: 8px;
+			color: #64748b;
+		}
+		.legend-badge {
+			display: inline-block;
+			padding: 1px 5px;
+			border-radius: 3px;
+			font-weight: bold;
+			margin-right: 6px;
+			font-size: 8.5px;
+		}
+
+		/* Status Badges */
+		.badge-p { background-color: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+		.badge-a { background-color: #ffe4e6; color: #9f1239; border: 1px solid #fecdd3; }
+		.badge-hd { background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+		.badge-l { background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+		.badge-h { background-color: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+		.badge-wo { background-color: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+
+		/* Table Styling */
+		table.matrix-table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 8.5px;
+			table-layout: fixed;
+		}
+		table.matrix-table th,
+		table.matrix-table td {
+			border: 1px solid #cbd5e1;
+			padding: 4px 3px;
+			text-align: center;
+			vertical-align: middle;
+			word-wrap: break-word;
+		}
+		table.matrix-table th {
+			background-color: #f1f5f9;
+			color: #1e293b;
+			font-weight: bold;
+			font-size: 8.5px;
+		}
+		table.matrix-table th.align-left,
+		table.matrix-table td.align-left {
+			text-align: left;
+			padding-left: 5px;
+		}
+
+		/* Specific Column Widths */
+		.col-emp-id { width: 55px; font-family: monospace; font-weight: bold; }
+		.col-emp-name { width: 95px; font-weight: bold; }
+		.col-dept { width: 75px; color: #475569; }
+		.col-day { width: 22px; font-size: 8px; font-weight: bold; }
+		.col-summary { width: 24px; font-weight: bold; }
+
+		.bg-summary-p { background-color: #ecfdf5; color: #047857; font-weight: bold; }
+		.bg-summary-a { background-color: #fff1f2; color: #be123c; font-weight: bold; }
+		.bg-summary-hd { background-color: #fffbeb; color: #b45309; font-weight: bold; }
+		.bg-summary-l { background-color: #eff6ff; color: #1d4ed8; font-weight: bold; }
+
+		/* Footer */
+		.report-footer {
+			margin-top: 15px;
+			padding-top: 6px;
+			border-top: 1px solid #e2e8f0;
+			font-size: 8px;
+			color: #94a3b8;
+			display: table;
+			width: 100%;
+		}
+		.footer-left { display: table-cell; text-align: left; }
+		.footer-right { display: table-cell; text-align: right; }
+
+		.avoid-break {
+			page-break-inside: avoid;
+		}
+	</style>
+</head>
+<body>
+
+	<!-- Report Header -->
+	<div class="report-header">
+		<div class="header-title-container">
+			<div class="header-left">
+				<h1 class="report-title">{{ report_title }}</h1>
+				<div class="company-name">{{ company_name }} &bull; Month: {{ month_label }}</div>
+			</div>
+			<div class="header-right">
+				Generated: {{ generated_on }}<br>
+				Total Employees: {{ data|length }}
+			</div>
+		</div>
+	</div>
+
+	<!-- Filter Metadata -->
+	<div class="filter-bar">
+		<div class="filter-item">
+			<span class="filter-label">Month:</span>
+			<span class="filter-value">{{ month_label }}</span>
+		</div>
+		<div class="filter-item">
+			<span class="filter-label">Department:</span>
+			<span class="filter-value">{{ selected_department or 'All Departments' }}</span>
+		</div>
+		<div class="filter-item">
+			<span class="filter-label">Branch:</span>
+			<span class="filter-value">{{ selected_branch or 'All Branches' }}</span>
+		</div>
+		{% if selected_employee %}
+		<div class="filter-item">
+			<span class="filter-label">Employee:</span>
+			<span class="filter-value">{{ selected_employee }}</span>
+		</div>
+		{% endif %}
+	</div>
+
+	<!-- Status Legend -->
+	<div class="legend-bar">
+		<span class="legend-title">Legend:</span>
+		<span class="legend-badge badge-p">P = Present</span>
+		<span class="legend-badge badge-a">A = Absent</span>
+		<span class="legend-badge badge-hd">HD = Half Day</span>
+		<span class="legend-badge badge-l">L = On Leave</span>
+		<span class="legend-badge badge-h">H = Holiday</span>
+		<span class="legend-badge badge-wo">WO = Weekly Off</span>
+	</div>
+
+	<!-- Matrix Table -->
+	<table class="matrix-table">
+		<thead>
+			<tr>
+				<th class="col-emp-id align-left">ID</th>
+				<th class="col-emp-name align-left">Employee Name</th>
+				<th class="col-dept align-left">Department</th>
+				{% for day_col in day_columns %}
+				<th class="col-day">{{ day_col.day_num }}<br>{{ day_col.day_abbr }}</th>
+				{% endfor %}
+				<th class="col-summary bg-summary-p">P</th>
+				<th class="col-summary bg-summary-a">A</th>
+				<th class="col-summary bg-summary-hd">HD</th>
+				<th class="col-summary bg-summary-l">L</th>
+				<th class="col-summary" style="background-color: #fff7ed; color: #c2410c;">Late</th>
+				<th class="col-summary" style="background-color: #faf5ff; color: #7e22ce;">Early</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for row in data %}
+			<tr class="avoid-break">
+				<td class="col-emp-id align-left">{{ row.employee }}</td>
+				<td class="col-emp-name align-left">{{ row.employee_name }}</td>
+				<td class="col-dept align-left">{{ row.department or '-' }}</td>
+				{% for day_col in day_columns %}
+					{% set val = row.get(day_col.fieldname, '')|string|upper %}
+					{% if val == 'P' %}
+						<td class="col-day badge-p">P</td>
+					{% elif val == 'A' %}
+						<td class="col-day badge-a">A</td>
+					{% elif val in ['HD', 'HD/P', 'HD/A'] %}
+						<td class="col-day badge-hd">HD</td>
+					{% elif val == 'L' %}
+						<td class="col-day badge-l">L</td>
+					{% elif val == 'H' %}
+						<td class="col-day badge-h">H</td>
+					{% elif val == 'WO' %}
+						<td class="col-day badge-wo">WO</td>
+					{% else %}
+						<td class="col-day" style="color: #cbd5e1;">-</td>
+					{% endif %}
+				{% endfor %}
+				<td class="col-summary bg-summary-p">{{ row.total_present or 0 }}</td>
+				<td class="col-summary bg-summary-a">{{ row.total_absent or 0 }}</td>
+				<td class="col-summary bg-summary-hd">{{ row.total_half_day or 0 }}</td>
+				<td class="col-summary bg-summary-l">{{ row.total_leave or 0 }}</td>
+				<td class="col-summary" style="background-color: #fff7ed; color: #c2410c; font-weight: bold;">{{ row.total_late_entries or 0 }}</td>
+				<td class="col-summary" style="background-color: #faf5ff; color: #7e22ce; font-weight: bold;">{{ row.total_early_exits or 0 }}</td>
+			</tr>
+			{% else %}
+			<tr>
+				<td colspan="{{ 4 + day_columns|length }}" style="text-align: center; padding: 20px; color: #64748b;">
+					No attendance records found for the selected month and filters.
+				</td>
+			</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+
+	<!-- Footer -->
+	<div class="report-footer">
+		<div class="footer-left">Monthly Attendance Sheet &bull; {{ company_name }}</div>
+		<div class="footer-right">Confidential &bull; Generated via ERPNext</div>
+	</div>
+
+</body>
+</html>

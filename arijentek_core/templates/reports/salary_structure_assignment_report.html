@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Salary Structure Assignment Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 10px;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .header h2 {
+            margin: 0 0 5px 0;
+            font-size: 18px;
+            color: #111827;
+        }
+        .filters {
+            margin-bottom: 15px;
+            font-size: 11px;
+            color: #4b5563;
+        }
+        .filters span {
+            margin-right: 15px;
+            display: inline-block;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        th, td {
+            border: 1px solid #d1d5db;
+            padding: 6px 8px;
+            text-align: left;
+            word-wrap: break-word;
+        }
+        th {
+            background-color: #f3f4f6;
+            font-weight: bold;
+            color: #374151;
+            font-size: 11px;
+        }
+        tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+        .text-right { text-align: right; }
+        .font-bold { font-weight: bold; }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 9px;
+            color: #6b7280;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>Salary Structure Assignment Report</h2>
+        <div class="filters">
+            {% if filters.employee %}
+            <span><strong>Employee:</strong> {{ filters.employee }}</span>
+            {% endif %}
+            
+            {% if filters.department %}
+            <span><strong>Department:</strong> {{ filters.department }}</span>
+            {% endif %}
+            
+            {% if filters.designation %}
+            <span><strong>Designation:</strong> {{ filters.designation }}</span>
+            {% endif %}
+            
+            {% if filters.salary_structure %}
+            <span><strong>Salary Structure:</strong> {{ filters.salary_structure }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 18%">Assignment ID</th>
+                <th style="width: 25%">Employee</th>
+                <th style="width: 17%">Department</th>
+                <th style="width: 17%">Designation</th>
+                <th style="width: 13%">Structure</th>
+                <th style="width: 10%" class="text-right">Base Salary</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in data %}
+            <tr>
+                <td style="font-weight: bold;">{{ row.name }}</td>
+                <td class="font-bold">{{ row.employee_str }}</td>
+                <td>{{ row.department }}</td>
+                <td>{{ row.designation }}</td>
+                <td>{{ row.salary_structure }}</td>
+                <td class="text-right font-bold">{{ "{:,.2f}".format(row.base) }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 20px; color: #6b7280;">
+                    No salary structure assignments found for the selected filters.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        Generated on {{ frappe.utils.formatdate(frappe.utils.today()) }}
+    </div>
+</body>
+</html>

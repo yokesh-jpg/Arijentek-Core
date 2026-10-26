@@ -1,0 +1,67 @@
+{
+  "actions": [],
+  "autoname": "hash",
+  "creation": "2026-08-12 10:15:00",
+  "doctype": "DocType",
+  "engine": "InnoDB",
+  "field_order": [
+    "user",
+    "endpoint",
+    "auth_key",
+    "p256dh_key"
+  ],
+  "fields": [
+    {
+      "fieldname": "user",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "User",
+      "options": "User",
+      "reqd": 1
+    },
+    {
+      "fieldname": "endpoint",
+      "fieldtype": "Data",
+      "label": "Endpoint URL",
+      "length": 1000,
+      "reqd": 1
+    },
+    {
+      "fieldname": "auth_key",
+      "fieldtype": "Data",
+      "label": "Auth Key",
+      "reqd": 1
+    },
+    {
+      "fieldname": "p256dh_key",
+      "fieldtype": "Data",
+      "label": "P256DH Key",
+      "reqd": 1
+    }
+  ],
+  "issingle": 0,
+  "links": [],
+  "modified": "2026-08-12 10:15:00",
+  "module": "Employee Portal",
+  "name": "Web Push Subscription",
+  "naming_rule": "Random",
+  "permissions": [
+    {
+      "create": 1,
+      "delete": 1,
+      "read": 1,
+      "role": "System Manager",
+      "write": 1
+    },
+    {
+      "create": 1,
+      "read": 1,
+      "role": "All",
+      "write": 1
+    }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "states": [],
+  "track_changes": 1
+}

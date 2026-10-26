@@ -2,29 +2,46 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arijentek - Employee Portal</title>
-    <link rel="icon" href="/favicon.ico">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zevar — Staff Hub</title>
+    <link rel="icon" href="/assets/arijentek_core/images/employee_portal_logo.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/arijentek_core/frontend/assets/index.css">
+    <!-- Inter + JetBrains Mono are loaded by the bundle's index.css; only the
+         Material Symbols icon font needs to come from the page. -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet">
     <script>
-        // Frappe injects the CSRF token for the current session
         window.csrf_token = "{{ frappe.session.csrf_token }}";
+        window.frappe_user = "{{ frappe.session.user }}";
     </script>
-    <style>
-        body {
-            background-color: #0b0d13;
-            margin: 0;
-        }
-    </style>
+    {% set employee_portal_js = get_frontend_asset('employee-portal', 'index.js') %}
+    {% set employee_portal_css = get_frontend_asset('employee-portal', 'index.css') %}
+
+    {% if employee_portal_js %}
+    <script type="module" crossorigin src="{{ employee_portal_js }}"></script>
+    {% endif %}
+    {% if employee_portal_css %}
+    <link rel="stylesheet" crossorigin href="{{ employee_portal_css }}">
+    {% endif %}
 </head>
 
-<body>
+<body class="bg-[#0F0F11]">
     <div id="app"></div>
-    <script type="module" src="/assets/arijentek_core/frontend/assets/main.js"></script>
+    {% if is_developer %}
+    <div id="debug-log"
+        style="color: red; padding: 20px; font-family: monospace; white-space: pre-wrap; z-index: 9999; position: relative;">
+    </div>
+    <script>
+        window.addEventListener('error', function (e) {
+            document.getElementById('debug-log').innerText += '\nError: ' + e.message + '\n' + e.error.stack;
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+            document.getElementById('debug-log').innerText += '\nPromise Rejection: ' + e.reason;
+        });
+    </script>
+    {% endif %}
 </body>
 
 </html>

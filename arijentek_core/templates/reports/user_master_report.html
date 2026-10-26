@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>{{ report_title }}</title>
+	<style>
+		@page {
+			size: A4 landscape;
+			margin: 10mm 8mm 10mm 8mm;
+		}
+
+		body {
+			font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+			font-size: 8.5px;
+			color: #1f2937;
+			margin: 0;
+			padding: 0;
+			background-color: #ffffff;
+		}
+
+		/* Header Section */
+		.report-header {
+			margin-bottom: 10px;
+			border-bottom: 2px solid #2563eb;
+			padding-bottom: 6px;
+		}
+		.header-title-container {
+			display: table;
+			width: 100%;
+		}
+		.header-left {
+			display: table-cell;
+			vertical-align: middle;
+		}
+		.header-right {
+			display: table-cell;
+			text-align: right;
+			vertical-align: middle;
+			font-size: 8.5px;
+			color: #6b7280;
+		}
+		.report-title {
+			font-size: 17px;
+			font-weight: bold;
+			color: #1e40af;
+			margin: 0;
+			text-transform: uppercase;
+			letter-spacing: 0.5px;
+		}
+		.company-name {
+			font-size: 10.5px;
+			font-weight: bold;
+			color: #374151;
+			margin: 2px 0 0 0;
+		}
+
+		/* Meta Filters Bar */
+		.filter-bar {
+			background-color: #f8fafc;
+			border: 1px solid #e2e8f0;
+			border-radius: 4px;
+			padding: 5px 10px;
+			margin-bottom: 10px;
+			font-size: 8.5px;
+		}
+		.filter-item {
+			display: inline-block;
+			margin-right: 14px;
+		}
+		.filter-label {
+			font-weight: bold;
+			color: #475569;
+		}
+		.filter-value {
+			color: #0f172a;
+		}
+
+		/* Status Badges */
+		.badge-status {
+			display: inline-block;
+			padding: 1px 5px;
+			border-radius: 3px;
+			font-weight: bold;
+			font-size: 8px;
+			text-transform: uppercase;
+		}
+		.badge-enabled { background-color: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+		.badge-disabled { background-color: #ffe4e6; color: #9f1239; border: 1px solid #fecdd3; }
+
+		/* Role Badge */
+		.role-badge {
+			display: inline-block;
+			padding: 1px 4px;
+			border-radius: 3px;
+			font-size: 7.5px;
+			font-weight: bold;
+			background-color: #eff6ff;
+			color: #1d4ed8;
+			border: 1px solid #bfdbfe;
+			margin-right: 3px;
+			margin-bottom: 2px;
+		}
+
+		/* Table Styling */
+		table.master-table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 8px;
+			table-layout: fixed;
+		}
+		table.master-table th,
+		table.master-table td {
+			border: 1px solid #cbd5e1;
+			padding: 4px 4px;
+			text-align: left;
+			vertical-align: middle;
+			word-wrap: break-word;
+		}
+		table.master-table th {
+			background-color: #f1f5f9;
+			color: #1e293b;
+			font-weight: bold;
+			font-size: 8px;
+			white-space: nowrap;
+		}
+		table.master-table td.text-center,
+		table.master-table th.text-center {
+			text-align: center;
+		}
+
+		.font-mono { font-family: monospace; font-size: 8px; font-weight: bold; }
+		.font-bold { font-weight: bold; }
+
+		/* Footer */
+		.report-footer {
+			margin-top: 12px;
+			padding-top: 5px;
+			border-top: 1px solid #e2e8f0;
+			font-size: 8px;
+			color: #94a3b8;
+			display: table;
+			width: 100%;
+		}
+		.footer-left { display: table-cell; text-align: left; }
+		.footer-right { display: table-cell; text-align: right; }
+
+		.avoid-break {
+			page-break-inside: avoid;
+		}
+	</style>
+</head>
+<body>
+
+	<!-- Report Header -->
+	<div class="report-header">
+		<div class="header-title-container">
+			<div class="header-left">
+				<h1 class="report-title">{{ report_title }}</h1>
+				<div class="company-name">{{ company_name }}</div>
+			</div>
+			<div class="header-right">
+				Generated: {{ generated_on }}<br>
+				Total Users: {{ data|length }}
+			</div>
+		</div>
+	</div>
+
+	<!-- Filter Metadata -->
+	<div class="filter-bar">
+		<div class="filter-item">
+			<span class="filter-label">Role:</span>
+			<span class="filter-value">{{ selected_role or 'All Roles' }}</span>
+		</div>
+		<div class="filter-item">
+			<span class="filter-label">Status:</span>
+			<span class="filter-value">{{ selected_status or 'All Statuses' }}</span>
+		</div>
+		{% if search_term %}
+		<div class="filter-item">
+			<span class="filter-label">Search:</span>
+			<span class="filter-value">{{ search_term }}</span>
+		</div>
+		{% endif %}
+	</div>
+
+	<!-- Master Table -->
+	<table class="master-table">
+		<thead>
+			<tr>
+				<th style="width: 120px;">User ID</th>
+				<th style="width: 130px;">Full Name</th>
+				<th style="width: 140px;">Email Address</th>
+				<th style="width: 100px;">Username</th>
+				<th style="width: 60px;" class="text-center">Status</th>
+				<th>Assigned Roles</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for row in data %}
+			<tr class="avoid-break">
+				<td class="font-mono">{{ row.user_id }}</td>
+				<td class="font-bold">{{ row.full_name }}</td>
+				<td>{{ row.email or '-' }}</td>
+				<td style="color: #475569;">{{ row.username or '-' }}</td>
+				<td class="text-center">
+					{% if row.enabled %}
+						<span class="badge-status badge-enabled">Active</span>
+					{% else %}
+						<span class="badge-status badge-disabled">Disabled</span>
+					{% endif %}
+				</td>
+				<td>
+					{% if row.roles_list %}
+						{% for role in row.roles_list %}
+							<span class="role-badge">{{ role }}</span>
+						{% endfor %}
+					{% else %}
+						<span style="color: #94a3b8;">No Roles</span>
+					{% endif %}
+				</td>
+			</tr>
+			{% else %}
+			<tr>
+				<td colspan="6" style="text-align: center; padding: 20px; color: #64748b;">
+					No user accounts found matching your selected filters.
+				</td>
+			</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+
+	<!-- Footer -->
+	<div class="report-footer">
+		<div class="footer-left">User Directory & Roles Report &bull; {{ company_name }}</div>
+		<div class="footer-right">Confidential &bull; Generated via ERPNext</div>
+	</div>
+
+</body>
+</html>

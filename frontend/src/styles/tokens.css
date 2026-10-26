@@ -1,0 +1,89 @@
+/* ===================================================================
+ * Gemora 360 tokens for the Staff Hub.
+ *
+ * Ported from zevar_ui_design_bundle/src/styles/tokens.css so the two
+ * apps share one brand. Change the accent here and in the POS together —
+ * they are separate builds, so the value cannot be shared at runtime.
+ *
+ * Channels, not hex, so Tailwind's opacity modifiers work:
+ * `bg-accent/10` resolves to rgb(91 75 196 / 0.1). A finished `var(--x)`
+ * colour silently breaks /10.
+ * =================================================================== */
+
+:root {
+	/* --- Accent ramp -------------------------------------------------
+	 * Steps 1-4 are the light-mode ramp, 5-8 the dark-mode ramp (markup
+	 * picks between them with `dark:`), 9-10 are pale washes. */
+	--accent-rgb: 91 75 196; /* #5B4BC4  primary */
+	--accent-hover-rgb: 71 56 170; /* #4738AA  hover (darker: the primary is a
+	                                  mid-tone, so a lighter hover washes out) */
+	--accent-deep-rgb: 51 40 123; /* #33287B  text on an accent tint */
+	--accent-chart-rgb: 59 47 143; /* #3B2F8F  line over accent bars */
+	--accent-soft-rgb: 142 126 236; /* #8E7EEC  dark-mode mid */
+	--accent-light-rgb: 161 146 242; /* #A192F2  dark-mode light */
+	--accent-pale-rgb: 196 187 246; /* #C4BBF6  dark-mode pale */
+	--accent-palest-rgb: 209 203 248; /* #D1CBF8  dark-mode palest */
+	--accent-wash-rgb: 234 232 247; /* #EAE8F7  pale wash */
+	--accent-wash-mid-rgb: 196 190 233; /* #C4BEE9  pale mid */
+
+	/* For plain CSS and <style> blocks that cannot use a Tailwind class. */
+	--accent: rgb(var(--accent-rgb));
+	--accent-hover: rgb(var(--accent-hover-rgb));
+	--accent-deep: rgb(var(--accent-deep-rgb));
+	--accent-soft: rgb(var(--accent-soft-rgb));
+	--accent-light: rgb(var(--accent-light-rgb));
+
+	/* --- Dark-mode graphite elevation ladder -------------------------
+	 * Each step is visibly lighter than the one beneath it. Purple is the
+	 * ACCENT in this system, never a surface. */
+	--bg-0: #0f0f11; /* app backdrop */
+	--bg-1: #18181b; /* panel / modal */
+	--bg-2: #212126; /* card */
+	--bg-3: #2a2a30; /* input / raised / pressed */
+
+	/* --- Light-mode surfaces ---------------------------------------- */
+	--bg-0-light: #f8f7fc;
+	--bg-1-light: #ffffff;
+	--bg-2-light: #f0eef8;
+	--bg-3-light: #e6e2f3;
+
+	/* --- Text ladder -------------------------------------------------- */
+	--text-1: #17181b; /* primary */
+	--text-2: #2d3138; /* strong secondary */
+	--text-3: #5c6169; /* secondary */
+	--text-4: #7b7f88; /* muted */
+	--text-5: #9aa0a8; /* faint */
+
+	/* --- Hairlines ----------------------------------------------------- */
+	--line: rgba(11, 11, 12, 0.07);
+	--line-strong: rgba(11, 11, 12, 0.12);
+	--line-dark: rgba(255, 255, 255, 0.08);
+	--line-dark-strong: rgba(255, 255, 255, 0.14);
+
+	/* --- Semantic ------------------------------------------------------
+	 * There is no informational blue or orange in this system, so both
+	 * resolve to the accent and the warning token rather than
+	 * reintroducing a hue. */
+	--green: #059669;
+	--green-deep: #047857;
+	--green-light: #6ee7b7;
+	--amber: #d97706;
+	--amber-deep: #b45309;
+	--amber-light: #fcd34d;
+	--red: #dc2626;
+	--red-deep: #b91c1c;
+	--red-light: #fca5a5;
+
+	/* --- Type and motion ------------------------------------------------ */
+	--font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+
+	--duration-fast: 120ms;
+	--duration-normal: 200ms;
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+	/* --- Radius — the 8/12/18 three-step scale --------------------------- */
+	--radius-sm: 8px;
+	--radius-md: 12px;
+	--radius-lg: 18px;
+}

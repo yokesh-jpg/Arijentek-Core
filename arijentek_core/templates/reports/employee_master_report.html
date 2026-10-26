@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>{{ report_title }}</title>
+	<style>
+		@page {
+			size: A4 landscape;
+			margin: 10mm 8mm 10mm 8mm;
+		}
+
+		body {
+			font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+			font-size: 8.5px;
+			color: #1f2937;
+			margin: 0;
+			padding: 0;
+			background-color: #ffffff;
+		}
+
+		/* Header Section */
+		.report-header {
+			margin-bottom: 10px;
+			border-bottom: 2px solid #059669;
+			padding-bottom: 6px;
+		}
+		.header-title-container {
+			display: table;
+			width: 100%;
+		}
+		.header-left {
+			display: table-cell;
+			vertical-align: middle;
+		}
+		.header-right {
+			display: table-cell;
+			text-align: right;
+			vertical-align: middle;
+			font-size: 8.5px;
+			color: #6b7280;
+		}
+		.report-title {
+			font-size: 17px;
+			font-weight: bold;
+			color: #065f46;
+			margin: 0;
+			text-transform: uppercase;
+			letter-spacing: 0.5px;
+		}
+		.company-name {
+			font-size: 10.5px;
+			font-weight: bold;
+			color: #374151;
+			margin: 2px 0 0 0;
+		}
+
+		/* Meta Filters Bar */
+		.filter-bar {
+			background-color: #f8fafc;
+			border: 1px solid #e2e8f0;
+			border-radius: 4px;
+			padding: 5px 10px;
+			margin-bottom: 10px;
+			font-size: 8.5px;
+		}
+		.filter-item {
+			display: inline-block;
+			margin-right: 14px;
+		}
+		.filter-label {
+			font-weight: bold;
+			color: #475569;
+		}
+		.filter-value {
+			color: #0f172a;
+		}
+
+		/* Status Badges */
+		.badge-status {
+			display: inline-block;
+			padding: 1px 5px;
+			border-radius: 3px;
+			font-weight: bold;
+			font-size: 8px;
+			text-transform: uppercase;
+		}
+		.badge-active { background-color: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+		.badge-inactive { background-color: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+		.badge-suspended { background-color: #ffe4e6; color: #9f1239; border: 1px solid #fecdd3; }
+		.badge-left { background-color: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
+
+		/* Table Styling */
+		table.master-table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 8px;
+			table-layout: fixed;
+		}
+		table.master-table th,
+		table.master-table td {
+			border: 1px solid #cbd5e1;
+			padding: 4px 3px;
+			text-align: left;
+			vertical-align: middle;
+			word-wrap: break-word;
+		}
+		table.master-table th {
+			background-color: #f1f5f9;
+			color: #1e293b;
+			font-weight: bold;
+			font-size: 8px;
+			white-space: nowrap;
+		}
+		table.master-table td.text-center,
+		table.master-table th.text-center {
+			text-align: center;
+		}
+		table.master-table td.text-right,
+		table.master-table th.text-right {
+			text-align: right;
+		}
+
+		.font-mono { font-family: monospace; font-size: 8px; font-weight: bold; }
+		.font-bold { font-weight: bold; }
+		.text-salary { color: #047857; font-weight: bold; }
+
+		/* Footer */
+		.report-footer {
+			margin-top: 12px;
+			padding-top: 5px;
+			border-top: 1px solid #e2e8f0;
+			font-size: 8px;
+			color: #94a3b8;
+			display: table;
+			width: 100%;
+		}
+		.footer-left { display: table-cell; text-align: left; }
+		.footer-right { display: table-cell; text-align: right; }
+
+		.avoid-break {
+			page-break-inside: avoid;
+		}
+	</style>
+</head>
+<body>
+
+	<!-- Report Header -->
+	<div class="report-header">
+		<div class="header-title-container">
+			<div class="header-left">
+				<h1 class="report-title">{{ report_title }}</h1>
+				<div class="company-name">{{ company_name }}</div>
+			</div>
+			<div class="header-right">
+				Generated: {{ generated_on }}<br>
+				Total Employees: {{ data|length }}
+			</div>
+		</div>
+	</div>
+
+	<!-- Filter Metadata -->
+	<div class="filter-bar">
+		<div class="filter-item">
+			<span class="filter-label">Department:</span>
+			<span class="filter-value">{{ selected_department or 'All Departments' }}</span>
+		</div>
+		<div class="filter-item">
+			<span class="filter-label">Branch:</span>
+			<span class="filter-value">{{ selected_branch or 'All Branches' }}</span>
+		</div>
+		<div class="filter-item">
+			<span class="filter-label">Designation:</span>
+			<span class="filter-value">{{ selected_designation or 'All Designations' }}</span>
+		</div>
+		<div class="filter-item">
+			<span class="filter-label">Status:</span>
+			<span class="filter-value">{{ selected_status or 'All Statuses' }}</span>
+		</div>
+		{% if selected_employee %}
+		<div class="filter-item">
+			<span class="filter-label">Employee:</span>
+			<span class="filter-value">{{ selected_employee }}</span>
+		</div>
+		{% endif %}
+	</div>
+
+	<!-- Master Table -->
+	<table class="master-table">
+		<thead>
+			<tr>
+				<th style="width: 60px;">ID</th>
+				<th style="width: 100px;">Employee Name</th>
+				<th style="width: 80px;">Department</th>
+				<th style="width: 80px;">Designation</th>
+				<th style="width: 70px;">Branch</th>
+				<th style="width: 75px;">Emp Type</th>
+				<th style="width: 110px;">Company Email</th>
+				<th style="width: 75px;">Phone</th>
+				<th style="width: 55px;" class="text-center">Joining</th>
+				<th style="width: 90px;">Salary Structure</th>
+				<th style="width: 65px;" class="text-right">Base Pay</th>
+				<th style="width: 55px;" class="text-center">Status</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for row in data %}
+			<tr class="avoid-break">
+				<td class="font-mono">{{ row.employee }}</td>
+				<td class="font-bold">{{ row.employee_name }}</td>
+				<td style="color: #475569;">{{ row.department or '-' }}</td>
+				<td style="color: #475569;">{{ row.designation or '-' }}</td>
+				<td style="color: #475569;">{{ row.branch or '-' }}</td>
+				<td style="color: #475569;">{{ row.employment_type or '-' }}</td>
+				<td style="font-size: 7.5px;">{{ row.company_email or '-' }}</td>
+				<td>{{ row.cell_number or '-' }}</td>
+				<td class="text-center">{{ row.date_of_joining or '-' }}</td>
+				<td style="font-size: 7.5px; color: #1e40af;">{{ row.salary_structure or '-' }}</td>
+				<td class="text-right text-salary">
+					{% if row.base_pay %}
+						{{ currency_symbol }} {{ row.base_pay }}
+					{% else %}
+						-
+					{% endif %}
+				</td>
+				<td class="text-center">
+					{% set st = row.status|string %}
+					{% if st == 'Active' %}
+						<span class="badge-status badge-active">Active</span>
+					{% elif st == 'Left' %}
+						<span class="badge-status badge-left">Left</span>
+					{% elif st == 'Suspended' %}
+						<span class="badge-status badge-suspended">Suspended</span>
+					{% else %}
+						<span class="badge-status badge-inactive">{{ row.status or 'Inactive' }}</span>
+					{% endif %}
+				</td>
+			</tr>
+			{% else %}
+			<tr>
+				<td colspan="12" style="text-align: center; padding: 20px; color: #64748b;">
+					No employee records found matching your selected filters.
+				</td>
+			</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+
+	<!-- Footer -->
+	<div class="report-footer">
+		<div class="footer-left">Employee Directory & Master Report &bull; {{ company_name }}</div>
+		<div class="footer-right">Confidential &bull; Generated via ERPNext</div>
+	</div>
+
+</body>
+</html>

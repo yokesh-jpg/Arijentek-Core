@@ -1,0 +1,178 @@
+{
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "category",
+  "severity",
+  "column_break_meta",
+  "source",
+  "dedup_key",
+  "section_content",
+  "title",
+  "message",
+  "section_link",
+  "link_doctype",
+  "link_name",
+  "section_read",
+  "read",
+  "read_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "category",
+   "fieldtype": "Select",
+   "label": "Category",
+   "options": "Security\nInventory\nLayaway\nRepair\nAppraisal\nMemo\nSpecial Order\nCRM\nCompliance\nFinance\nHR\nSystem",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "severity",
+   "fieldtype": "Select",
+   "label": "Severity",
+   "options": "Info\nWarning\nCritical",
+   "default": "Info",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "column_break_meta",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "Event\nComputed\nNotification Log",
+   "default": "Event",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "dedup_key",
+   "fieldtype": "Data",
+   "label": "Dedup Key",
+   "search_index": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "section_content",
+   "fieldtype": "Section Break",
+   "label": "Content"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "message",
+   "fieldtype": "Small Text",
+   "label": "Message"
+  },
+  {
+   "fieldname": "section_link",
+   "fieldtype": "Section Break",
+   "label": "Link",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "link_doctype",
+   "fieldtype": "Link",
+   "label": "Link DocType",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "link_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Link Name",
+   "options": "link_doctype"
+  },
+  {
+   "fieldname": "section_read",
+   "fieldtype": "Section Break",
+   "label": "Read State"
+  },
+  {
+   "fieldname": "read",
+   "fieldtype": "Check",
+   "label": "Read",
+   "default": "0",
+   "search_index": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "read_on",
+   "fieldtype": "Datetime",
+   "label": "Read On"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-17 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Employee Portal",
+ "owner": "Administrator",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "actions": [],
+ "creation": "2026-08-17 00:00:00.000000",
+ "doctype": "DocType",
+ "issingle": 0,
+ "editable_grid": 1,
+ "name": "Zevar Notification",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "delete": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Employee",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "email": 1
+  },
+  {
+   "role": "HR Manager",
+   "read": 1,
+   "write": 1,
+   "delete": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "HR User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "email": 1
+  }
+ ]
+}

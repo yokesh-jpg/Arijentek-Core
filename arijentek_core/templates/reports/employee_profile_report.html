@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>{{ doc.employee_name }} - Profile Record</title>
+	<style>
+		@page {
+			size: A4 portrait;
+			margin: 6mm 8mm 6mm 8mm;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		body {
+			font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+			font-size: 8.5px;
+			color: #0f172a;
+			margin: 0;
+			padding: 0;
+			background-color: #ffffff;
+			line-height: 1.25;
+		}
+
+		/* Top Gradient Bar */
+		.top-accent-bar {
+			height: 4px;
+			background: #059669;
+			margin-bottom: 8px;
+			border-radius: 2px;
+		}
+
+		/* Header Hero Section */
+		.hero-card {
+			background: #f8fafc;
+			border: 1px solid #e2e8f0;
+			border-radius: 8px;
+			padding: 10px 12px;
+			margin-bottom: 8px;
+			display: table;
+			width: 100%;
+		}
+		.hero-left {
+			display: table-cell;
+			vertical-align: middle;
+			width: 70%;
+		}
+		.hero-right {
+			display: table-cell;
+			vertical-align: middle;
+			text-align: right;
+			width: 30%;
+		}
+		.company-sub {
+			font-size: 8px;
+			font-weight: 700;
+			color: #059669;
+			text-transform: uppercase;
+			letter-spacing: 1px;
+			margin-bottom: 2px;
+		}
+		.emp-name-title {
+			font-size: 16px;
+			font-weight: 800;
+			color: #0f172a;
+			margin: 0;
+			line-height: 1.1;
+		}
+		.emp-designation-sub {
+			font-size: 9.5px;
+			font-weight: 600;
+			color: #475569;
+			margin-top: 2px;
+		}
+
+		/* Badge Pills */
+		.badge-pill {
+			display: inline-block;
+			padding: 2.5px 8px;
+			border-radius: 12px;
+			font-weight: 700;
+			font-size: 8px;
+			text-transform: uppercase;
+			letter-spacing: 0.5px;
+		}
+		.badge-emp-id {
+			background-color: #0f172a;
+			color: #ffffff;
+			font-family: monospace;
+			font-size: 8.5px;
+			margin-right: 4px;
+		}
+		.badge-active { background-color: #d1fae5; color: #047857; border: 1px solid #a7f3d0; }
+		.badge-inactive { background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+		.badge-suspended { background-color: #ffe4e6; color: #be123c; border: 1px solid #fecdd3; }
+		.badge-left { background-color: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
+
+		/* Modern Section Blocks */
+		.section-container {
+			margin-bottom: 7px;
+		}
+		.section-title-bar {
+			background-color: #f1f5f9;
+			border: 1px solid #e2e8f0;
+			border-left: 3px solid #059669;
+			border-radius: 4px 4px 0 0;
+			padding: 3.5px 8px;
+			font-size: 8.5px;
+			font-weight: 800;
+			color: #0f172a;
+			text-transform: uppercase;
+			letter-spacing: 0.5px;
+		}
+		.card-table {
+			width: 100%;
+			border-collapse: collapse;
+			border: 1px solid #e2e8f0;
+			border-top: none;
+			border-radius: 0 0 4px 4px;
+			background-color: #ffffff;
+		}
+		.card-table td {
+			padding: 4.5px 7px;
+			border-bottom: 1px solid #f1f5f9;
+			border-right: 1px solid #f1f5f9;
+			vertical-align: top;
+		}
+		.card-table tr:last-child td {
+			border-bottom: none;
+		}
+		.card-table td:last-child {
+			border-right: none;
+		}
+
+		/* Labels & Values */
+		.lbl {
+			font-size: 7.5px;
+			font-weight: 700;
+			color: #64748b;
+			text-transform: uppercase;
+			letter-spacing: 0.3px;
+			margin-bottom: 1px;
+			display: block;
+		}
+		.val {
+			font-size: 9px;
+			font-weight: 600;
+			color: #0f172a;
+		}
+		.val-email { color: #2563eb; font-weight: 600; }
+		.val-phone { color: #047857; font-weight: 700; }
+		.val-emergency { color: #be123c; font-weight: 700; }
+		.val-bold { font-weight: 700; }
+
+		/* Footer */
+		.footer-bar {
+			margin-top: 6px;
+			padding-top: 4px;
+			border-top: 1px solid #e2e8f0;
+			font-size: 7.5px;
+			color: #94a3b8;
+			display: table;
+			width: 100%;
+		}
+		.footer-left { display: table-cell; text-align: left; }
+		.footer-right { display: table-cell; text-align: right; }
+	</style>
+</head>
+<body>
+
+	<!-- Top Accent Bar -->
+	<div class="top-accent-bar"></div>
+
+	<!-- Hero Header Card -->
+	<div class="hero-card">
+		<div class="hero-left">
+			<div class="company-sub">{{ company_name }} &bull; Official Employee Record</div>
+			<h1 class="emp-name-title">
+				{% if doc.salutation %}{{ doc.salutation }} {% endif %}{{ doc.first_name }} {% if doc.middle_name %}{{ doc.middle_name }} {% endif %}{{ doc.last_name }}
+			</h1>
+			<div class="emp-designation-sub">
+				{{ doc.designation or 'Employee' }} {% if doc.department %}&bull; {{ doc.department }}{% endif %}
+			</div>
+		</div>
+		<div class="hero-right">
+			<span class="badge-pill badge-emp-id">{{ doc.name }}</span>
+			{% set st = doc.status|string %}
+			{% if st == 'Active' %}
+				<span class="badge-pill badge-active">Active</span>
+			{% elif st == 'Left' %}
+				<span class="badge-pill badge-left">Left</span>
+			{% elif st == 'Suspended' %}
+				<span class="badge-pill badge-suspended">Suspended</span>
+			{% else %}
+				<span class="badge-pill badge-inactive">{{ doc.status or 'Inactive' }}</span>
+			{% endif %}
+			<div style="font-size: 7.5px; color: #64748b; margin-top: 4px;">
+				Generated: {{ generated_on }}
+			</div>
+		</div>
+	</div>
+
+	<!-- 1. Personal & Account Details -->
+	<div class="section-container">
+		<div class="section-title-bar">Personal & Account Information</div>
+		<table class="card-table">
+			<tr>
+				<td style="width: 20%;">
+					<span class="lbl">Salutation</span>
+					<span class="val">{{ doc.salutation or '-' }}</span>
+				</td>
+				<td style="width: 26.66%;">
+					<span class="lbl">First Name</span>
+					<span class="val val-bold">{{ doc.first_name or '-' }}</span>
+				</td>
+				<td style="width: 26.66%;">
+					<span class="lbl">Middle Name</span>
+					<span class="val">{{ doc.middle_name or '-' }}</span>
+				</td>
+				<td style="width: 26.66%;">
+					<span class="lbl">Last Name</span>
+					<span class="val val-bold">{{ doc.last_name or '-' }}</span>
+				</td>
+			</tr>
+			<tr>
+				<td colspan="2">
+					<span class="lbl">Full Name</span>
+					<span class="val val-bold" style="color: #047857;">{{ doc.employee_name }}</span>
+				</td>
+				<td>
+					<span class="lbl">Gender</span>
+					<span class="val">{{ doc.gender or '-' }}</span>
+				</td>
+				<td>
+					<span class="lbl">Date of Birth (DOB)</span>
+					<span class="val">{{ doc.date_of_birth or '-' }}</span>
+				</td>
+			</tr>
+			<tr>
+				<td colspan="4">
+					<span class="lbl">Linked User Account</span>
+					<span class="val val-email">{{ doc.user_id or 'Not Connected' }}</span>
+				</td>
+			</tr>
+		</table>
+	</div>
+
+	<!-- 2. Employment & Organization Structure -->
+	<div class="section-container">
+		<div class="section-title-bar">Employment & Organizational Structure</div>
+		<table class="card-table">
+			<tr>
+				<td style="width: 25%;">
+					<span class="lbl">Employee ID</span>
+					<span class="val val-bold" style="font-family: monospace;">{{ doc.name }}</span>
+				</td>
+				<td style="width: 25%;">
+					<span class="lbl">Date of Joining</span>
+					<span class="val">{{ doc.date_of_joining or '-' }}</span>
+				</td>
+				<td style="width: 25%;">
+					<span class="lbl">Designation</span>
+					<span class="val val-bold">{{ doc.designation or '-' }}</span>
+				</td>
+				<td style="width: 25%;">
+					<span class="lbl">Department</span>
+					<span class="val">{{ doc.department or '-' }}</span>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<span class="lbl">Branch</span>
+					<span class="val">{{ doc.branch or '-' }}</span>
+				</td>
+				<td>
+					<span class="lbl">Grade</span>
+					<span class="val">{{ doc.grade or '-' }}</span>
+				</td>
+				<td>
+					<span class="lbl">Employment Type</span>
+					<span class="val">{{ doc.employment_type or '-' }}</span>
+				</td>
+				<td>
+					<span class="lbl">Reports To (Manager)</span>
+					<span class="val val-bold">{{ reports_to_name or doc.reports_to or '-' }}</span>
+				</td>
+			</tr>
+			<tr>
+				<td colspan="2">
+					<span class="lbl">Assigned Holiday List</span>
+					<span class="val">{{ doc.holiday_list or 'Standard Company Holiday List' }}</span>
+				</td>
+				<td colspan="2">
+					<span class="lbl">Default Shift</span>
+					<span class="val">{{ doc.default_shift or '-' }}</span>
+				</td>
+			</tr>
+		</table>
+	</div>
+
+	<!-- 3. Workflow Approvers -->
+	<div class="section-container">
+		<div class="section-title-bar">Designated Workflow Approvers</div>
+		<table class="card-table">
+			<tr>
+				<td style="width: 33.33%;">
+					<span class="lbl">Expense Approver</span>
+					<span class="val">{{ expense_approver_name or doc.expense_approver or '-' }}</span>
+				</td>
+				<td style="width: 33.33%;">
+					<span class="lbl">Shift Request Approver</span>
+					<span class="val">{{ shift_approver_name or doc.shift_request_approver or '-' }}</span>
+				</td>
+				<td style="width: 33.33%;">
+					<span class="lbl">Leave Approver</span>
+					<span class="val">{{ leave_approver_name or doc.leave_approver or '-' }}</span>
+				</td>
+			</tr>
+		</table>
+	</div>
+
+	<!-- 4. Contact & Address Details -->
+	<div class="section-container">
+		<div class="section-title-bar">Contact Details & Addresses</div>
+		<table class="card-table">
+			<tr>
+				<td style="width: 33.33%;">
+					<span class="lbl">Mobile / Phone Number</span>
+					<span class="val val-phone">{{ doc.cell_number or '-' }}</span>
+				</td>
+				<td style="width: 33.33%;">
+					<span class="lbl">Company Email</span>
+					<span class="val val-email">{{ doc.company_email or '-' }}</span>
+				</td>
+				<td style="width: 33.33%;">
+					<span class="lbl">Personal Email</span>
+					<span class="val val-email">{{ doc.personal_email or '-' }}</span>
+				</td>
+			</tr>
+			<tr>
+				<td colspan="2">
+					<span class="lbl">Current Address</span>
+					<span class="val">{{ doc.current_address or '-' }}</span>
+				</td>
+				<td colspan="2">
+					<span class="lbl">Permanent Address</span>
+					<span class="val">{{ doc.permanent_address or '-' }}</span>
+				</td>
+			</tr>
+		</table>
+	</div>
+
+	<!-- 5. Emergency Contact -->
+	<div class="section-container">
+		<div class="section-title-bar">Emergency Contact</div>
+		<table class="card-table">
+			<tr>
+				<td style="width: 33.33%;">
+					<span class="lbl">Contact Person Name</span>
+					<span class="val val-bold">{{ doc.person_to_be_contacted or '-' }}</span>
+				</td>
+				<td style="width: 33.33%;">
+					<span class="lbl">Emergency Phone Number</span>
+					<span class="val val-emergency">{{ doc.emergency_phone_number or '-' }}</span>
+				</td>
+				<td style="width: 33.33%;">
+					<span class="lbl">Relationship</span>
+					<span class="val">{{ doc.relation or '-' }}</span>
+				</td>
+			</tr>
+		</table>
+	</div>
+
+	<!-- Footer -->
+	<div class="footer-bar">
+		<div class="footer-left">Confidential Employee Profile &bull; {{ company_name }}</div>
+		<div class="footer-right">Page 1 of 1 &bull; Generated via Employee Portal</div>
+	</div>
+
+</body>
+</html>

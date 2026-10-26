@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Issues Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 10px;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .header h2 {
+            margin: 0 0 5px 0;
+            font-size: 18px;
+            color: #111827;
+        }
+        .filters {
+            margin-bottom: 15px;
+            font-size: 11px;
+            color: #4b5563;
+        }
+        .filters span {
+            margin-right: 15px;
+            display: inline-block;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        th, td {
+            border: 1px solid #d1d5db;
+            padding: 6px 8px;
+            text-align: left;
+            word-wrap: break-word;
+        }
+        th {
+            background-color: #f3f4f6;
+            font-weight: bold;
+            color: #374151;
+            font-size: 11px;
+        }
+        tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+        .font-bold { font-weight: bold; }
+        .status-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .status-Open { background-color: #fef9c3; color: #854d0e; }
+        .status-Investigated { background-color: #e0f2fe; color: #0369a1; }
+        .status-Resolved { background-color: #dcfce7; color: #166534; }
+        .status-Invalid { background-color: #fee2e2; color: #991b1b; }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 9px;
+            color: #6b7280;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>Issues Report</h2>
+        <div class="filters">
+            {% if filters.from_date and filters.to_date %}
+            <span><strong>Date Range:</strong> {{ filters.from_date }} to {{ filters.to_date }}</span>
+            {% elif filters.from_date %}
+            <span><strong>From Date:</strong> {{ filters.from_date }}</span>
+            {% elif filters.to_date %}
+            <span><strong>To Date:</strong> {{ filters.to_date }}</span>
+            {% endif %}
+            
+            {% if filters.status %}
+            <span><strong>Status:</strong> {{ filters.status }}</span>
+            {% endif %}
+
+            {% if filters.issue_type %}
+            <span><strong>Type:</strong> {{ filters.issue_type }}</span>
+            {% endif %}
+
+            {% if filters.employee %}
+            <span><strong>Raised By:</strong> {{ filters.employee }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 15%">Issue ID</th>
+                <th style="width: 25%">Subject</th>
+                <th style="width: 12%">Date</th>
+                <th style="width: 23%">Raised By</th>
+                <th style="width: 13%">Type</th>
+                <th style="width: 12%">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in data %}
+            <tr>
+                <td style="font-weight: bold;">{{ row.name }}</td>
+                <td>{{ row.subject }}</td>
+                <td>{{ row.date }}</td>
+                <td class="font-bold">{{ row.raised_by_str }}</td>
+                <td>{{ row.issue_type }}</td>
+                <td>
+                    <span class="status-badge status-{{ row.status }}">
+                        {{ row.status }}
+                    </span>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 20px; color: #6b7280;">
+                    No issues found for the selected filters.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        Generated on {{ frappe.utils.formatdate(frappe.utils.today()) }}
+    </div>
+</body>
+</html>

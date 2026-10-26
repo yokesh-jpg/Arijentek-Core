@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>{{ report_title }}</title>
+	<style>
+		body {
+			font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+			font-size: 10px;
+			color: #333;
+			margin: 0;
+			padding: 0;
+		}
+		.report-header {
+			text-align: center;
+			margin-bottom: 20px;
+			border-bottom: 2px solid #2d3748;
+			padding-bottom: 10px;
+		}
+		.report-header h1 {
+			margin: 0 0 5px 0;
+			font-size: 18px;
+			color: #1a202c;
+		}
+		.report-header h2 {
+			margin: 0;
+			font-size: 14px;
+			color: #4a5568;
+			font-weight: normal;
+		}
+		.filters-section {
+			display: flex;
+			flex-wrap: wrap;
+			margin-bottom: 15px;
+			font-size: 9px;
+			color: #4a5568;
+		}
+		.filter-item {
+			margin-right: 20px;
+			margin-bottom: 5px;
+		}
+		.filter-item strong {
+			color: #2d3748;
+		}
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			margin-bottom: 20px;
+		}
+		th, td {
+			border: 1px solid #e2e8f0;
+			padding: 6px 8px;
+			text-align: left;
+		}
+		th {
+			background-color: #f7fafc;
+			font-weight: bold;
+			color: #2d3748;
+			font-size: 9px;
+			text-transform: uppercase;
+		}
+		td {
+			font-size: 9px;
+			color: #2d3748;
+		}
+		tr:nth-child(even) td {
+			background-color: #f8fafc;
+		}
+		.status-approved {
+			color: #059669;
+			font-weight: bold;
+		}
+		.status-draft {
+			color: #4b5563;
+			font-weight: bold;
+		}
+		.status-cancelled {
+			color: #dc2626;
+			font-weight: bold;
+		}
+		.report-footer {
+			margin-top: 30px;
+			text-align: right;
+			font-size: 8px;
+			color: #a0aec0;
+			border-top: 1px solid #e2e8f0;
+			padding-top: 10px;
+		}
+	</style>
+</head>
+<body>
+
+	<div class="report-header">
+		<h1>{{ company_name }}</h1>
+		<h2>{{ report_title }}</h2>
+	</div>
+
+	<div class="filters-section">
+		<div class="filter-item">
+			<strong>Date Range:</strong> {{ date_range }}
+		</div>
+		{% if selected_employee %}
+		<div class="filter-item">
+			<strong>Employee:</strong> {{ selected_employee }}
+		</div>
+		{% endif %}
+		{% if selected_status %}
+		<div class="filter-item">
+			<strong>Status:</strong> {{ selected_status }}
+		</div>
+		{% endif %}
+	</div>
+
+	<table>
+		<thead>
+			<tr>
+				{% for col in columns %}
+					<th>{{ col.label }}</th>
+				{% endfor %}
+			</tr>
+		</thead>
+		<tbody>
+			{% if data %}
+				{% for row in data %}
+					<tr>
+						{% for col in columns %}
+							{% set val = row.get(col.fieldname, '') %}
+							{% if col.fieldname == 'status' %}
+								{% if val == 'Approved' or val == 'Submitted' %}
+									<td class="status-approved">{{ val }}</td>
+								{% elif val == 'Cancelled' or val == 'Rejected' %}
+									<td class="status-cancelled">{{ val }}</td>
+								{% else %}
+									<td class="status-draft">{{ val }}</td>
+								{% endif %}
+							{% else %}
+								<td>{{ val }}</td>
+							{% endif %}
+						{% endfor %}
+					</tr>
+				{% endfor %}
+			{% else %}
+				<tr>
+					<td colspan="{{ columns|length }}" style="text-align: center; padding: 20px;">
+						No attendance requests found for the selected criteria.
+					</td>
+				</tr>
+			{% endif %}
+		</tbody>
+	</table>
+
+	<div class="report-footer">
+		Generated on {{ generated_on }}
+	</div>
+
+</body>
+</html>

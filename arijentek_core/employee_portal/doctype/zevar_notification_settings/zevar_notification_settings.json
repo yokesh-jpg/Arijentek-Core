@@ -1,0 +1,61 @@
+{
+ "engine": "InnoDB",
+ "field_order": [
+  "push_enabled",
+  "snapshot_interval_minutes",
+  "default_preferences"
+ ],
+ "fields": [
+  {
+   "default": "1",
+   "fieldname": "push_enabled",
+   "fieldtype": "Check",
+   "label": "Browser Push Enabled"
+  },
+  {
+   "default": "15",
+   "fieldname": "snapshot_interval_minutes",
+   "fieldtype": "Int",
+   "label": "Computed Alert Snapshot Interval (minutes)"
+  },
+  {
+   "fieldname": "default_preferences",
+   "fieldtype": "JSON",
+   "label": "Default Preferences"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-17 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Employee Portal",
+ "owner": "Administrator",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "actions": [],
+ "creation": "2026-08-17 00:00:00.000000",
+ "doctype": "DocType",
+ "issingle": 1,
+ "name": "Zevar Notification Settings",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "HR Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ]
+}
