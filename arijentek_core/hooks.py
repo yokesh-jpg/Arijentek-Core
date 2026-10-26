@@ -26,11 +26,11 @@ add_to_apps_screen = [
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/arijentek_core/css/arijentek_core.css"
-app_include_js = "/assets/arijentek_core/js/portal_desk_button.js"
+# app_include_js = "/assets/arijentek_core/js/portal_desk_button.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/arijentek_core/css/arijentek_core.css"
-web_include_js = "/assets/arijentek_core/js/login_redirect.js"
+# web_include_js = "/assets/arijentek_core/js/login_redirect.js"
 
 # include custom scss in every website theme (without file extension ".scss")
 # website_theme_scss = "arijentek_core/public/scss/website"
@@ -75,19 +75,27 @@ web_include_js = "/assets/arijentek_core/js/login_redirect.js"
 
 # Jinja
 # ----------
-
-# add methods and filters to jinja environment
-# jinja = {
-# 	"methods": "arijentek_core.utils.jinja_methods",
-# 	"filters": "arijentek_core.utils.jinja_filters"
-# }
+jinja = {
+	"methods": [
+		"arijentek_core.utils.assets.get_frontend_asset",
+	]
+}
 
 # Installation
 # ------------
 
-# before_install = "arijentek_core.install.before_install"
-after_install = "arijentek_core.install.after_install"
-after_migrate = "arijentek_core.install.after_migrate"
+after_install = [
+	"arijentek_core.custom_fields.setup_custom_fields",
+	"arijentek_core.install.after_install",
+	"arijentek_core.api.overtime_type.create_standard_overtime_type",
+	"arijentek_core.api.expense_type.update_standard_expense_types",
+]
+after_migrate = [
+	"arijentek_core.custom_fields.setup_custom_fields",
+	"arijentek_core.install.after_migrate",
+	"arijentek_core.api.overtime_type.create_standard_overtime_type",
+	"arijentek_core.api.expense_type.update_standard_expense_types",
+]
 
 # Uninstallation
 # ------------
@@ -131,36 +139,30 @@ after_migrate = "arijentek_core.install.after_migrate"
 
 # Document Events
 # ---------------
-# Hook on document methods and events
+doc_events = {
+	"Holiday List": {
+		"on_trash": "arijentek_core.overrides.holiday_list.on_holiday_list_trash",
+	},
+}
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+# HR Holiday List Resolution Override (bypasses date boundary crash and adds smart fallback)
+employee_holiday_list = [
+	"arijentek_core.overrides.holiday_list.get_holiday_list_for_employee"
+]
 
 # Scheduled Tasks
 # ---------------
-
-# scheduler_events = {
-# 	"all": [
-# 		"arijentek_core.tasks.all"
-# 	],
-# 	"daily": [
-# 		"arijentek_core.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"arijentek_core.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"arijentek_core.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"arijentek_core.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"monthly": [
+		"arijentek_core.payroll.automation.run_monthly_payroll_automation",
+		"arijentek_core.services.overtime_payroll.push_approved_overtime_to_payroll",
+	],
+	"cron": {
+		"0 */2 * * *": [
+			"arijentek_core.api.attendance.mark_daily_attendance",
+		],
+	},
+}
 
 # Testing
 # -------
@@ -252,58 +254,13 @@ after_migrate = "arijentek_core.install.after_migrate"
 # ignore_translatable_strings_from = []
 
 # ===========================================
-# ARIJENTEK CONFIGURATION
+# EMPLOYEE PORTAL ROUTING
 # ===========================================
-
-# --- Login override ---
-# Supports Employee ID login + returns CSRF token for SPA.
-override_whitelisted_methods = {
-	"frappe.auth.login": "arijentek_core.auth.custom_login.login",
-}
-
-# --- Request security ---
-before_request = ["arijentek_core.security.validate_request"]
-
-# --- Audit logging ---
-doc_events = {
-	"Employee Checkin": {
-		"on_submit": "arijentek_core.security.log_attendance_event",
-		"after_insert": "arijentek_core.attendance.auto_attendance.on_employee_checkin_insert",
-	},
-	"Attendance": {"on_submit": "arijentek_core.security.log_attendance_event"},
-	"Leave Application": {
-		"after_insert": "arijentek_core.leave_notifications.on_leave_application_insert",
-		"on_update": "arijentek_core.leave_notifications.on_leave_application_update",
-		"validate": "arijentek_core.leave_validation.validate_leave_date",
-	},
-}
-
-# --- Session ---
-on_session_creation = "arijentek_core.security.on_session_created"
-
-# --- Scheduled Tasks ---
-scheduler_events = {
-	"daily_long": [
-		"arijentek_core.attendance.daily_attendance.mark_daily_attendance",
-	],
-	"monthly": [
-		"arijentek_core.payroll.automation.run_monthly_payroll_automation",
-		"arijentek_core.attendance.earned_leave.sync_earned_leave_allocations",
-	],
-}
 
 # --- Employee Portal routing ---
 # Serve the SPA from www/employee-portal.html at /employee-portal
-# The <path:app_path> wildcard ensures all sub-paths render the SPA (HTML5 history mode ready).
 website_route_rules = [
 	{"from_route": "/employee-portal", "to_route": "employee-portal"},
 	{"from_route": "/employee-portal/<path:app_path>", "to_route": "employee-portal"},
 ]
 
-# --- Post-login redirect: ALL users land on Employee Portal first ---
-role_home_page = {
-	"Employee": "/employee-portal",
-	"System Manager": "/employee-portal",
-}
-get_website_user_home_page = "arijentek_core.utils.get_employee_home_page"
-boot_session = "arijentek_core.utils.redirect_employee_on_boot"

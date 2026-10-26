@@ -1,0 +1,51 @@
+{
+  "actions": [],
+  "autoname": "Web Push Settings",
+  "creation": "2026-08-12 10:15:00",
+  "doctype": "DocType",
+  "engine": "InnoDB",
+  "field_order": [
+    "vapid_public_key",
+    "vapid_private_key",
+    "admin_email"
+  ],
+  "fields": [
+    {
+      "description": "Auto-generated VAPID public key",
+      "fieldname": "vapid_public_key",
+      "fieldtype": "Data",
+      "label": "VAPID Public Key"
+    },
+    {
+      "description": "Auto-generated VAPID private key",
+      "fieldname": "vapid_private_key",
+      "fieldtype": "Password",
+      "label": "VAPID Private Key"
+    },
+    {
+      "default": "mailto:admin@arijentek.com",
+      "description": "Required for VAPID claims",
+      "fieldname": "admin_email",
+      "fieldtype": "Data",
+      "label": "Admin Email"
+    }
+  ],
+  "issingle": 1,
+  "links": [],
+  "modified": "2026-08-12 10:15:00",
+  "module": "Employee Portal",
+  "name": "Web Push Settings",
+  "naming_rule": "Set by user",
+  "permissions": [
+    {
+      "create": 1,
+      "read": 1,
+      "role": "System Manager",
+      "write": 1
+    }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "states": [],
+  "track_changes": 1
+}

@@ -1,0 +1,612 @@
+<style>
+    :root {
+        --gold: #D4AF37;
+        --gold-light: #F5E6B8;
+        --dark: #1a1a2e;
+        --text: #2d2d2d;
+        --text-muted: #6b7280;
+        --border: #e5e7eb;
+        --present: #16a34a;
+        --absent: #dc2626;
+        --leave: #f59e0b;
+        --half-day: #8b5cf6;
+        --wfh: #0891b2;
+    }
+
+    @page {
+        size: A4 landscape;
+        margin: 15mm 12mm;
+    }
+
+    @media print {
+        .no-print { display: none !important; }
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+
+    body {
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+        color: var(--text);
+        line-height: 1.5;
+    }
+
+    .report-container {
+        max-width: 100%;
+        margin: 0 auto;
+    }
+
+    .report-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 3px solid var(--gold);
+        padding-bottom: 16px;
+        margin-bottom: 20px;
+    }
+
+    .company-info {
+        flex: 1;
+    }
+
+    .company-name {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--dark);
+        letter-spacing: 0.5px;
+    }
+
+    .company-details {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 2px;
+    }
+
+    .report-title-block {
+        text-align: center;
+        flex: 1;
+    }
+
+    .report-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--dark);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .report-period {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 2px;
+    }
+
+    .report-meta {
+        text-align: right;
+        flex: 1;
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+
+    .employee-summary {
+        display: flex;
+        gap: 24px;
+        margin-bottom: 20px;
+        padding: 12px 16px;
+        background: #f9fafb;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+    }
+
+    .emp-detail {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .emp-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+
+    .emp-value {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--dark);
+    }
+
+    .attendance-grid {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+        margin-bottom: 20px;
+    }
+
+    .attendance-grid thead th {
+        background: var(--dark);
+        color: #fff;
+        padding: 8px 4px;
+        text-align: center;
+        font-weight: 600;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .attendance-grid thead th.day-col {
+        min-width: 28px;
+        font-size: 9px;
+    }
+
+    .attendance-grid tbody td {
+        padding: 6px 4px;
+        text-align: center;
+        border: 1px solid var(--border);
+        font-size: 11px;
+    }
+
+    .attendance-grid tbody tr:nth-child(even) {
+        background: #fafbfc;
+    }
+
+    .attendance-grid tbody tr:hover {
+        background: #f0f4ff;
+    }
+
+    .status-badge {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        line-height: 20px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .status-P { background: #dcfce7; color: var(--present); }
+    .status-A { background: #fee2e2; color: var(--absent); }
+    .status-L { background: #fef3c7; color: var(--leave); }
+    .status-H { background: #ede9fe; color: var(--half-day); }
+    .status-W { background: #cffafe; color: var(--wfh); }
+
+    .weekly-summary-row td {
+        background: #f9fafb;
+        font-weight: 600;
+        border-top: 2px solid var(--dark) !important;
+    }
+
+    .totals-section {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    .total-card {
+        flex: 1;
+        padding: 12px;
+        border-radius: 8px;
+        text-align: center;
+        border: 1px solid var(--border);
+    }
+
+    .total-card .total-number {
+        font-size: 24px;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .total-card .total-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted);
+        font-weight: 600;
+        margin-top: 2px;
+    }
+
+    .total-card.present { background: #f0fdf4; border-color: #bbf7d0; }
+    .total-card.present .total-number { color: var(--present); }
+    .total-card.absent { background: #fef2f2; border-color: #fecaca; }
+    .total-card.absent .total-number { color: var(--absent); }
+    .total-card.leave { background: #fffbeb; border-color: #fde68a; }
+    .total-card.leave .total-number { color: var(--leave); }
+    .total-card.half-day { background: #f5f3ff; border-color: #ddd6fe; }
+    .total-card.half-day .total-number { color: var(--half-day); }
+    .total-card.wfh { background: #ecfeff; border-color: #a5f3fc; }
+    .total-card.wfh .total-number { color: var(--wfh); }
+
+    .hours-section {
+        margin-bottom: 20px;
+        padding: 12px 16px;
+        background: #f9fafb;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+    }
+
+    .hours-section h3 {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+    }
+
+    .hours-grid {
+        display: flex;
+        gap: 24px;
+    }
+
+    .hours-item {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .hours-item .hours-val {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--dark);
+    }
+
+    .hours-item .hours-label {
+        font-size: 10px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+    }
+
+    .legend {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 20px;
+        padding: 10px 16px;
+        background: #f9fafb;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        font-size: 11px;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .legend-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+    }
+
+    .legend-dot.present { background: #dcfce7; border: 1px solid var(--present); }
+    .legend-dot.absent { background: #fee2e2; border: 1px solid var(--absent); }
+    .legend-dot.leave { background: #fef3c7; border: 1px solid var(--leave); }
+    .legend-dot.half-day { background: #ede9fe; border: 1px solid var(--half-day); }
+    .legend-dot.wfh { background: #cffafe; border: 1px solid var(--wfh); }
+
+    .report-footer {
+        margin-top: 30px;
+        padding-top: 16px;
+        border-top: 2px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        color: var(--text-muted);
+    }
+
+    .signature-block {
+        margin-top: 40px;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .signature-line {
+        text-align: center;
+        width: 200px;
+    }
+
+    .signature-line .line {
+        border-top: 1px solid #333;
+        margin-bottom: 4px;
+    }
+
+    .signature-line .label {
+        font-size: 10px;
+        color: var(--text-muted);
+    }
+</style>
+
+<div class="report-container">
+    <div class="report-header">
+        <div class="company-info">
+            <div class="company-name">{{ doc.company }}</div>
+            <div class="company-details">
+                {% if doc.department %}Department: {{ doc.department }}<br>{% endif %}
+                Monthly Attendance Record
+            </div>
+        </div>
+        <div class="report-title-block">
+            <div class="report-title">Monthly Attendance Report</div>
+            <div class="report-period">
+                {{ frappe.utils.formatdate(frappe.utils.get_first_day(doc.attendance_date), "MMMM YYYY") if doc.attendance_date else "Period" }}
+            </div>
+        </div>
+        <div class="report-meta">
+            <div>Employee ID: {{ doc.employee }}</div>
+            <div>Generated: {{ frappe.utils.nowdate() }}</div>
+        </div>
+    </div>
+
+    {% set employee = frappe.get_doc("Employee", doc.employee) if doc.employee else None %}
+    {% set month_start = frappe.utils.get_first_day(doc.attendance_date) if doc.attendance_date else frappe.utils.get_first_day(frappe.utils.nowdate()) %}
+    {% set month_end = frappe.utils.get_last_day(doc.attendance_date) if doc.attendance_date else frappe.utils.get_last_day(frappe.utils.nowdate()) %}
+
+    <div class="employee-summary">
+        <div class="emp-detail">
+            <span class="emp-label">Employee</span>
+            <span class="emp-value">{{ doc.employee_name or employee.employee_name or "" }}</span>
+        </div>
+        <div class="emp-detail">
+            <span class="emp-label">Employee ID</span>
+            <span class="emp-value">{{ doc.employee }}</span>
+        </div>
+        {% if employee %}
+        <div class="emp-detail">
+            <span class="emp-label">Designation</span>
+            <span class="emp-value">{{ employee.designation or "" }}</span>
+        </div>
+        <div class="emp-detail">
+            <span class="emp-label">Department</span>
+            <span class="emp-value">{{ doc.department or employee.department or "" }}</span>
+        </div>
+        <div class="emp-detail">
+            <span class="emp-label">Employment Type</span>
+            <span class="emp-value">{{ employee.employment_type or "Full-time" }}</span>
+        </div>
+        {% if employee.custom_branch %}
+        <div class="emp-detail">
+            <span class="emp-label">Branch</span>
+            <span class="emp-value">{{ employee.custom_branch }}</span>
+        </div>
+        {% endif %}
+        {% endif %}
+    </div>
+
+    {% set attendance_records = frappe.get_all(
+        "Attendance",
+        filters={
+            "employee": doc.employee,
+            "attendance_date": [">=", month_start],
+            "attendance_date": ["<=", month_end],
+            "docstatus": 1
+        },
+        fields=["attendance_date", "status", "working_hours", "in_time", "out_time", "late_entry", "early_exit", "shift", "leave_type"],
+        order_by="attendance_date asc"
+    ) %}
+
+    {% set record_map = {} %}
+    {% for rec in attendance_records %}
+        {% set _ = record_map.update({rec.attendance_date.strftime("%Y-%m-%d") if rec.attendance_date else "": rec}) %}
+    {% endfor %}
+
+    {% set present_count = 0 %}
+    {% set absent_count = 0 %}
+    {% set leave_count = 0 %}
+    {% set half_day_count = 0 %}
+    {% set wfh_count = 0 %}
+    {% set total_working_hours = 0 %}
+    {% set total_days = frappe.utils.date_diff(month_end, month_start) + 1 %}
+    {% set holidays = frappe.get_all("Holiday", filters={"parent": "Holiday List"}, fields=["holiday_date"]) if frappe.db.exists("DocType", "Holiday") else [] %}
+    {% set holiday_dates = [] %}
+    {% for h in holidays %}
+        {% set _ = holiday_dates.append(h.holiday_date.strftime("%Y-%m-%d") if hasattr(h.holiday_date, 'strftime') else str(h.holiday_date)) %}
+    {% endfor %}
+
+    <table class="attendance-grid">
+        <thead>
+            <tr>
+                <th style="min-width:40px;">Day</th>
+                <th style="min-width:60px;">Date</th>
+                <th style="min-width:70px;">Status</th>
+                <th style="min-width:55px;">In Time</th>
+                <th style="min-width:55px;">Out Time</th>
+                <th style="min-width:55px;">Hrs</th>
+                <th style="min-width:50px;">Late</th>
+                <th style="min-width:50px;">Early</th>
+                <th style="min-width:70px;">Shift</th>
+                <th style="min-width:70px;">Leave Type</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% set current_date = month_start %}
+            {% set week_hours = 0 %}
+            {% set week_days = 0 %}
+            {% set week_num = 1 %}
+
+            {% for day_num in range(total_days) %}
+                {% set current_date = frappe.utils.add_days(month_start, day_num) %}
+                {% set date_str = current_date.strftime("%Y-%m-%d") %}
+                {% set rec = record_map.get(date_str, {}) %}
+                {% set is_weekend = current_date.weekday() >= 5 %}
+                {% set is_holiday = date_str in holiday_dates %}
+
+                {% if rec and rec.status == "Present" %}
+                    {% set present_count = present_count + 1 %}
+                {% elif rec and rec.status == "Absent" %}
+                    {% set absent_count = absent_count + 1 %}
+                {% elif rec and rec.status == "On Leave" %}
+                    {% set leave_count = leave_count + 1 %}
+                {% elif rec and rec.status == "Half Day" %}
+                    {% set half_day_count = half_day_count + 1 %}
+                {% elif rec and rec.status == "Work From Home" %}
+                    {% set wfh_count = wfh_count + 1 %}
+                {% endif %}
+
+                {% if rec and rec.working_hours %}
+                    {% set total_working_hours = total_working_hours + rec.working_hours %}
+                {% endif %}
+
+                {% set week_hours = week_hours + (rec.working_hours or 0) %}
+
+                <tr>
+                    <td style="font-weight:600; {% if is_weekend %}color:#9ca3af;{% endif %}">
+                        {{ current_date.strftime("%a") }}
+                    </td>
+                    <td>{{ current_date.strftime("%d") }}</td>
+                    <td>
+                        {% if is_holiday %}
+                            <span class="status-badge status-L" title="Holiday">HD</span>
+                        {% elif is_weekend and not rec %}
+                            <span style="color:#9ca3af; font-size:10px;">OFF</span>
+                        {% elif rec and rec.status == "Present" %}
+                            <span class="status-badge status-P" title="Present">P</span>
+                        {% elif rec and rec.status == "Absent" %}
+                            <span class="status-badge status-A" title="Absent">A</span>
+                        {% elif rec and rec.status == "On Leave" %}
+                            <span class="status-badge status-L" title="On Leave">L</span>
+                        {% elif rec and rec.status == "Half Day" %}
+                            <span class="status-badge status-H" title="Half Day">H</span>
+                        {% elif rec and rec.status == "Work From Home" %}
+                            <span class="status-badge status-W" title="Work From Home">W</span>
+                        {% elif not is_weekend %}
+                            <span style="color:#d1d5db;">--</span>
+                        {% else %}
+                            <span style="color:#d1d5db;">--</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if rec and rec.in_time %}
+                            {{ rec.in_time.strftime("%H:%M") if hasattr(rec.in_time, 'strftime') else rec.in_time[-8:-3] }}
+                        {% else %}
+                            --
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if rec and rec.out_time %}
+                            {{ rec.out_time.strftime("%H:%M") if hasattr(rec.out_time, 'strftime') else rec.out_time[-8:-3] }}
+                        {% else %}
+                            --
+                        {% endif %}
+                    </td>
+                    <td style="font-weight:600;">
+                        {% if rec and rec.working_hours %}
+                            {{ "%.1f"|format(rec.working_hours) }}
+                        {% else %}
+                            --
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if rec and rec.late_entry %}
+                            <span style="color:var(--absent); font-weight:600;">Yes</span>
+                        {% else %}
+                            --
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if rec and rec.early_exit %}
+                            <span style="color:var(--absent); font-weight:600;">Yes</span>
+                        {% else %}
+                            --
+                        {% endif %}
+                    </td>
+                    <td style="font-size:10px;">
+                        {{ rec.shift or "--" }}
+                    </td>
+                    <td style="font-size:10px;">
+                        {{ rec.leave_type or "--" }}
+                    </td>
+                </tr>
+
+                {% if current_date.weekday() == 6 or day_num == total_days - 1 %}
+                    {% set week_hours = 0 %}
+                    {% set week_num = week_num + 1 %}
+                {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="legend">
+        <div class="legend-item"><span class="legend-dot present"></span> Present</div>
+        <div class="legend-item"><span class="legend-dot absent"></span> Absent</div>
+        <div class="legend-item"><span class="legend-dot leave"></span> Leave / Holiday</div>
+        <div class="legend-item"><span class="legend-dot half-day"></span> Half Day</div>
+        <div class="legend-item"><span class="legend-dot wfh"></span> Work From Home</div>
+    </div>
+
+    <div class="totals-section">
+        <div class="total-card present">
+            <div class="total-number">{{ present_count }}</div>
+            <div class="total-label">Present Days</div>
+        </div>
+        <div class="total-card absent">
+            <div class="total-number">{{ absent_count }}</div>
+            <div class="total-label">Absent Days</div>
+        </div>
+        <div class="total-card leave">
+            <div class="total-number">{{ leave_count }}</div>
+            <div class="total-label">Leave Days</div>
+        </div>
+        <div class="total-card half-day">
+            <div class="total-number">{{ half_day_count }}</div>
+            <div class="total-label">Half Days</div>
+        </div>
+        <div class="total-card wfh">
+            <div class="total-number">{{ wfh_count }}</div>
+            <div class="total-label">WFH Days</div>
+        </div>
+    </div>
+
+    {% set working_days = present_count + absent_count + leave_count + half_day_count + wfh_count %}
+    {% set attendance_pct = (present_count + wfh_count + (half_day_count * 0.5)) / working_days * 100 if working_days > 0 else 0 %}
+    {% set roster = frappe.get_all("Shift Assignment", filters={"employee": doc.employee, "docstatus": 1, "status": "Active"}, fields=["shift_type"], limit=1) %}
+    {% set shift_name = roster[0].shift_type if roster else "Standard" %}
+    {% set shift_doc = frappe.get_doc("Shift Type", shift_name) if frappe.db.exists("Shift Type", shift_name) else None %}
+    {% set target_hours = (shift_doc.working_hours or 8) * working_days if shift_doc and working_days > 0 else 0 %}
+
+    <div class="hours-section">
+        <h3>Working Hours Summary</h3>
+        <div class="hours-grid">
+            <div class="hours-item">
+                <span class="hours-val">{{ "%.1f"|format(total_working_hours) }}</span>
+                <span class="hours-label">Total Hours Worked</span>
+            </div>
+            <div class="hours-item">
+                <span class="hours-val">{{ "%.1f"|format(target_hours) }}</span>
+                <span class="hours-label">Target Hours</span>
+            </div>
+            <div class="hours-item">
+                <span class="hours-val">{{ "%.1f"|format(total_working_hours - target_hours) }}</span>
+                <span class="hours-label">Overtime / Shortfall</span>
+            </div>
+            <div class="hours-item">
+                <span class="hours-val">{{ "%.0f"|format(attendance_pct) }}%</span>
+                <span class="hours-label">Attendance Rate</span>
+            </div>
+            <div class="hours-item">
+                <span class="hours-val">{{ working_days }}</span>
+                <span class="hours-label">Working Days</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="signature-block">
+        <div class="signature-line">
+            <div class="line">&nbsp;</div>
+            <div class="label">Employee Signature</div>
+        </div>
+        <div class="signature-line">
+            <div class="line">&nbsp;</div>
+            <div class="label">HR Manager</div>
+        </div>
+        <div class="signature-line">
+            <div class="line">&nbsp;</div>
+            <div class="label">Authorized Signatory</div>
+        </div>
+    </div>
+
+    <div class="report-footer">
+        <div>Attendance Management System</div>
+        <div>Report generated on {{ frappe.utils.formatdate(frappe.utils.nowdate(), "dd MMM yyyy") }}</div>
+        <div>Page 1 of 1</div>
+    </div>
+</div>

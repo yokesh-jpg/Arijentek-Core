@@ -1,128 +1,158 @@
-<script setup lang="ts">
-import { ref } from "vue";
-import { useRouter } from "vue-router";
-import { useAuthStore } from "../stores/auth";
-import { LogIn, Loader2, AlertCircle, Eye, EyeOff } from "lucide-vue-next";
+<template>
+	<!-- Same shell as the app behind it: graphite backdrop, one floating light
+	     panel. Signing in should look like the place you are signing in to. -->
+	<div class="login-shell">
+		<div class="w-full max-w-[400px] flex flex-col items-center">
+			<img
+				:src="asset('images/gemora-logo-full.png')"
+				alt="Gemora 360"
+				class="h-[74px] w-auto mb-1"
+			/>
+			<p class="text-[13px] text-white/45 mb-6">Staff Hub</p>
 
-const router = useRouter();
-const authStore = useAuthStore();
+			<div
+				class="w-full rounded-[22px] bg-white dark:bg-surface-1 border border-black/[0.07] dark:border-white/10 shadow-[0_28px_70px_-24px_rgba(0,0,0,.55)] p-6 sm:p-7"
+			>
+				<h1
+					class="text-xl font-semibold tracking-[-0.015em] text-[#17181B] dark:text-white"
+				>
+					Sign in
+				</h1>
+				<p class="text-[13px] text-[#5C6169] dark:text-white/65 mt-1 mb-6">
+					Use your Zevar account to continue.
+				</p>
 
-const username = ref("");
-const password = ref("");
-const error = ref("");
-const loading = ref(false);
-const showPassword = ref(false);
+				<form @submit.prevent="handleLogin" class="space-y-4">
+					<div>
+						<label for="login-email" class="field-label">Email</label>
+						<div class="relative">
+							<span
+								class="material-symbols-outlined !text-[18px] absolute left-3.5 top-1/2 -translate-y-1/2 text-[#656A72] dark:text-white/60 pointer-events-none"
+								>alternate_email</span
+							>
+							<input
+								id="login-email"
+								v-model="email"
+								type="email"
+								autocomplete="username"
+								required
+								placeholder="you@zevar.com"
+								class="field-input !pl-10"
+							/>
+						</div>
+					</div>
 
-async function handleLogin() {
-  loading.value = true;
-  error.value = "";
+					<div>
+						<div class="flex items-baseline justify-between gap-3">
+							<label for="login-password" class="field-label">Password</label>
+							<!-- Not wired to anything yet — see the note in README. -->
+							<a
+								href="#"
+								class="text-xs font-medium text-accent dark:text-accent-light hover:underline mb-1.5"
+								>Forgot password?</a
+							>
+						</div>
+						<div class="relative">
+							<span
+								class="material-symbols-outlined !text-[18px] absolute left-3.5 top-1/2 -translate-y-1/2 text-[#656A72] dark:text-white/60 pointer-events-none"
+								>lock</span
+							>
+							<input
+								id="login-password"
+								v-model="password"
+								:type="showPassword ? 'text' : 'password'"
+								autocomplete="current-password"
+								required
+								placeholder="••••••••"
+								class="field-input !pl-10 !pr-11"
+							/>
+							<button
+								type="button"
+								@click="showPassword = !showPassword"
+								tabindex="-1"
+								class="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 grid place-items-center rounded-full text-[#656A72] dark:text-white/60 hover:text-[#17181B] dark:hover:text-white hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors"
+								:aria-label="showPassword ? 'Hide password' : 'Show password'"
+							>
+								<span class="material-symbols-outlined !text-[18px]">{{
+									showPassword ? 'visibility_off' : 'visibility'
+								}}</span>
+							</button>
+						</div>
+					</div>
 
-  try {
-    const result = await authStore.login(username.value, password.value);
+					<div
+						v-if="errorMsg"
+						class="flex items-start gap-2.5 p-3 rounded-[12px] bg-red-500/[0.08] border border-red-500/20"
+						role="alert"
+					>
+						<span class="material-symbols-outlined !text-[18px] text-red-600 dark:text-red-400 shrink-0"
+							>error</span
+						>
+						<p class="text-[13px] text-red-700 dark:text-red-300 leading-snug">
+							{{ errorMsg }}
+						</p>
+					</div>
 
-    if (result && result.success) {
-      router.push("/");
-    } else {
-      const errObj = result?.error as any;
-      error.value = errObj?.message || errObj || "Invalid credentials";
-    }
-  } catch (e: any) {
-    error.value = e.message || "Login failed";
-  } finally {
-    loading.value = false;
-  }
+					<button type="submit" :disabled="loading" class="btn-primary w-full !h-12">
+						<span
+							v-if="loading"
+							class="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin"
+						></span>
+						<template v-else>Sign in</template>
+					</button>
+				</form>
+			</div>
+
+			<p class="text-xs text-white/30 mt-6 text-center">
+				Authorised access only · v4.2.0
+			</p>
+		</div>
+	</div>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import { createResource } from 'frappe-ui'
+
+const email = ref('')
+const password = ref('')
+const showPassword = ref(false)
+const loading = ref(false)
+const errorMsg = ref('')
+
+// Vite serves this app under BASE_URL, so a root-relative path would 404.
+const asset = (p) => `${import.meta.env.BASE_URL}${p}`
+
+const loginResource = createResource({
+	url: 'login',
+	makeParams() {
+		return { usr: email.value, pwd: password.value }
+	},
+	onSuccess() {
+		window.location.reload()
+	},
+	onError(err) {
+		loading.value = false
+		errorMsg.value = err?.messages?.[0] || 'Invalid credentials'
+	},
+})
+
+function handleLogin() {
+	errorMsg.value = ''
+	loading.value = true
+	loginResource.submit()
 }
 </script>
 
-<template>
-  <div class="min-h-screen flex items-center justify-center relative overflow-hidden px-4">
-    <!-- Background gradient orbs -->
-    <div class="absolute -top-40 -left-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl" />
-    <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-purple-500/8 rounded-full blur-3xl" />
-
-    <div class="w-full max-w-[420px] relative z-10 animate-fade-in">
-      <!-- Logo -->
-      <div class="text-center mb-10">
-        <div
-          class="w-14 h-14 rounded-2xl bg-accent/15 flex items-center justify-center mx-auto mb-5 ring-1 ring-accent/20"
-        >
-          <span class="text-accent text-2xl font-bold">A</span>
-        </div>
-        <h1 class="text-3xl font-bold text-white tracking-tight">Employee Portal</h1>
-        <p class="text-slate-500 mt-2 text-sm">Sign in to access your dashboard</p>
-      </div>
-
-      <!-- Card -->
-      <div class="glass-card p-8">
-        <form @submit.prevent="handleLogin" class="space-y-5">
-          <!-- Username -->
-          <div>
-            <label for="username" class="block text-sm font-medium text-slate-400 mb-1.5">
-              Username / Employee ID
-            </label>
-            <input
-              id="username"
-              v-model="username"
-              type="text"
-              required
-              autocomplete="username"
-              class="input-dark"
-              placeholder="Enter your username"
-            />
-          </div>
-
-          <!-- Password -->
-          <div>
-            <label for="password" class="block text-sm font-medium text-slate-400 mb-1.5">
-              Password
-            </label>
-            <div class="relative group">
-              <input
-                id="password pr-10"
-                v-model="password"
-                :type="showPassword ? 'text' : 'password'"
-                required
-                autocomplete="current-password"
-              class="input-dark pr-10"
-                placeholder="Enter your password"
-              />
-              <button
-                type="button"
-                @click="showPassword = !showPassword"
-                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors focus:outline-none"
-              >
-                <EyeOff v-if="showPassword" :size="18" />
-                <Eye v-else :size="18" />
-              </button>
-            </div>
-          </div>
-
-          <!-- Error -->
-          <div
-            v-if="error"
-            class="flex items-start gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 p-3 rounded-xl"
-          >
-            <AlertCircle :size="16" class="mt-0.5 shrink-0" />
-            <span>{{ error }}</span>
-          </div>
-
-          <!-- Submit -->
-          <button
-            type="submit"
-            :disabled="loading || !username || !password"
-            class="btn-accent w-full flex items-center justify-center gap-2 py-3.5"
-          >
-            <Loader2 v-if="loading" :size="18" class="animate-spin" />
-            <LogIn v-else :size="18" />
-            <span>{{ loading ? "Signing in..." : "Sign in" }}</span>
-          </button>
-        </form>
-      </div>
-
-      <!-- Footer -->
-      <p class="text-center text-xs text-slate-600 mt-8">
-        Powered by <span class="text-slate-500">Arijentek Solutions</span>
-      </p>
-    </div>
-  </div>
-</template>
+<style scoped>
+/* The backdrop is the same graphite in both themes — it is the shell, not a
+   surface — so this needs no dark variant. */
+.login-shell {
+	min-height: 100dvh;
+	width: 100%;
+	display: grid;
+	place-items: center;
+	padding: 24px 16px;
+	background: #0b0b11;
+}
+</style>

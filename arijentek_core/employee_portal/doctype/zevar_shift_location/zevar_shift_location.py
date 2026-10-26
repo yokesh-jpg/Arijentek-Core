@@ -1,0 +1,8 @@
+# Copyright (c) 2026, Gemora 360 and contributors
+# For license information, please see license.txt
+
+from frappe.model.document import Document
+
+
+class ZevarShiftLocation(Document):
+	pass

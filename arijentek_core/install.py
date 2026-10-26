@@ -48,6 +48,27 @@ def _ensure_employee_role():
 	pass  # No role modifications needed; Frappe handles access by user_type.
 
 
+def create_core_roles():
+	"""Create essential staff roles on setup if missing."""
+	if not frappe.db.exists("DocType", "Role"):
+		return
+
+	core_roles = [
+		{"role_name": "Admin User", "desk_access": 0},
+		{"role_name": "Store Manager", "desk_access": 0},
+		{"role_name": "Sales User", "desk_access": 0},
+		{"role_name": "HR Manager", "desk_access": 1},
+		{"role_name": "HR User", "desk_access": 1},
+	]
+
+	for spec in core_roles:
+		if not frappe.db.exists("Role", spec["role_name"]):
+			doc = frappe.new_doc("Role")
+			doc.role_name = spec["role_name"]
+			doc.desk_access = spec.get("desk_access", 0)
+			doc.insert(ignore_permissions=True)
+
+
 def _ensure_module_def():
 	"""Create 'Employee Portal' Module Def so it appears as its own tile on /app."""
 	module_name = "Employee Portal"

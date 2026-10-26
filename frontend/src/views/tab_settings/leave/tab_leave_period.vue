@@ -1,0 +1,173 @@
+<template>
+	<div class="space-y-4 sm:space-y-5 tab-fill">
+		<!-- ===== Header ===== -->
+		<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+			<div>
+				<h2 class="section-title">Leave periods</h2>
+				<p class="section-subtitle">The years allowances are counted against.</p>
+			</div>
+			<button v-if="leaveStore.canCreateLeavePeriod" @click="handleCreate" class="btn-primary shrink-0">
+				<span class="material-symbols-outlined !text-[18px]">add</span>
+				Add period
+			</button>
+		</div>
+
+		<!-- ===== Filters ===== -->
+		<div class="glass-card !p-3">
+			<div class="flex flex-wrap items-center gap-2">
+				<div class="relative flex-[2] min-w-[220px]">
+					<span class="material-symbols-outlined !text-[18px] absolute left-3 top-1/2 -translate-y-1/2 text-[#656A72] dark:text-white/55 pointer-events-none">search</span>
+					<input v-model="searchQuery" type="text" placeholder="Period ID" aria-label="Search" class="field-input !pl-9" />
+				</div>
+			</div>
+		</div>
+
+		<!-- ===== Table ===== -->
+		<DataTable
+			:columns="listColumns"
+			:rows="pager.state.rows"
+			:actions="actionsForPeriod"
+			:row-key="'name'"
+			:loading="pager.state.loading"
+			:empty-text="searchQuery ? 'No leave periods match that search.' : 'No leave periods found.'"
+			:show-pager="true"
+			:total="pager.state.total"
+			:page="pager.state.page"
+			:page-size="pager.state.size"
+			@update:page="pager.state.page = $event"
+			@update:page-size="pager.setPageSize($event)"
+		>
+			<template #cell-name="{ row }">
+				<div>
+					<span class="block whitespace-normal sm:whitespace-nowrap font-medium">{{ formatDate(row.from_date) }} – {{ formatDate(row.to_date) }}</span>
+					<span class="block text-xs font-normal text-[#5C6169] dark:text-white/60">{{ row.name }}</span>
+				</div>
+			</template>
+			<template #cell-status="{ row }">
+				<span class="premium-tag" :class="row.is_active ? 'tag-emerald' : 'tag-neutral'">{{ row.is_active ? 'Active' : 'Closed' }}</span>
+			</template>
+		</DataTable>
+
+		<!-- Modals -->
+		<CreateLeavePeriod
+			v-model="showCreateModal"
+			:editId="editPeriodId"
+			@save="pager.fetchPage"
+		/>
+	</div>
+</template>
+
+<script setup>
+import DataTable from '@/components/DataTable.vue'
+import { useServerPager } from '@/composables/useServerPager.js'
+import CreateLeavePeriod from '../../forms/leave/create_leave_period.vue'
+import { useLeaveStore } from '@/stores/leave'
+import { notify, ask } from '@/utils/feedback.js'
+import { getErrorMessage } from '@/utils'
+import { ref, watch, onMounted } from 'vue'
+import { call } from 'frappe-ui'
+
+const leaveStore = useLeaveStore()
+
+const searchQuery = ref('')
+const showCreateModal = ref(false)
+const editPeriodId = ref('')
+
+const listColumns = [
+	{ key: 'name', label: 'Period', className: 'table-td-strong' },
+	{ key: 'status', label: 'Status', className: 'table-td' },
+]
+
+function actionsForPeriod(row) {
+	return [
+		{
+			label: 'Edit',
+			icon: 'edit',
+			show: leaveStore.canEditLeavePeriod,
+			onClick: () => handleEdit(row),
+		},
+		{ divider: true },
+		{
+			label: 'Delete',
+			icon: 'delete',
+			danger: true,
+			show: leaveStore.canDeleteLeavePeriod,
+			onClick: () => deleteLeavePeriod(row.name),
+		},
+	]
+}
+
+function handleCreate() {
+	editPeriodId.value = ''
+	showCreateModal.value = true
+}
+
+function handleEdit(row) {
+	editPeriodId.value = row.name
+	showCreateModal.value = true
+}
+
+async function deleteLeavePeriod(name) {
+	if (!await ask('Are you sure you want to delete this leave period?')) return
+	try {
+		const res = await call('arijentek_core.api.leave.delete_leave_period', { name })
+		if (res && res.success === false) {
+			notify(getErrorMessage(res.error || res, 'Failed to delete leave period.'))
+		} else {
+			await pager.fetchPage()
+		}
+	} catch (err) {
+		notify(getErrorMessage(err, 'Failed to delete leave period.'))
+	}
+}
+
+async function fetchLeavePeriods(page, size) {
+	try {
+		const params = {
+			page: page || 1,
+			page_size: size || pager.state.size || 10,
+		}
+		if (searchQuery.value) {
+			params.search_text = searchQuery.value
+		}
+		const res = await call('arijentek_core.api.leave.get_leave_periods', params)
+		const rows = res?.rows || (Array.isArray(res) ? res : res?.data || [])
+		const total = res?.total != null ? Number(res.total) : rows.length
+		return { rows, total }
+	} catch (e) {
+		console.error('Failed to fetch leave periods:', e)
+		return { rows: [], total: 0 }
+	}
+}
+
+const pager = useServerPager((page, size) => fetchLeavePeriods(page, size), { size: 10 })
+
+function triggerFilterRefresh() {
+	if (pager.state.page !== 1) {
+		pager.state.page = 1
+	} else {
+		pager.fetchPage()
+	}
+}
+
+let debounceTimer
+watch(searchQuery, () => {
+	clearTimeout(debounceTimer)
+	debounceTimer = setTimeout(() => {
+		triggerFilterRefresh()
+	}, 300)
+})
+
+onMounted(() => {
+	pager.fetchPage()
+})
+
+function formatDate(dateStr) {
+	if (!dateStr) return '-'
+	return new Date(dateStr).toLocaleDateString('en-US', {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric',
+	})
+}
+</script>

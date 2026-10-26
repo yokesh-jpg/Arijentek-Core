@@ -1,21 +1,17 @@
-<script setup lang="ts">
-import { computed } from "vue";
-import { useRoute, RouterView } from "vue-router";
-import AppLayout from "./components/AppLayout.vue";
+<template>
+	<PortalLayout v-if="!route.meta.guest">
+		<router-view />
+	</PortalLayout>
+	<router-view v-else />
+	<ToastHost />
+	<ConfirmHost />
+</template>
+
+<script setup>
+import { useRoute } from "vue-router";
+import PortalLayout from "@/components/PortalLayout.vue";
+import ToastHost from "@/components/ToastHost.vue";
+import ConfirmHost from "@/components/ConfirmHost.vue";
 
 const route = useRoute();
-const isLoginPage = computed(() => route.path === "/login");
 </script>
-
-<template>
-  <div v-if="isLoginPage">
-    <RouterView />
-  </div>
-  <AppLayout v-else>
-    <RouterView v-slot="{ Component }">
-      <transition name="page" mode="out-in">
-        <component :is="Component" />
-      </transition>
-    </RouterView>
-  </AppLayout>
-</template>

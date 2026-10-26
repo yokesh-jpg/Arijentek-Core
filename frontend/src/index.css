@@ -1,0 +1,1109 @@
+/* Inter only. Cinzel and Plus Jakarta Sans are gone — the Gemora scale is a
+   single family, with JetBrains Mono reserved for codes and IDs. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Material Symbols. 140 files use .material-symbols-outlined but the zip
+   declared neither the font nor the class, so every icon rendered as its
+   literal ligature name over the label. */
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block');
+@import './styles/tokens.css';
+@import 'frappe-ui/style.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+	* {
+		font-family: var(--font-sans);
+	}
+
+	/* Headings were Plus Jakarta Sans at weight 800 with a !important. Gemora
+	   tops out at 700 and uses tracking, not weight, to set a heading apart. */
+	h1,
+	h2,
+	h3,
+	h4,
+	h5,
+	h6 {
+		font-family: var(--font-sans);
+		font-weight: 600;
+		letter-spacing: -0.01em;
+	}
+
+	html,
+	body,
+	#app {
+		height: 100%;
+		margin: 0;
+		padding: 0;
+		overflow: hidden;
+	}
+
+	body {
+		background-color: var(--bg-0-light);
+		color: var(--text-1);
+		@apply transition-colors duration-300;
+	}
+
+	.dark body {
+		background-color: var(--bg-0);
+		color: #ffffff;
+	}
+
+	/* Native controls (date pickers, selects, scrollbars) follow the theme. */
+	:root {
+		color-scheme: light;
+	}
+	.dark {
+		color-scheme: dark;
+	}
+
+	.font-mono,
+	.num,
+	.tabular {
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+		letter-spacing: -0.01em;
+	}
+}
+
+@layer components {
+	/* The Gemora surface. `premium-card` is kept as an alias because 37 call
+	   sites use it — both resolve to the same thing, so markup can migrate
+	   gradually instead of in one sweep. */
+	.glass-card,
+	.premium-card {
+		@apply bg-white/[0.55] dark:bg-white/[0.04] border border-black/[0.07] dark:border-white/[0.08] rounded-[16px] p-4 shadow-[0_1px_2px_rgba(11,11,12,.04),0_14px_34px_-14px_rgba(51,40,123,.20)] transition-colors duration-200;
+		backdrop-filter: blur(8px);
+		-webkit-backdrop-filter: blur(8px);
+	}
+
+	.glass-card-interactive {
+		@apply hover:border-accent/30 dark:hover:border-accent-soft/30 hover:shadow-[0_2px_4px_rgba(11,11,12,.05),0_28px_60px_-22px_rgba(51,40,123,.28)];
+	}
+
+	.glass-inner {
+		@apply bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.07] rounded-[12px];
+	}
+
+	/* Was 10px, uppercase, 0.3em tracking, weight 900 — three shouts at once,
+	   and below the 11px floor. */
+	.status-label {
+		@apply text-xs font-semibold text-[#656A72] dark:text-white/55 mb-3 block;
+	}
+
+	/* Status chip: uppercase, set small and bold on a flat tint with no outline.
+	   The capsule-with-a-border it replaces drew two edges around two words —
+	   the tint alone separates it from the row.
+	   whitespace-nowrap: a two-word shift name was breaking across lines inside
+	   the chip on a narrow table cell. */
+	.premium-tag {
+		@apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap;
+	}
+
+	/* Semantic tags. `tag-emerald` means SUCCESS, so it stays green even though
+	   the emerald palette now resolves to the accent — see tailwind.config.js.
+	   The colour is the whole signal now that the outline is gone, so the text
+	   steps are the darker ones that hold up against a 12% tint. */
+	.tag-emerald {
+		@apply bg-green-500/[0.12] text-green-700 dark:bg-green-500/20 dark:text-green-300;
+	}
+	.tag-amber {
+		@apply bg-amber-500/[0.14] text-amber-800 dark:bg-amber-500/20 dark:text-amber-300;
+	}
+	.tag-red {
+		@apply bg-red-500/[0.12] text-red-700 dark:bg-red-500/20 dark:text-red-300;
+	}
+	/* `tag-accent` / `tag-neutral` are the honest names — there is no blue or
+	   grey in this palette. The old names stay as aliases for existing markup. */
+	.tag-blue,
+	.tag-accent {
+		@apply bg-accent/[0.12] text-accent dark:bg-accent-soft/20 dark:text-accent-light;
+	}
+	.tag-gray,
+	.tag-neutral {
+		@apply bg-black/[0.06] text-[#5C6169] dark:bg-white/[0.09] dark:text-white/65;
+	}
+
+	.premium-title {
+		@apply text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.01em] leading-tight;
+	}
+
+	.premium-subtitle {
+		@apply text-sm text-gray-500 dark:text-white/55;
+	}
+
+	.sidebar-active {
+		@apply bg-accent text-white shadow-[0_8px_24px_-6px_rgb(var(--accent-rgb)/0.42)];
+	}
+
+	/* ===== Dialogs and forms =====
+	   Built as primitives because the portal has ~50 of these. Each form was
+	   restating the same scrim, panel, label and button classes by hand, which
+	   is how they drifted apart in the first place. */
+	.modal-scrim {
+		@apply fixed inset-0 z-50 grid place-items-center p-4 sm:p-6 bg-[#0B0B0C]/60 backdrop-blur-sm;
+	}
+
+	.modal-panel {
+		@apply w-full flex flex-col max-h-[90vh] overflow-hidden rounded-[20px] bg-white dark:bg-surface-1 border border-[#ECECF1] dark:border-white/[0.08] shadow-[0_24px_60px_-20px_rgba(11,11,12,.35)] dark:shadow-[0_24px_60px_-20px_rgba(0,0,0,.7)];
+	}
+
+	.modal-header {
+		@apply flex items-center justify-between gap-4 px-6 py-5 border-b border-[#F2F2F6] dark:border-white/[0.08] shrink-0;
+	}
+
+	.modal-title {
+		@apply text-lg font-semibold text-[#17181B] dark:text-white;
+	}
+
+	.modal-close {
+		@apply w-8 h-8 grid place-items-center rounded-full text-[#9AA0A8] hover:text-[#17181B] dark:hover:text-white hover:bg-[#F5F5F8] dark:hover:bg-surface-3 transition-colors shrink-0;
+	}
+
+	.modal-body {
+		@apply px-6 py-5 overflow-y-auto flex-1 space-y-4;
+	}
+
+	.modal-footer {
+		@apply flex items-center justify-end gap-3 px-6 py-4 border-t border-[#F2F2F6] dark:border-white/[0.08] bg-[#FAFAFC] dark:bg-white/[0.02] shrink-0;
+	}
+
+	/* Was 11px uppercase at wide tracking — three emphases at once on a word
+	   that only has to name the field below it. */
+	.field-label {
+		@apply block text-xs font-medium text-[#5C6169] dark:text-white/65 mb-1.5;
+	}
+
+	.field-input {
+		@apply w-full h-10 px-3 rounded-[12px] text-[13px] bg-black/[0.03] dark:bg-white/[0.05] border border-black/[0.08] dark:border-white/[0.1] text-gray-900 dark:text-white placeholder:text-[#656A72] focus:bg-white dark:focus:bg-white/[0.09] focus:border-accent/40 outline-none transition-colors;
+	}
+
+	textarea.field-input {
+		@apply h-auto py-3 resize-none leading-snug;
+	}
+
+	/* A value the form shows but does not take — same shape as an input so the
+	   column of fields stays aligned, no border so it does not invite a click. */
+	.field-static {
+		@apply w-full min-h-[40px] px-3 py-2.5 rounded-[12px] text-[13px] font-medium bg-black/[0.03] dark:bg-white/[0.05] text-gray-900 dark:text-white;
+	}
+
+	.field-error {
+		@apply text-xs font-medium text-red-600 dark:text-red-400 mt-1.5;
+	}
+
+	.btn-primary {
+		@apply h-9 lg:h-8 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-[12px] bg-accent hover:bg-accent-hover text-white text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+	}
+
+	.btn-secondary {
+		@apply h-9 lg:h-8 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-[12px] border border-black/[0.08] dark:border-white/[0.1] bg-transparent text-[#2D3138] dark:text-white/80 text-xs font-medium hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+	}
+	/* The show/hide control inside a password field. */
+	.reveal-btn {
+		@apply absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 grid place-items-center rounded-full text-[#656A72] hover:text-[#17181B] dark:hover:text-white hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors;
+	}
+
+	/* Profile menu rows, matching the POS's settings dropdown: a title over a
+	   one-line description with an icon column, grouped under small labels. */
+	.menu-row {
+		@apply w-full flex items-start gap-3 px-3.5 py-2.5 text-left text-[#17181B] dark:text-white hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors;
+	}
+	.menu-icon {
+		@apply shrink-0 mt-0.5 text-[#5C6169] dark:text-white/65;
+	}
+	.menu-label {
+		@apply px-3.5 pt-2 pb-1 text-xs font-semibold text-[#656A72] dark:text-white/55;
+	}
+	.menu-divider {
+		@apply h-px my-1 bg-black/[0.07] dark:bg-white/[0.08];
+	}
+
+	/* A run of sections inside a dialog. A card here would be a second surface
+	   on top of the panel, which is what made the payroll dialogs read as a
+	   stack of floating boxes; a rule does the same grouping job. */
+	.modal-section {
+		@apply pt-5 mt-5 border-t border-black/[0.07] dark:border-white/10 first:pt-0 first:mt-0 first:border-t-0;
+	}
+	/* The third action in a row, where a second outline would read as a second
+	   choice of equal weight - Cancel beside Save draft and Submit. */
+	.btn-ghost {
+		@apply h-9 lg:h-8 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-[12px] border border-transparent bg-transparent text-[#5C6169] dark:text-white/65 text-xs font-medium hover:bg-black/[0.03] dark:hover:bg-white/[0.06] hover:text-[#17181B] dark:hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+	}
+
+	/* Same contrast fix as .btn-icon-ghost: gray-400 measured 2.64:1, under the
+	   3:1 an icon control needs. Red is held for hover, so a row of actions is
+	   not a row of warnings. */
+	.btn-danger-ghost {
+		@apply w-8 h-8 grid place-items-center rounded-[10px] text-[#5C6169] dark:text-white/65 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/[0.08] transition-colors;
+	}
+
+
+	/* ===== Data tables =====
+	   One set of row/header rules for every list in the app. Headers are
+	   sentence case at 11px, not uppercase at weight 900 — the column name is
+	   a label, not a headline. */
+	.table-card {
+		@apply bg-white/[0.55] dark:bg-white/[0.04] border border-black/[0.07] dark:border-white/[0.08] rounded-[16px] overflow-hidden shadow-[0_1px_2px_rgba(11,11,12,.04),0_14px_34px_-14px_rgba(51,40,123,.14)];
+	}
+
+	.table-head {
+		@apply bg-[#FAFAFC] dark:bg-surface-1 border-b border-[#F2F2F6] dark:border-white/[0.08];
+	}
+
+	.table-th {
+		@apply px-3 sm:px-4 py-3 text-[12px] leading-[14px] font-medium text-[#5c6169] dark:text-white/65 text-left whitespace-nowrap;
+	}
+
+	.table-row {
+		@apply border-b border-[#F2F2F6] dark:border-white/[0.06] last:border-0 hover:bg-[#FAFAFC] dark:hover:bg-white/[0.03] transition-colors;
+	}
+
+	.table-td {
+		@apply px-3 sm:px-4 py-3 text-[13px] text-[#17181B] dark:text-white/80 align-middle;
+	}
+
+	.table-td-strong {
+		@apply px-3 sm:px-4 py-3 text-[13px] font-medium text-[#17181B] dark:text-white align-middle;
+	}
+
+	.table-foot {
+		@apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-3 sm:px-4 py-3.5 border-t border-[#F2F2F6] dark:border-white/[0.08] bg-[#FAFAFC] dark:bg-surface-1;
+	}
+
+	/* Back / forward / home in the top bar (POS AppShell). */
+	.history-btn {
+		@apply w-8 h-8 flex items-center justify-center rounded-full text-[#656A72] dark:text-white/55 hover:bg-white dark:hover:bg-white/10 hover:text-[#17181B] dark:hover:text-white transition-colors;
+	}
+
+	/* Previous / Next in a list footer - the POS's worded pager buttons. */
+	.pager-btn {
+		@apply h-8 px-3 rounded-[12px] border border-black/[0.08] dark:border-white/[0.1] text-xs font-medium text-[#5C6169] dark:text-white/70 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent;
+	}
+
+	/* Round initials chip used wherever a person is named in a list. */
+	.avatar-chip {
+		@apply w-9 h-9 shrink-0 rounded-full grid place-items-center bg-accent/[0.12] text-accent dark:text-accent-light text-xs font-semibold;
+	}
+
+	/* Segmented control (matrix/list, weekly/monthly). */
+	.seg-group {
+		@apply inline-flex items-center gap-0.5 p-1 rounded-[12px] bg-black/[0.04] dark:bg-white/[0.07];
+	}
+	.seg-item {
+		@apply h-8 px-3.5 inline-flex items-center gap-1.5 rounded-[9px] text-[13px] font-medium text-[#5C6169] dark:text-white/65 hover:text-[#17181B] dark:hover:text-white transition-colors;
+	}
+	.seg-item-active {
+		@apply bg-white dark:bg-white/[0.12] text-[#17181B] dark:text-white shadow-[0_1px_3px_rgba(0,0,0,.08)];
+	}
+
+
+	/* Rows-per-page select. The inherited form reset gave it 8px vertical
+	   padding on top of a 24px line-height, which overflowed the 32px control
+	   and clipped the digits — hence the explicit leading and py-0. */
+	.page-size-select {
+		@apply h-8 min-w-[76px] px-2.5 py-0 rounded-[12px] text-[12px] leading-none bg-white dark:bg-white/[0.06] border border-black/[0.09] dark:border-white/[0.14] text-[#17181B] dark:text-white cursor-pointer;
+	}
+
+
+	/* ===== Page tabs =====
+	   A scroller, not a wrapping row. The mask fades whichever edge has more
+	   content behind it, so a phone shows there are tabs off-screen. */
+	/* The wrapper for a tabbed page. Every one of these used to set its own
+	   gap under the tab row - 20px on Payroll, 32 on Expense and Roster, 48 on
+	   Attendance and Leave - so the heading sat at a different height on each
+	   page. One class owns that distance now. The wrapper's only children are
+	   the tab row and the content, so this governs nothing else. */
+	.tab-page {
+		@apply space-y-6;
+	}
+
+	/* The frame itself lives in the plain-CSS block at the end of this file,
+	   where :has() and the breakpoint can be written without @apply. These two
+	   are only markers the markup carries:
+
+	     .tab-fill      on a panel root that holds one dominant list
+	     .table-scroll  on the element that scrolls that list
+
+	   A panel with no .table-scroll never becomes a frame, which is what keeps
+	   the calendar-style tabs scrolling the page normally instead of being
+	   clipped with no way out. */
+
+	.tab-bar {
+		@apply flex w-fit max-w-full items-center gap-1 p-1.5 overflow-x-auto whitespace-nowrap rounded-[12px] bg-accent/[0.035] dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/[0.07];
+		scroll-snap-type: x proximity;
+		/* Snap to the inside of the track padding (p-1.5), or the first tab
+		   snaps flush to the edge and the strip opens scrolled 6px, under the
+		   left arrow. */
+		scroll-padding-inline: 0.375rem;
+		scrollbar-width: none;
+		-ms-overflow-style: none;
+	}
+	.tab-bar::-webkit-scrollbar {
+		display: none;
+	}
+
+	.tab-item {
+		@apply shrink-0 h-8 px-2.5 inline-flex items-center gap-1.5 rounded-[12px] text-[13px] font-medium text-[#5C6169] dark:text-white/60 hover:text-[#17181B] dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors;
+		scroll-snap-align: start;
+	}
+
+	.tab-item-active {
+		@apply bg-accent hover:bg-accent dark:hover:bg-accent text-white hover:text-white dark:text-white dark:hover:text-white;
+	}
+	.tab-icon {
+		@apply !text-[17px] leading-none;
+	}
+
+
+	/* ===== Calendar ===== */
+	.cal-weekday {
+		@apply text-xs font-medium tracking-wide text-[#656A72] dark:text-white/55 px-1 sm:px-2 py-1 text-center sm:text-left truncate;
+	}
+
+	/* Month and year pickers in a calendar header. */
+	.cal-select {
+		@apply h-9 px-2.5 py-0 rounded-[12px] text-[13px] font-medium leading-none bg-transparent border border-transparent hover:border-black/[0.09] dark:hover:border-white/[0.14] text-[#17181B] dark:text-white cursor-pointer;
+	}
+
+	/* Below sm a cell is ~41px wide: too narrow for a list, so the date centres
+	   and the markers become a row of dots under it. From sm up it is the
+	   reference's tall cell - date top-left, one labelled entry per line. */
+	.cal-cell {
+		@apply relative flex flex-col items-center justify-center gap-1.5 min-h-[52px] rounded-[8px] p-1 text-center border border-black/[0.07] dark:border-white/[0.09] bg-white/50 dark:bg-white/[0.03] transition-colors min-w-0 w-full max-w-full overflow-hidden
+		       sm:items-stretch sm:justify-start sm:gap-1 sm:min-h-[92px] sm:rounded-[12px] sm:p-2.5 sm:text-left;
+	}
+	.cal-cell-hover {
+		@apply hover:border-accent/35 hover:bg-accent/[0.04] dark:hover:bg-accent/[0.08];
+	}
+	/* Outside the month: present but plainly not part of it. */
+	.cal-cell-muted {
+		@apply border-transparent bg-transparent dark:bg-transparent cursor-default;
+	}
+	.cal-cell-today {
+		@apply bg-accent border-accent hover:bg-accent;
+	}
+	.cal-cell-selected {
+		@apply ring-2 ring-accent ring-offset-1 ring-offset-white dark:ring-offset-[#18181b] border-accent/40;
+	}
+
+	.cal-date {
+		@apply text-[13px] sm:text-[14px] font-semibold tabular-nums leading-none text-[#17181B] dark:text-white shrink-0;
+	}
+	.cal-date-muted {
+		@apply text-[#656A72] dark:text-white/55;
+	}
+
+	/* The markers inside a cell: a dot row on a phone, a stacked list from sm. */
+	.cal-entries {
+		@apply flex flex-row flex-wrap items-center justify-center gap-1 min-w-0 w-full max-w-full overflow-hidden
+		       sm:flex-col sm:items-stretch sm:gap-0.5 sm:w-full;
+	}
+	/* One entry inside a cell: a coloured tick and a label that truncates. */
+	.cal-entry {
+		@apply flex items-center gap-1 sm:gap-1.5 min-w-0 w-full max-w-full overflow-hidden;
+	}
+	/* A 3px vertical sliver only reads as a marker beside its label. With the
+	   label hidden on a phone it becomes a dot instead. */
+	.cal-tick {
+		@apply w-1.5 h-1.5 rounded-full shrink-0 sm:w-[3px] sm:h-3;
+	}
+	.cal-entry-label {
+		@apply hidden sm:block text-xs leading-tight truncate min-w-0 flex-1 max-w-full text-[#4A4D55] dark:text-white/60;
+	}
+
+	/* Day-panel card: a coloured bar across the top, then the detail. */
+	.cal-card {
+		@apply rounded-[12px] overflow-hidden bg-black/[0.03] dark:bg-white/[0.05] border border-black/[0.06] dark:border-white/[0.07];
+	}
+	.cal-card-bar {
+		@apply h-1 w-full;
+	}
+	.cal-time-label {
+		@apply flex items-center gap-3 text-xs font-medium text-[#5C6169] dark:text-white/60 tabular-nums;
+	}
+	.cal-time-label::after {
+		content: '';
+		@apply flex-1 h-px bg-black/[0.07] dark:bg-white/[0.09];
+	}
+
+	/* A quiet panel inside a dialog: a group of fields that belong together,
+	   without the weight of a card. */
+	.inset-panel {
+		@apply rounded-[12px] border border-black/[0.07] dark:border-white/[0.09] bg-black/[0.02] dark:bg-white/[0.03] p-3.5 text-[13px];
+	}
+
+	/* ===== Menus =====
+	   Taken from the POS (zevar_ui_design_bundle/src/index.css) so a dropdown
+	   is the same object in both products. Values are that file's, not a
+	   re-interpretation of them. */
+	.filter-menu {
+		@apply flex flex-col gap-[2px] p-1.5 overflow-y-auto text-[#0b0b0c] dark:text-white;
+		border-radius: 16px;
+		max-height: min(300px, calc(100vh - 160px));
+		/* Opaque: at 90% the table rows behind showed through the options. */
+		background-color: #fff;
+		background-image: linear-gradient(168deg, #fff 0%, #f8f7fc 100%);
+		border: 1px solid rgba(11, 11, 12, 0.08);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.9),
+			0 2px 6px rgba(11, 11, 12, 0.05),
+			0 20px 44px -16px rgba(51, 40, 123, 0.28);
+		-webkit-backdrop-filter: blur(18px) saturate(1.6);
+		backdrop-filter: blur(18px) saturate(1.6);
+	}
+	.dark .filter-menu {
+		background-color: rgb(33, 33, 38);
+		background-image: linear-gradient(168deg, rgba(255, 255, 255, 0.06) 0%, rgba(142, 126, 236, 0.05) 100%);
+		border-color: rgba(255, 255, 255, 0.1);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.08),
+			0 2px 8px rgba(0, 0, 0, 0.4),
+			0 22px 48px -18px rgba(0, 0, 0, 0.75);
+	}
+
+	.filter-option {
+		@apply flex items-center justify-between gap-2 w-full min-h-[34px] px-2.5 py-1.5 text-left text-[13px] font-medium text-[#5c6169] cursor-pointer;
+		border-radius: 10px;
+		transition: background-color 0.15s ease, color 0.15s ease;
+	}
+	.filter-option:hover {
+		background: rgba(91, 75, 196, 0.06);
+		color: #0b0b0c;
+	}
+	.filter-option.is-active {
+		background: rgba(91, 75, 196, 0.1);
+		color: var(--accent, #5b4bc4);
+		font-weight: 600;
+	}
+	/* The selected row says so with a tick, not only with a tint. */
+	.filter-option.is-active::after {
+		content: '';
+		@apply shrink-0 w-4 h-4;
+		background-color: currentColor;
+		-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 13l4 4L19 7'/%3E%3C/svg%3E") center / contain no-repeat;
+		mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 13l4 4L19 7'/%3E%3C/svg%3E") center / contain no-repeat;
+	}
+	.dark .filter-option {
+		color: rgba(255, 255, 255, 0.65);
+	}
+	.dark .filter-option:hover {
+		background: rgba(255, 255, 255, 0.06);
+		color: #fff;
+	}
+	.dark .filter-option.is-active {
+		background: rgba(142, 126, 236, 0.16);
+		color: var(--accent-light, #a192f2);
+	}
+	.filter-option:disabled,
+	.filter-option.is-disabled {
+		@apply opacity-40 cursor-not-allowed;
+	}
+
+	.filter-menu-label {
+		@apply px-2.5 pt-2 pb-1 text-xs font-semibold text-[#9aa0a8] dark:text-white/60;
+	}
+	.filter-menu-divider {
+		@apply h-px mx-1.5 my-1 bg-black/[0.07] dark:bg-white/[0.08];
+	}
+	/* Standing in for a native select's OS popup, so it matches its control. */
+	.select-menu-pop {
+		min-width: 120px;
+	}
+	.select-menu-pop .filter-option {
+		white-space: nowrap;
+	}
+
+	.empty-state {
+		@apply flex flex-col items-center justify-center gap-1.5 py-12 px-6 text-center;
+	}
+	.empty-state > .material-symbols-outlined:first-child {
+		@apply w-14 h-14 mb-2.5 rounded-full grid place-items-center bg-accent/10 !text-accent dark:!text-accent-light !text-[24px];
+	}
+	.empty-state-title {
+		@apply text-[14px] font-semibold text-[#17181B] dark:text-white;
+	}
+	.empty-state-text {
+		@apply text-[12px] leading-relaxed max-w-sm text-[#5C6169] dark:text-white/55;
+	}
+
+	/* Page heading used by every tab body. The old pages opened with a 36px
+	   bold title inside a tab that already named the page. */
+	.page-title {
+		@apply text-[20px] leading-tight font-semibold tracking-[-0.01em] text-[#17181B] dark:text-white;
+	}
+	/* A heading inside a tab, under the page title and the tab row - the POS
+	   section heading (14px / 600 is its most common size). */
+	.section-title {
+		@apply text-[14px] leading-tight font-semibold text-[#17181B] dark:text-white;
+	}
+	.section-subtitle {
+		@apply text-xs text-[#5C6169] dark:text-white/60 mt-0.5;
+	}
+
+	.page-subtitle {
+		@apply text-[13px] font-normal text-[#5C6169] dark:text-white/65 mt-0.5;
+	}
+
+	/* The "+" beside a dropdown that opens a form to add a missing option -
+	   the POS's Purchase Order pattern: a square the height of the field, on
+	   its right, neutral until hovered. Sits in the same row as the field so
+	   it reads as belonging to that field, not to the column heading. */
+	.btn-add-option {
+		@apply w-10 h-10 shrink-0 grid place-items-center rounded-[12px] border border-black/[0.08] dark:border-white/[0.1] text-[#5C6169] dark:text-white/65 hover:bg-black/[0.04] dark:hover:bg-white/[0.07] hover:text-accent dark:hover:text-accent-light transition-colors disabled:opacity-40;
+	}
+
+	/* The one Actions control every list uses. Quiet enough to repeat down a
+	   column without competing with the row's own content, but labelled - the
+	   bare ⋮ it replaces gave no clue what was inside until you clicked it. */
+	.row-actions-btn {
+		@apply h-8 pl-2.5 pr-1.5 inline-flex items-center gap-1 rounded-[12px] text-xs font-medium text-[#5C6169] dark:text-white/65 border border-transparent hover:bg-black/[0.04] dark:hover:bg-white/[0.08] hover:text-[#17181B] dark:hover:text-white transition-colors;
+	}
+	.row-actions-btn-open {
+		@apply bg-black/[0.05] dark:bg-white/[0.09] text-[#17181B] dark:text-white;
+	}
+
+	/* Was gray-400 (#9AA0A8), which measures 2.64:1 on the panel - under the
+	   3:1 that icon controls need. Barely noticeable on a lone dialog close
+	   button, plainly washed out down a whole column of table row actions. */
+	.btn-icon-ghost {
+		@apply w-8 h-8 grid place-items-center rounded-[10px] text-[#5C6169] dark:text-white/65 hover:text-[#17181B] dark:hover:text-white hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors;
+	}
+}
+
+@layer utilities {
+	.custom-scrollbar::-webkit-scrollbar {
+		width: 4px;
+		height: 4px;
+	}
+	.custom-scrollbar::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	.custom-scrollbar::-webkit-scrollbar-thumb {
+		@apply bg-black/10 dark:bg-white/10 rounded-full;
+	}
+
+	/* Hiding a scrollbar also hides the only hint that a list scrolls, so the
+	   content fades at both edges instead. */
+	.scroll-fade-y {
+		-webkit-mask-image: linear-gradient(to bottom, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+		mask-image: linear-gradient(to bottom, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+	}
+
+	.no-scrollbar::-webkit-scrollbar {
+		display: none !important;
+	}
+	.no-scrollbar {
+		-ms-overflow-style: none !important;
+		scrollbar-width: none !important;
+	}
+}
+
+/* Transitions. Was `transition-all duration-300` on every button and link,
+   which animates layout properties too and makes the whole UI feel laggy. */
+button,
+a {
+	transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+	transition-duration: var(--duration-normal);
+	transition-timing-function: var(--ease-out);
+}
+
+@keyframes pulse-accent {
+	0%,
+	100% {
+		opacity: 1;
+		transform: scale(1);
+	}
+	50% {
+		opacity: 0.7;
+		transform: scale(0.95);
+	}
+}
+
+/* Kept under the old name: 1 call site still uses it. */
+.animate-pulse-emerald {
+	animation: pulse-accent 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Dialog overlay stacks above the sidebar (z-50). */
+.dialog-overlay {
+	z-index: 100 !important;
+}
+
+.material-symbols-outlined {
+	font-family: 'Material Symbols Outlined';
+	font-weight: normal;
+	font-style: normal;
+	font-size: 24px;
+	line-height: 1;
+	letter-spacing: normal;
+	text-transform: none;
+	display: inline-block;
+	white-space: nowrap;
+	word-wrap: normal;
+	direction: ltr;
+	-webkit-font-smoothing: antialiased;
+	font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* The rule above sits outside @layer, so its `display` outranks Tailwind's
+   display utilities and `hidden` silently did nothing on any icon in the app.
+   Restoring it here rather than moving the whole block into @layer base,
+   because that would also hand `font-size` to text utilities and shrink icons
+   across ~140 files that rely on the 24px default. */
+.material-symbols-outlined.hidden {
+	display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.animate-pulse-emerald {
+		animation: none;
+	}
+	button,
+	a {
+		transition-duration: 0ms;
+	}
+}
+
+/* ===== Large text mode =====
+ * The app sizes its type in absolute px, so neither a root font-size nor a
+ * rem-based scale moves it - measured both, neither changed a thing. `zoom`
+ * does scale px, and unlike `transform: scale()` it keeps the layout and the
+ * scroll container honest.
+ *
+ * Applied to the content area and to anything teleported out of it (dialogs,
+ * menus), since those are not inside <main>. The sidebar and header are left
+ * at their own size: scaling a fixed-width rail only squeezes its labels.
+ */
+:root.text-large main {
+	zoom: 1.15;
+}
+/* Sidebar and top bar: zoom their contents, not the boxes themselves, so the
+   100vh rail and 64px bar keep their size. */
+:root.text-large aside.portal-rail > *,
+:root.text-large header.portal-bar > * {
+	zoom: 1.12;
+}
+:root.text-large aside.portal-rail:not([class*='w-[80px]']) {
+	width: 280px !important;
+	min-width: 280px !important;
+}
+/* Dialogs and forms: every teleported overlay scales its panel; the overlay
+   scrolls so a 90vh panel that grows past the window stays reachable. */
+:root.text-large body > [class~="fixed"][class~="inset-0"] {
+	overflow-y: auto;
+}
+:root.text-large body > [class~="fixed"][class~="inset-0"] > :not([class~="fixed"]):not([class~="absolute"]),
+:root.text-large .dialog-content,
+:root.text-large .modal-panel,
+:root.text-large .filter-menu,
+:root.text-large [data-lt-zoom],
+:root.text-large .toast-card {
+	zoom: 1.12;
+}
+:root.text-large body > [class~="fixed"][class~="inset-0"] > :not([class~="fixed"]):not([class~="absolute"]) {
+	max-height: calc((100vh - 2rem) / 1.12) !important;
+}
+:root.text-large body > [class~="fixed"][class~="inset-0"] > * .modal-panel,
+:root.text-large body > [class~="fixed"][class~="inset-0"] > * .dialog-content {
+	zoom: 1;
+}
+
+/* ---------------------------------------------------------------------------
+   Tabbed list pages as a fixed frame (lg and up)
+
+   The tab row, the page heading and the filter card hold still; only the list
+   scrolls. Filtering a 340-row table no longer means scrolling back to the top
+   to reach the filters.
+
+   Below lg the page scrolls as one. Pinning the frame on a phone fights the
+   browser's own address-bar behaviour and sits badly against the bottom nav.
+
+   The page only becomes a frame when the active panel actually has a scroll
+   region - :has(> .tab-fill) - so a calendar tab with nothing to scroll is
+   never trapped inside an overflow:hidden box.
+
+   Every link in the chain needs min-height:0. Without it a flex child refuses
+   to shrink below its content, the height never reaches the list, and nothing
+   scrolls at all.
+   --------------------------------------------------------------------------- */
+@media (min-width: 1024px) {
+	.tab-page:has(> .tab-fill) {
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.tab-fill {
+		flex: 1 1 auto;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+
+	/* Everything in the frame holds its natural height by default; only the
+	   row carrying the list is allowed to flex. The tab row needs this most:
+	   it is a horizontal scroll container, so as a flex child it will happily
+	   shrink to a 3px sliver rather than keep its 45px.
+
+	   The three :not()s matter. Payroll and Issues put a wrapper between the
+	   page and the panel, so .tab-fill nests; without the first exclusion this
+	   rule would pin the inner one at its natural height and the chain would
+	   stop one level short of the list.
+
+	   The card holding the list is excluded for a related reason. It is
+	   matched by the :has() rule below, but that selector is weaker than this
+	   one, so without the exclusion this rule would win and pin the card at
+	   its full content height - overflowing the frame rather than scrolling
+	   inside it. */
+	.tab-page:has(> .tab-fill) > .page-head,
+	.tab-page:has(> .tab-fill) > .tab-strip,
+	.tab-fill > *:not(.tab-fill):not(.table-scroll):not(:has(.table-scroll)) {
+		flex: none;
+	}
+
+	/* The card holding the list, and any wrapper between it and the scroller.
+	   Selected structurally so the markup stays clean and a panel's second,
+	   hidden card (a calendar behind a v-if) is never caught.
+
+	   flex: 0 1 auto, not 1 1 auto. Growing would stretch a four-row card down
+	   to the full height of the frame and leave a band of empty white under
+	   the last row. Shrinking is what matters: a long list gives up height to
+	   fit the frame and scrolls inside it, while a short one simply ends where
+	   its rows end. */
+	.tab-fill > :has(.table-scroll),
+	.tab-fill :has(> .table-scroll) {
+		flex: 0 1 auto;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.table-scroll {
+		flex: 0 1 auto;
+		min-height: 0;
+		overflow-y: auto;
+	}
+
+	/* The default scrollbar is heavy enough to read as part of the table, and
+	   it was inconsistent besides: half these lists carried no-scrollbar and
+	   showed nothing at all, half showed the full-width default. Both now use
+	   the same 4px bar the app already uses on <main>.
+
+	   Slim rather than hidden on purpose - the bar is the only thing telling
+	   you the list continues past the bottom edge.
+
+	   Deliberately no scrollbar-width/scrollbar-color here. Setting either one
+	   switches Chromium to the standard scrollbar and makes it ignore the
+	   ::-webkit rules below, which costs 10px instead of 4px. Firefox keeps
+	   its own default bar; this is a Chromium desktop app. */
+	.table-scroll::-webkit-scrollbar {
+		width: 4px;
+		height: 4px;
+	}
+	.table-scroll::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	.table-scroll::-webkit-scrollbar-thumb {
+		@apply bg-black/[0.16] dark:bg-white/20 rounded-full;
+	}
+	.table-scroll::-webkit-scrollbar-corner {
+		background: transparent;
+	}
+
+	/* The column header stays put while rows scroll under it. It needs an
+	   opaque background to hide them: .table-head is a translucent wash, so
+	   rows would show straight through. These two values are that wash already
+	   composited over the card, measured in the running page. */
+	.table-scroll thead th {
+		position: sticky;
+		top: 0;
+		z-index: 10;
+		background-color: #fafafc;
+	}
+	:root.dark .table-scroll thead th {
+		background-color: #262628;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Tab overflow
+
+   The strip scrolls but has scrollbar-width: none, so nothing on screen said
+   so. Measured at 375px: Leave showed 2 of 9 tabs with 884px off to the right,
+   Team 4 of 12 with 902px. It bites well before phone size too - at 1024px,
+   seven of Leave's nine are already out of sight.
+
+   Below sm the strip is replaced by a menu. From sm up it stays a strip, with
+   arrows that appear only when there is somewhere to scroll.
+   --------------------------------------------------------------------------- */
+@layer components {
+	/* The phone switcher: the desktop tab track, holding only the current tab
+	   (filled, as the active tab is on the strip), a chevron and a count. */
+	.tab-switch {
+		@apply w-full flex items-center gap-1.5 p-1.5 pr-3 rounded-[12px]
+			bg-accent/[0.035] dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/[0.07]
+			text-[#17181B] dark:text-white;
+	}
+	.tab-switch-label {
+		@apply h-8 px-3 inline-flex items-center rounded-[10px] bg-accent text-white
+			text-[13px] font-medium min-w-0;
+	}
+
+	.tab-menu {
+		@apply absolute left-0 right-0 top-full mt-1.5 z-40 max-h-[60vh] overflow-y-auto
+			p-1.5 rounded-[12px] bg-white dark:bg-surface-1
+			border border-black/[0.07] dark:border-white/10
+			shadow-[0_18px_44px_-16px_rgba(0,0,0,.4)];
+	}
+
+	.tab-menu-row {
+		@apply w-full flex items-center gap-2 px-3 py-2.5 rounded-[10px] text-left
+			text-[13px] font-medium text-[#17181B] dark:text-white
+			hover:bg-black/[0.04] dark:hover:bg-white/[0.07] transition-colors;
+	}
+
+	.tab-menu-row-active {
+		@apply bg-accent/[0.10] text-accent dark:text-accent-light font-semibold;
+	}
+
+	/* The arrow carries its own fade, so one element both hints at the cut-off
+	   content and scrolls it. The gradient stops are the composited page
+	   background behind the strip, measured in the running app. */
+	.tab-nudge {
+		@apply absolute top-px bottom-px w-9 grid place-items-center rounded-[12px]
+			text-[#5C6169] dark:text-white/70 hover:text-[#17181B] dark:hover:text-white
+			transition-colors;
+	}
+	.tab-nudge-left {
+		@apply justify-items-start pl-0.5;
+		background: linear-gradient(to right, rgb(244 244 250) 55%, rgb(244 244 250 / 0));
+	}
+	.tab-nudge-right {
+		@apply justify-items-end pr-0.5;
+		background: linear-gradient(to left, rgb(244 244 250) 55%, rgb(244 244 250 / 0));
+	}
+	:root.dark .tab-nudge-left {
+		background: linear-gradient(to right, rgb(24 24 27) 55%, rgb(24 24 27 / 0));
+	}
+	:root.dark .tab-nudge-right {
+		background: linear-gradient(to left, rgb(24 24 27) 55%, rgb(24 24 27 / 0));
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Phone bottom bar
+
+   The active state was colour alone - a purple icon among grey ones - which is
+   the weakest signal in the app and the only nav that does not match the
+   sidebar's filled pill. The icon now sits in a tinted capsule, the same
+   accent/12 wash the avatar chip uses, so the current destination is legible
+   at a glance and not by colour alone.
+   --------------------------------------------------------------------------- */
+@layer components {
+	.phone-nav-item {
+		@apply flex flex-col items-center justify-center gap-0.5
+			text-[#5C6169] dark:text-white/65 transition-colors;
+	}
+
+	.phone-nav-pill {
+		@apply h-7 w-14 grid place-items-center rounded-full transition-colors;
+	}
+
+	.phone-nav-label {
+		@apply text-xs font-medium;
+	}
+
+	.phone-nav-item-active {
+		@apply text-accent dark:text-accent-light;
+	}
+
+	.phone-nav-item-active .phone-nav-pill {
+		@apply bg-accent/[0.12] dark:bg-accent-light/[0.16];
+	}
+
+	.phone-nav-item-active .phone-nav-label {
+		@apply font-semibold;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Phone: the tab switcher is the page title
+
+   On a tabbed page the phone read Attendance (header) / Checkins (switcher) /
+   Check-ins (heading) / subtitle - 215px of a 812px screen, with the page
+   named twice, before any content. The switcher already names the view, so
+   the heading goes.
+
+   Visually hidden rather than display:none. The page keeps its h1 for screen
+   readers and for the document outline; only the duplicate pixels go. The
+   subtitle stays - it says something the tab label does not.
+
+   Scoped to .tab-page, so an untabbed page like the dashboard keeps its
+   heading, which is the only thing naming it.
+   --------------------------------------------------------------------------- */
+@media (max-width: 639px) {
+	/* The page title is in the top bar on a phone, so the page header goes;
+	   the tab switcher names the tab, so its heading is visually hidden too. */
+	.tab-page > .page-head {
+		display: none;
+	}
+	.tab-page .section-title {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border-width: 0;
+	}
+}
+
+/* Toast cards (ToastHost.vue) - copied from the POS. Plain CSS, not scoped:
+   the cards are teleported to <body>. */
+@layer components {
+	.toast-card {
+		background-color: rgba(255, 255, 255, 0.86);
+		background-image: linear-gradient(168deg, rgba(255, 255, 255, 0.9) 0%, rgba(246, 245, 252, 0.8) 100%);
+		border: 1px solid rgba(11, 11, 12, 0.08);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.9),
+			0 2px 6px rgba(11, 11, 12, 0.05),
+			0 18px 40px -16px rgba(51, 40, 123, 0.3);
+		-webkit-backdrop-filter: blur(18px) saturate(1.6);
+		backdrop-filter: blur(18px) saturate(1.6);
+	}
+	:root.dark .toast-card {
+		background-color: rgba(33, 33, 38, 0.92);
+		background-image: linear-gradient(168deg, rgba(255, 255, 255, 0.06) 0%, rgba(142, 126, 236, 0.05) 100%);
+		border-color: rgba(255, 255, 255, 0.1);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.08),
+			0 2px 8px rgba(0, 0, 0, 0.4),
+			0 22px 48px -18px rgba(0, 0, 0, 0.75);
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   Dialog density (POS BaseModal): fields and actions are tighter than on a
+   page - 34px fields, 13px semibold buttons in the footer.
+   --------------------------------------------------------------------------- */
+@layer components {
+	.modal-panel .field-input:not(textarea) {
+		@apply h-[34px];
+	}
+	.modal-panel .field-static {
+		@apply min-h-[34px] py-2;
+	}
+	.modal-panel .btn-add-option {
+		@apply w-[34px] h-[34px];
+	}
+	.modal-panel .field-label {
+		@apply font-semibold mb-1;
+	}
+	.modal-footer .btn-primary,
+	.modal-footer .btn-secondary,
+	.modal-footer .btn-ghost {
+		@apply h-[34px] px-4 text-[13px] font-semibold;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   frappe-ui Dialog, brought onto the POS BaseModal: a near-black blurred
+   scrim (it was black at 27%, unblurred), and a wrapper that no longer clips
+   the 20px panel to its own 16px corner or adds a second shadow.
+   --------------------------------------------------------------------------- */
+.dialog-overlay {
+	background-color: rgb(11 11 12 / 0.6) !important;
+	-webkit-backdrop-filter: blur(4px);
+	backdrop-filter: blur(4px);
+}
+.dialog-content {
+	border-radius: 20px !important;
+	background: transparent !important;
+	box-shadow: none !important;
+}
+
+/* Tabs inside a dialog are the POS dialog's underline tabs (Create customer:
+   accent text on a 2px accent rule), not the page's filled pills. */
+@layer components {
+	.modal-panel .tab-item {
+		@apply h-11 px-0 mr-5 rounded-none bg-transparent hover:bg-transparent border-b-2 border-transparent text-[13px] font-medium text-[#5C6169] dark:text-white/60;
+	}
+	.modal-panel .tab-item-active {
+		@apply border-accent text-accent dark:text-accent-light font-semibold bg-transparent hover:bg-transparent hover:text-accent;
+	}
+}
+
+/* Icon buttons in a dialog header (edit / delete / close) take the POS
+   BaseModal close button's round shape. */
+@layer components {
+	.modal-header .btn-icon-ghost,
+	.modal-header .btn-danger-ghost {
+		@apply rounded-full;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+   One scrollbar everywhere, the POS's: 4px, rounded, no arrow buttons, on a
+   transparent track. Chromium only (Electron app). No scrollbar-width or
+   scrollbar-color anywhere - either switches Chromium to its standard bar and
+   the rules below stop applying.
+   --------------------------------------------------------------------------- */
+*::-webkit-scrollbar {
+	width: 4px;
+	height: 4px;
+}
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+	background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+	background-color: rgba(11, 11, 12, 0.16);
+	border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+	background-color: rgba(11, 11, 12, 0.28);
+}
+*::-webkit-scrollbar-button {
+	display: none;
+	width: 0;
+	height: 0;
+}
+.dark *::-webkit-scrollbar-thumb {
+	background-color: rgba(255, 255, 255, 0.2);
+}
+.dark *::-webkit-scrollbar-thumb:hover {
+	background-color: rgba(255, 255, 255, 0.32);
+}
+/* Menus: keep the bar off the 16px rounded corners. */
+.filter-menu::-webkit-scrollbar-track {
+	margin: 10px 0;
+}
+/* frappe-ui's own stylesheet loads after this one and gives .custom-scrollbar
+   an 8px bar; this holds it to the same 4px as everything else. */
+.custom-scrollbar::-webkit-scrollbar {
+	width: 4px !important;
+	height: 4px !important;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+	background-color: rgba(11, 11, 12, 0.16) !important;
+	border-radius: 9999px !important;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+	background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* ===== Full-screen overlays =====
+   Dialog backdrops are often rendered inside a `space-y-*` wrapper, whose
+   sibling margin pushed the fixed backdrop down and left an undimmed strip
+   at the top of the screen. A fixed, inset-0 layer never wants a margin.
+   !important because the space-y selector out-specifies this one. */
+.fixed.inset-0,
+.modal-scrim {
+	margin: 0 !important;
+}

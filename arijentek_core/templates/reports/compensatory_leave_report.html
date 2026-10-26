@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Compensatory Leave Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 10px;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .header h2 {
+            margin: 0 0 5px 0;
+            font-size: 18px;
+            color: #111827;
+        }
+        .filters {
+            margin-bottom: 15px;
+            font-size: 11px;
+            color: #4b5563;
+        }
+        .filters span {
+            margin-right: 15px;
+            display: inline-block;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        th, td {
+            border: 1px solid #d1d5db;
+            padding: 6px 8px;
+            text-align: left;
+            word-wrap: break-word;
+        }
+        th {
+            background-color: #f3f4f6;
+            font-weight: bold;
+            color: #374151;
+            font-size: 11px;
+        }
+        tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .status-Approved { background-color: #dcfce7; color: #166534; }
+        .status-Open { background-color: #fef9c3; color: #854d0e; }
+        .status-Rejected { background-color: #fee2e2; color: #991b1b; }
+        .status-Cancelled { background-color: #f3f4f6; color: #374151; }
+        
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 9px;
+            color: #6b7280;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>Compensatory Leave Report</h2>
+        <div class="filters">
+            {% if filters.from_date and filters.to_date %}
+            <span><strong>Work Period:</strong> {{ filters.from_date }} to {{ filters.to_date }}</span>
+            {% elif filters.from_date %}
+            <span><strong>Work From:</strong> {{ filters.from_date }}</span>
+            {% elif filters.to_date %}
+            <span><strong>Work To:</strong> {{ filters.to_date }}</span>
+            {% endif %}
+            
+            {% if filters.employee %}
+            <span><strong>Employee:</strong> {{ filters.employee }}</span>
+            {% endif %}
+            
+            {% if filters.status %}
+            <span><strong>Status:</strong> {{ filters.status }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 15%">Reference</th>
+                <th style="width: 25%">Employee</th>
+                <th style="width: 12%">From Date</th>
+                <th style="width: 12%">To Date</th>
+                <th style="width: 10%">Half Day</th>
+                <th style="width: 16%">Reason</th>
+                <th style="width: 10%">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in data %}
+            <tr>
+                <td>{{ row.name }}</td>
+                <td>{{ row.employee }} - {{ row.employee_name }}</td>
+                <td>{{ frappe.format_date(row.work_from_date) if row.work_from_date else '' }}</td>
+                <td>{{ frappe.format_date(row.work_end_date) if row.work_end_date else '' }}</td>
+                <td>{{ 'Yes' if row.half_day else 'No' }}</td>
+                <td>{{ row.reason }}</td>
+                <td>
+                    <span class="status-badge status-{{ row.status | replace(' ', '') }}">
+                        {{ row.status }}
+                    </span>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 20px; color: #6b7280;">
+                    No compensatory leave requests found for the selected filters.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        Generated on {{ frappe.utils.formatdate(frappe.utils.today()) }}
+    </div>
+</body>
+</html>

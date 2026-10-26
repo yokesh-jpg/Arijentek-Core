@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Leave Policy Assignment Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 10px;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .header h2 {
+            margin: 0 0 5px 0;
+            font-size: 18px;
+            color: #111827;
+        }
+        .filters {
+            margin-bottom: 15px;
+            font-size: 11px;
+            color: #4b5563;
+        }
+        .filters span {
+            margin-right: 15px;
+            display: inline-block;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        th, td {
+            border: 1px solid #d1d5db;
+            padding: 6px 8px;
+            text-align: left;
+            word-wrap: break-word;
+        }
+        th {
+            background-color: #f3f4f6;
+            font-weight: bold;
+            color: #374151;
+            font-size: 11px;
+        }
+        tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 9px;
+            color: #6b7280;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>Leave Policy Assignment Report</h2>
+        <div class="filters">
+            {% if filters.employee %}
+            <span><strong>Employee:</strong> {{ filters.employee }}</span>
+            {% endif %}
+            
+            {% if filters.leave_policy %}
+            <span><strong>Leave Policy:</strong> {{ filters.leave_policy }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 15%">Assignment ID</th>
+                <th style="width: 15%">Employee ID</th>
+                <th style="width: 25%">Employee Name</th>
+                <th style="width: 20%">Leave Policy</th>
+                <th style="width: 12%">Effective From</th>
+                <th style="width: 12%">Effective To</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in data %}
+            <tr>
+                <td>{{ row.name }}</td>
+                <td>{{ row.employee }}</td>
+                <td>{{ row.employee_name }}</td>
+                <td>{{ row.leave_policy }}</td>
+                <td>{{ frappe.format_date(row.effective_from) if row.effective_from else '' }}</td>
+                <td>{{ frappe.format_date(row.effective_to) if row.effective_to else '' }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 20px; color: #6b7280;">
+                    No leave policy assignments found for the selected filters.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        Generated on {{ frappe.utils.formatdate(frappe.utils.today()) }}
+    </div>
+</body>
+</html>

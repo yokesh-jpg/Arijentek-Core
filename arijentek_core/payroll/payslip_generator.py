@@ -487,8 +487,14 @@ def download_payslip_pdf(name: str):
 	slip = frappe.get_doc("Salary Slip", name)
 
 	# Verify access
-	employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
-	if not employee or (slip.employee != employee and not frappe.has_permission("Salary Slip", "read")):
+	user = frappe.session.user
+	roles = frappe.get_roles(user)
+	employee = frappe.db.get_value("Employee", {"user_id": user}, "name")
+
+	has_manager_access = user == "Administrator" or bool(set(roles).intersection({"HR Manager", "System Manager", "HR User", "Payroll Manager"}))
+	is_own_payslip = employee and slip.employee == employee
+
+	if not (has_manager_access or is_own_payslip or frappe.has_permission("Salary Slip", "read")):
 		frappe.throw(_("Not authorized to view this payslip"))
 
 	# Generate PDF
@@ -517,7 +523,7 @@ def download_payslip_pdf(name: str):
 	# Add amount in words to doc (monkey patch for template)
 	slip.net_pay_in_words = money_in_words(slip.net_pay, slip.currency)
 
-	html = frappe.render_template("arijentek_core/templates/simple_payslip.html", context)
+	html = frappe.render_template("arijentek_core/templates/reports/simple_payslip.html", context)
 
 	# PDF Kit Options - Minimal set for unpatched wkhtmltopdf
 	options = {

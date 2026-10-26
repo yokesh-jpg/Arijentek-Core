@@ -1,43 +1,32 @@
 {
-  "name": "frontend",
-  "version": "0.0.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "test:unit": "vitest",
-    "build-only": "vite build",
-    "type-check": "vue-tsc --build",
-    "lint": "run-s lint:*",
-    "lint:oxlint": "oxlint . --fix",
-    "lint:eslint": "eslint . --fix --cache"
-  },
-  "dependencies": {
-    "lucide-vue-next": "^0.563.0",
-    "npm-run-all2": "^7.0.2",
-    "pinia": "^2.1.7",
-    "vue": "^3.4.0",
-    "vue-router": "^4.6.4"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.0.0",
-    "@types/jsdom": "^27.0.0",
-    "@types/node": "^25.2.3",
-    "@vitejs/plugin-vue": "^5.0.0",
-    "@vue/test-utils": "^2.4.11",
-    "@vue/tsconfig": "^0.5.0",
-    "autoprefixer": "^10.4.16",
-    "jsdom": "^29.1.1",
-    "postcss": "^8.4.32",
-    "tailwindcss": "^3.4.0",
-    "typescript": "^5.9.3",
-    "vite": "^5.0.0",
-    "vitest": "^4.1.9",
-    "vue-tsc": "^3.2.4"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  }
+    "name": "employee-portal",
+    "private": true,
+    "version": "0.0.1",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview",
+        "test": "vitest run",
+        "test:watch": "vitest"
+    },
+    "dependencies": {
+        "frappe-ui": "^0.1.62",
+        "pinia": "^2.1.7",
+        "sortablejs": "^1.15.7",
+        "splitpanes": "^4.0.4",
+        "vue": "^3.4.21",
+        "vue-router": "^4.3.0"
+    },
+    "devDependencies": {
+        "@vitejs/plugin-vue": "^5.0.4",
+        "@vue/test-utils": "^2.4.5",
+        "autoprefixer": "^10.4.19",
+        "happy-dom": "^14.7.1",
+        "jsdom": "^24.0.0",
+        "postcss": "^8.4.38",
+        "tailwindcss": "^3.4.3",
+        "vite": "^5.2.8",
+        "vitest": "^1.6.0"
+    }
 }
