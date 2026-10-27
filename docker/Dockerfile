@@ -8,6 +8,9 @@ RUN bench init --skip-redis-config-generation --skip-assets --frappe-branch vers
 
 WORKDIR /home/frappe/frappe-bench
 
+# Copy latest local app code so local changes are always built
+COPY --chown=frappe:frappe . /home/frappe/frappe-bench/apps/arijentek_core
+
 WORKDIR /home/frappe/frappe-bench/apps/arijentek_core/frontend
 RUN npm install && npm run build
 
