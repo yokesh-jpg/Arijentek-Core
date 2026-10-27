@@ -8,22 +8,6 @@
         "branch": "version-16"
     },
     {
-        "url": "https://github.com/frappe/crm",
-        "branch": "develop"
-    },
-    {
-        "url": "https://github.com/frappe/helpdesk",
-        "branch": "develop"
-    },
-    {
-        "url": "https://github.com/frappe/gameplan",
-        "branch": "develop"
-    },
-    {
-        "url": "https://github.com/frappe/telephony",
-        "branch": "develop"
-    },
-    {
         "url": "https://github.com/yokesh-jpg/Arijentek-Core",
         "branch": "main"
     }
