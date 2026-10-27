@@ -26,5 +26,9 @@
     {
         "url": "https://github.com/Akshay-Arijentek/Arijentek-Core",
         "branch": "main"
+    },
+    {
+        "url": "https://github.com/yokesh-jpg/Arijentek-Core",
+        "branch": "main"
     }
 ]
