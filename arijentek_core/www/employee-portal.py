@@ -26,11 +26,7 @@ def get_context(context):
 
 	# Gate 1: guests must log in.
 	if user == "Guest":
-		frappe.redirect_to_message(
-			_("Login required"),
-			_("Please sign in to access the Employee Portal."),
-			indicator="info",
-		)
+		frappe.local.flags.redirect_location = "/login?redirect-to=/employee-portal"
 		raise frappe.Redirect
 
 	# Gate 2: authenticated users must have an Employee record OR a portal/HR/manager role.

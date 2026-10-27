@@ -26,11 +26,11 @@ add_to_apps_screen = [
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/arijentek_core/css/arijentek_core.css"
-# app_include_js = "/assets/arijentek_core/js/portal_desk_button.js"
+app_include_js = "/assets/arijentek_core/js/portal_desk_button.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/arijentek_core/css/arijentek_core.css"
-# web_include_js = "/assets/arijentek_core/js/login_redirect.js"
+web_include_js = "/assets/arijentek_core/js/login_redirect.js"
 
 # include custom scss in every website theme (without file extension ".scss")
 # website_theme_scss = "arijentek_core/public/scss/website"
@@ -57,12 +57,15 @@ add_to_apps_screen = [
 # ----------
 
 # application home page (will override Website Settings)
-# home_page = "login"
+home_page = "employee-portal"
+
+get_website_user_home_page = "arijentek_core.utils.get_employee_home_page"
 
 # website user home page (by Role)
-# role_home_page = {
-# 	"Role": "home_page"
-# }
+role_home_page = {
+	"Employee": "/employee-portal",
+	"Employee Self Service": "/employee-portal",
+}
 
 # Generators
 # ----------
@@ -202,7 +205,7 @@ scheduler_events = {
 
 # Request Events
 # ----------------
-# before_request = ["arijentek_core.utils.before_request"]
+before_request = ["arijentek_core.utils.block_desk_access"]
 # after_request = ["arijentek_core.utils.after_request"]
 
 # Job Events
@@ -237,6 +240,9 @@ scheduler_events = {
 # Authentication and authorization
 # --------------------------------
 
+on_login = "arijentek_core.utils.redirect_employee_after_login"
+on_session_creation = "arijentek_core.utils.redirect_employee_after_login"
+
 # auth_hooks = [
 # 	"arijentek_core.auth.validate"
 # ]
@@ -260,6 +266,7 @@ scheduler_events = {
 # --- Employee Portal routing ---
 # Serve the SPA from www/employee-portal.html at /employee-portal
 website_route_rules = [
+	{"from_route": "/", "to_route": "employee-portal"},
 	{"from_route": "/employee-portal", "to_route": "employee-portal"},
 	{"from_route": "/employee-portal/<path:app_path>", "to_route": "employee-portal"},
 ]

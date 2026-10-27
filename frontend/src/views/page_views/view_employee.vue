@@ -9,7 +9,7 @@
 						<p class="text-[12px] text-[#656A72] dark:text-white/55 truncate tabular-nums">{{ employeeId }}</p>
 					</div>
 					<div class="flex items-center gap-1 shrink-0">
-						<button v-if="details && teamStore.editEmployeePermissionResource?.data" @click="emit('edit', { name: details.name }); show = false" class="btn-icon-ghost" aria-label="Edit" title="Edit">
+						<button v-if="details && canEditThisEmployee" @click="emit('edit', { name: details.name }); show = false" class="btn-icon-ghost" aria-label="Edit" title="Edit">
 							<span class="material-symbols-outlined !text-[18px]">edit</span>
 						</button>
 						<button v-if="details && teamStore.deleteEmployeePermissionResource?.data" @click="emit('delete', { name: details.name }); show = false" class="btn-danger-ghost" aria-label="Delete" title="Delete">
@@ -122,8 +122,12 @@
 import { ref, watch, computed } from 'vue';
 import { Dialog, createResource } from 'frappe-ui';
 import { useTeamStore } from '../../stores/team.js';
+import { useEmployeeStore } from '../../stores/employee.js';
+import { useAuthStore } from '../../stores/auth.js';
 
 const teamStore = useTeamStore();
+const employeeStore = useEmployeeStore();
+const authStore = useAuthStore();
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -140,6 +144,16 @@ const show = computed({
 const loading = ref(true);
 const error = ref('');
 const details = ref(null);
+
+const canEditThisEmployee = computed(() => {
+	if (teamStore.editEmployeePermissionResource?.data) return true;
+	const currentEmpId = employeeStore.employee?.name;
+	const currentUserId = authStore.user?.user || authStore.user?.email;
+	if (details.value && ((currentEmpId && details.value.name === currentEmpId) || (currentUserId && details.value.user_id && details.value.user_id === currentUserId))) {
+		return true;
+	}
+	return false;
+});
 
 watch(() => show.value, (newVal) => {
 	if (newVal && props.employeeId) {

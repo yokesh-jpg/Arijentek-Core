@@ -24,19 +24,19 @@
 
 				<form @submit.prevent="handleLogin" class="space-y-4">
 					<div>
-						<label for="login-email" class="field-label">Email</label>
+						<label for="login-username" class="field-label">Username or Email</label>
 						<div class="relative">
 							<span
 								class="material-symbols-outlined !text-[18px] absolute left-3.5 top-1/2 -translate-y-1/2 text-[#656A72] dark:text-white/60 pointer-events-none"
-								>alternate_email</span
+								>person</span
 							>
 							<input
-								id="login-email"
-								v-model="email"
-								type="email"
+								id="login-username"
+								v-model="usernameOrEmail"
+								type="text"
 								autocomplete="username"
 								required
-								placeholder="you@zevar.com"
+								placeholder="Username or email"
 								class="field-input !pl-10"
 							/>
 						</div>
@@ -114,7 +114,7 @@
 import { ref } from 'vue'
 import { createResource } from 'frappe-ui'
 
-const email = ref('')
+const usernameOrEmail = ref('')
 const password = ref('')
 const showPassword = ref(false)
 const loading = ref(false)
@@ -126,7 +126,7 @@ const asset = (p) => `${import.meta.env.BASE_URL}${p}`
 const loginResource = createResource({
 	url: 'login',
 	makeParams() {
-		return { usr: email.value, pwd: password.value }
+		return { usr: (usernameOrEmail.value || '').trim(), pwd: password.value }
 	},
 	onSuccess() {
 		window.location.reload()

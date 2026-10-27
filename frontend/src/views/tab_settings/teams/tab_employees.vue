@@ -84,6 +84,8 @@
 import { reactive, ref, computed, watch, onMounted } from 'vue'
 import { call } from 'frappe-ui'
 import { useTeamStore } from '@/stores/team'
+import { useEmployeeStore } from '@/stores/employee'
+import { useAuthStore } from '@/stores/auth'
 import { notify, ask } from '@/utils/feedback.js'
 import { getErrorMessage } from '@/utils.js'
 import DataTable from '@/components/DataTable.vue'
@@ -93,6 +95,8 @@ import CreateEmployeeForm from '@/views/forms/create_employee.vue'
 import ViewEmployeeModal from '@/views/page_views/view_employee.vue'
 
 const teamStore = useTeamStore()
+const employeeStore = useEmployeeStore()
+const authStore = useAuthStore()
 
 const showCreateEmployee = ref(false)
 const selectedEmployeeId = ref('')
@@ -187,13 +191,25 @@ async function deleteEmployee(id) {
 	}
 }
 
+function canEditEmployee(emp) {
+	if (teamStore.editEmployeePermissionResource?.data) {
+		return true
+	}
+	const currentEmpId = employeeStore.employee?.name
+	const currentUserId = authStore.user?.user || authStore.user?.email
+	if (emp && ((currentEmpId && emp.name === currentEmpId) || (currentUserId && emp.user_id && emp.user_id === currentUserId))) {
+		return true
+	}
+	return false
+}
+
 function employeeActions(emp) {
 	return [
 		{ label: 'View', icon: 'visibility', onClick: () => viewEmployee(emp.name) },
 		{
 			label: 'Edit',
 			icon: 'edit',
-			show: !!teamStore.editEmployeePermissionResource?.data,
+			show: canEditEmployee(emp),
 			onClick: () => editEmployee(emp.name)
 		},
 		{ divider: true },

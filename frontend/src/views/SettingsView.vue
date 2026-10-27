@@ -86,9 +86,12 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { createResource } from 'frappe-ui'
 import { notify } from '@/utils/feedback.js'
 import { getErrorMessage } from '@/utils'
+
+const router = useRouter()
 
 const timesheetWithClockin = ref(false)
 const markPresentOnClockOut = ref(false)
@@ -188,6 +191,8 @@ onMounted(async () => {
 		await getSettingsResource.fetch()
 	} catch (error) {
 		console.error('Error fetching settings on mount:', error)
+		notify('You do not have permission to access HR Settings')
+		router.push('/')
 	} finally {
 		initialLoading.value = false
 	}

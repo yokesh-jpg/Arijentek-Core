@@ -2633,7 +2633,7 @@ def save_holiday_list_assignment(**kwargs) -> dict:
 			doc.applicable_for = kwargs.get("applicable_for")
 			doc.assigned_to = kwargs.get("assigned_to")
 			doc.from_date = kwargs.get("from_date")
-			doc.save()
+			doc.save(ignore_permissions=True)
 		else:
 			doc = frappe.get_doc({
 				"doctype": "Holiday List Assignment",
@@ -2642,7 +2642,7 @@ def save_holiday_list_assignment(**kwargs) -> dict:
 				"assigned_to": kwargs.get("assigned_to"),
 				"from_date": kwargs.get("from_date")
 			})
-			doc.insert()
+			doc.insert(ignore_permissions=True)
 			doc.submit()
 
 		return {"success": True, "name": doc.name}

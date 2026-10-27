@@ -639,7 +639,7 @@ watch(show, async (newVal) => {
           if (data.relation) formData.value.emergency_relation = data.relation;
           if (data.person_to_be_contacted) formData.value.emergency_contact_name = data.person_to_be_contacted;
           if (data.shift_request_approver) formData.value.shift_approver = data.shift_request_approver;
-          if (data.reports_to_user_id) formData.value.reports_to = data.reports_to_user_id;
+          if (data.reports_to) formData.value.reports_to = data.reports_to;
         }
         
         // Fetch employee's current holiday list assignment

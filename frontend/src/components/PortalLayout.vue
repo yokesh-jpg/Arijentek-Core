@@ -626,6 +626,14 @@ function goMenu(path) {
 }
 const isDark = ref(false)
 const canCreateReports = ref(false)
+const canAccessSettings = ref(
+	Boolean(
+		auth.user &&
+		(auth.user.user === 'Administrator' ||
+		 (auth.user.roles || []).includes('HR Manager') ||
+		 (auth.user.roles || []).includes('System Manager'))
+	)
+)
 
 // Vite serves this app under BASE_URL (/employee-portal/), so a root-relative
 // "/images/…" would 404 in the build.
@@ -670,6 +678,7 @@ const navItems = computed(() => {
 				teamStore.readUsersPermissionResource.data
 			)
 		if (item.to === '/reports') return canCreateReports.value
+		if (item.to === '/settings') return canAccessSettings.value
 		return true
 	})
 	// UX change by developer: removed /desk route from portal navigation.
@@ -749,6 +758,7 @@ onMounted(async () => {
 			tasksStore.loadPermissions(perms.tasks)
 			teamStore.loadPermissions(perms.team)
 			if (perms.reports) canCreateReports.value = Boolean(perms.reports.can_create_reports)
+			if (perms.hr_settings) canAccessSettings.value = Boolean(perms.hr_settings.can_read_hr_settings)
 		}
 	} catch (err) {
 		console.error('Failed to load global portal permissions:', err)
@@ -760,6 +770,15 @@ onMounted(async () => {
 			canCreateReports.value = Boolean((await repRes.json()).message)
 		} catch (e) {
 			console.warn('Failed to check report permission', e)
+		}
+	}
+
+	if (!canAccessSettings.value) {
+		try {
+			const setRes = await fetch('/api/method/arijentek_core.api.hr_settings.can_read_hr_settings')
+			canAccessSettings.value = Boolean((await setRes.json()).message)
+		} catch (e) {
+			console.warn('Failed to check hr settings permission', e)
 		}
 	}
 

@@ -432,12 +432,16 @@ def get_employee_dashboard_data(employee_id=None):
 def get_all_portal_permissions():
 	"""Return all employee portal permission flags in a single consolidated response."""
 	from arijentek_core.api import attendance as att_api
+	from arijentek_core.api import hr_settings as hr_settings_api
 	from arijentek_core.api import payroll as pay_api
 	from arijentek_core.api import reports as rep_api
 	from arijentek_core.api import tasks as task_api
 	from arijentek_core.api import teams_permissons as team_api
 
 	return {
+		"hr_settings": {
+			"can_read_hr_settings": hr_settings_api.can_read_hr_settings(),
+		},
 		"reports": {
 			"can_create_reports": rep_api.can_create_reports(),
 		},

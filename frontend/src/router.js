@@ -127,6 +127,28 @@ router.beforeEach(async (to, _from, next) => {
 		next({ name: "login" });
 	} else if (to.name === "login" && auth.isLoggedIn) {
 		next({ name: "dashboard" });
+	} else if (to.name === "settings") {
+		const roles = auth.user?.roles || [];
+		const isPermitted =
+			auth.user?.user === "Administrator" ||
+			roles.includes("HR Manager") ||
+			roles.includes("System Manager");
+
+		if (isPermitted) {
+			next();
+		} else {
+			try {
+				const res = await fetch("/api/method/arijentek_core.api.hr_settings.can_read_hr_settings");
+				const data = await res.json();
+				if (data.message) {
+					next();
+					return;
+				}
+			} catch (err) {
+				console.warn("Failed checking hr_settings permission in router:", err);
+			}
+			next({ name: "dashboard" });
+		}
 	} else {
 		next();
 	}

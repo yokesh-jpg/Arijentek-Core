@@ -1,0 +1,1 @@
+import{j as c,S as l,m as s,B as u}from"./index-D1ShDDRS.js";function m(n,e=10){const o=s(()=>u(n())||[]),t=l({page:1,size:e,total:s(()=>o.value.length),rows:s(()=>{const a=Number(t.size)||e,r=(t.page-1)*a;return o.value.slice(r,r+a)})});return c(()=>[t.total,t.size],()=>{const a=Math.max(1,Math.ceil(t.total/(Number(t.size)||e)));t.page>a&&(t.page=a)}),t}export{m as u};

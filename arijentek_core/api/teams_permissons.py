@@ -94,18 +94,31 @@ def can_create_user():
 	return False
 
 @frappe.whitelist()
-def can_read_employee():
+def can_read_employee(employee_id=None):
 	"""
 	Returns True if the current user has permission to read an Employee.
+	- HR Manager, System Manager, and Administrator can read all employees.
+	- If employee_id is specified, a normal employee can only read their own record.
+	- If employee_id is not specified (portal bootstrap), normal employees return True so they can access their portal data.
 	"""
 	user = frappe.session.user
+	if user == "Administrator":
+		return True
 
 	roles = frappe.get_roles(user)
 	if "HR Manager" in roles or "System Manager" in roles:
 		return True
-	if has_role_permission("Employee", "read"):
-		return True
-	return False
+
+	if employee_id:
+		emp_user = frappe.db.get_value("Employee", employee_id, "user_id")
+		if emp_user and emp_user == user:
+			return True
+		linked_emp = frappe.db.get_value("Employee", {"user_id": user}, "name")
+		if linked_emp and linked_emp == employee_id:
+			return True
+		return False
+
+	return "Employee" in roles or "Employee Self Service" in roles or has_role_permission("Employee", "read")
 
 @frappe.whitelist()
 def can_read_users():
@@ -121,16 +134,29 @@ def can_read_users():
 	return False
 
 @frappe.whitelist()
-def can_edit_employee():
+def can_edit_employee(employee_id=None):
 	"""
-	Returns True if the current user has permission to edit an Employee.
+	Returns True if current user can edit an Employee.
+	- HR Manager, System Manager, and Administrator can edit all employees.
+	- If employee_id is specified, normal users can edit if it matches their own employee record.
+	- If employee_id is not specified (global permission check), normal users return False.
 	"""
 	user = frappe.session.user
+	if user == "Administrator":
+		return True
+
 	roles = frappe.get_roles(user)
 	if "HR Manager" in roles or "System Manager" in roles:
 		return True
-	if has_role_permission("Employee", "write"):
-		return True
+
+	if employee_id:
+		emp_user = frappe.db.get_value("Employee", employee_id, "user_id")
+		if emp_user and emp_user == user:
+			return True
+		linked_emp = frappe.db.get_value("Employee", {"user_id": user}, "name")
+		if linked_emp and linked_emp == employee_id:
+			return True
+
 	return False
 
 @frappe.whitelist()
@@ -394,12 +420,20 @@ def can_delete_employee_type():
 
 @frappe.whitelist()
 def get_employee_list(employee_id="", search_term="", department="", designation="", gender="", employment_type="", page=1, page_size=0):
-	if not can_read_employee():
+	user = frappe.session.user
+	roles = frappe.get_roles(user)
+	is_manager = user == "Administrator" or "HR Manager" in roles or "System Manager" in roles
+
+	if not can_read_employee(employee_id=employee_id):
 		return {} if employee_id else []
 
 	filters = {}
+	if not is_manager:
+		# Exactly like in Frappe Desk: normal employees only see their own employee record
+		filters["user_id"] = user
+
 	has_employment_type = frappe.db.has_column("Employee", "employment_type")
-	fields = ["name", "employee_name", "department", "designation", "gender", "cell_number", "image", "status"]
+	fields = ["name", "employee_name", "user_id", "department", "designation", "gender", "cell_number", "image", "status"]
 	if has_employment_type:
 		fields.append("employment_type")
 
@@ -705,7 +739,7 @@ def create_employee(employee_data):
 		if not can_create_employee():
 			frappe.throw("Not permitted to create Employee", frappe.PermissionError)
 	else:
-		if not can_edit_employee():
+		if not can_edit_employee(employee_id=employee_data.get("name")):
 			frappe.throw("Not permitted to edit Employee", frappe.PermissionError)
 
 	if isinstance(employee_data, str):
@@ -714,7 +748,12 @@ def create_employee(employee_data):
 	reports_to_emp = employee_data.get("reports_to")
 	if reports_to_emp:
 		if not frappe.db.exists("Employee", reports_to_emp):
-			frappe.throw(f"Employee {reports_to_emp} does not exist.")
+			# If reports_to was passed as an email/user_id, resolve it to the corresponding Employee record
+			emp_by_user = frappe.db.get_value("Employee", {"user_id": reports_to_emp}, "name")
+			if emp_by_user:
+				reports_to_emp = emp_by_user
+			else:
+				frappe.throw(f"Employee {reports_to_emp} does not exist.")
 
 	company = employee_data.get("company") or frappe.defaults.get_user_default("Company") or frappe.db.get_single_value("Global Defaults", "default_company")
 
@@ -757,13 +796,13 @@ def create_employee(employee_data):
 		# Remove empty fields to let frappe handle defaults for new docs
 		doc_fields = {k: v for k, v in doc_fields.items() if v}
 		doc = frappe.get_doc(doc_fields)
-		doc.insert()
+		doc.insert(ignore_permissions=True)
 	else:
 		doc = frappe.get_doc("Employee", employee_data.get("name"))
 		if not doc_fields.get("user_id"):
 			doc_fields.pop("user_id", None) # Do not overwrite user_id if we don't have it
 		doc.update(doc_fields)
-		doc.save()
+		doc.save(ignore_permissions=True)
 
 	return doc.name
 
