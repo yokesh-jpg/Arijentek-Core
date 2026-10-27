@@ -1,4 +1,4 @@
-FROM frappe/bench:latest as builder
+FROM frappe/bench:latest AS builder
 
 # Use local apps.json which excludes arijentek_core (pulled separately or copied)
 COPY docker/builder_apps.json /apps.json
@@ -9,7 +9,7 @@ RUN bench init --skip-redis-config-generation --skip-assets --frappe-branch vers
 WORKDIR /home/frappe/frappe-bench
 
 WORKDIR /home/frappe/frappe-bench/apps/arijentek_core/frontend
-RUN npm install && npm run build-only
+RUN npm install && npm run build
 
 WORKDIR /home/frappe/frappe-bench
 
