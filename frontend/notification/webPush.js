@@ -17,6 +17,7 @@ const OPT_IN_KEY = 'arijentek.push_opt_in'
 
 export function initializeWebPush(frappeRequest, { optIn = false } = {}) {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (typeof window !== 'undefined' && (!window.frappe_user || window.frappe_user === 'Guest')) return;
     window.addEventListener('load', async () => {
         try {
             const registration = await navigator.serviceWorker.register('/assets/arijentek_core/js/sw.js');
@@ -42,6 +43,7 @@ export function initializeWebPush(frappeRequest, { optIn = false } = {}) {
 }
 
 async function subscribeWebPush(frappeRequest, registration) {
+    if (typeof window !== 'undefined' && (!window.frappe_user || window.frappe_user === 'Guest')) return null;
     let subscription = await registration.pushManager.getSubscription();
     if (subscription) return subscription;
 

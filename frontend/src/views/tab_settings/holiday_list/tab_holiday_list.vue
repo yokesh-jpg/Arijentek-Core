@@ -33,33 +33,51 @@
 			:total="pager.state.total"
 			:page="pager.state.page"
 			:page-size="pager.state.size"
+			:sort="{ key: sortBy, dir: sortDir }"
 			:on-row-click="(hl) => openView(hl)"
 			@update:page="pager.state.page = $event"
 			@update:page-size="pager.setPageSize($event)"
+			@sort="toggleSort"
 		>
 			<template #cell-name="{ row }">
 				<div class="flex items-center gap-2 sm:gap-3 min-w-0">
-					<span class="avatar-chip !w-7 !h-7 sm:!w-9 sm:!h-9">
+					<span class="avatar-chip !w-7 !h-7 sm:!w-9 sm:!h-9 shrink-0">
 						<span class="material-symbols-outlined !text-[16px]">event</span>
 					</span>
 					<span class="min-w-0">
-						<span class="block break-words leading-snug sm:truncate">{{ row.holiday_list_name || row.name }}</span>
+						<span class="block break-words leading-snug font-medium text-[#17181B] dark:text-white">{{ row.holiday_list_name || row.name }}</span>
 						<!-- The period only has its own column from sm up. -->
-						<span class="block sm:hidden text-xs font-normal text-[#5C6169] dark:text-white/60 leading-snug">
-							{{ formatDate(row.from_date) }} – {{ formatDate(row.to_date) }}
-						</span>
+						<div class="flex items-center gap-1.5 sm:hidden mt-0.5">
+							<span class="text-xs font-normal text-[#5C6169] dark:text-white/60 leading-snug">
+								{{ formatDate(row.from_date) }} – {{ formatDate(row.to_date) }}
+							</span>
+							<span
+								v-if="isCurrentList(row)"
+								class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 shrink-0"
+							>
+								Current
+							</span>
+						</div>
 					</span>
 				</div>
 			</template>
 			<template #cell-period="{ row }">
-				{{ formatDate(row.from_date) }} – {{ formatDate(row.to_date) }}
-			</template>
-			<template #cell-weekly_off="{ row }">
-				<span v-if="row.weekly_off" class="premium-tag tag-neutral">{{ row.weekly_off }}</span>
-				<span v-else class="text-[#656A72] dark:text-white/55">—</span>
+				<div class="flex items-center gap-2 flex-wrap">
+					<span class="text-[13px] text-[#4A4D55] dark:text-white/70 whitespace-nowrap">
+						{{ formatDate(row.from_date) }} – {{ formatDate(row.to_date) }}
+					</span>
+					<span
+						v-if="isCurrentList(row)"
+						class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/40 shrink-0"
+					>
+						Current
+					</span>
+				</div>
 			</template>
 			<template #cell-days_off="{ row }">
-				<span class="tabular-nums font-medium text-[#17181B] dark:text-white">{{ row.total_holidays || 0 }}</span>
+				<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold tag-neutral tabular-nums">
+					{{ row.total_holidays || 0 }} {{ row.total_holidays === 1 ? 'day' : 'days' }}
+				</span>
 			</template>
 		</DataTable>
 
@@ -75,7 +93,7 @@
 import DataTable from '@/components/DataTable.vue'
 import { useServerPager } from '@/composables/useServerPager.js'
 import { notify, ask } from '@/utils/feedback.js'
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { call } from 'frappe-ui'
 import { useLeaveStore } from '@/stores/leave'
 import { getErrorMessage } from '@/utils.js'
@@ -127,7 +145,7 @@ async function deleteHolidayList(name) {
    Returns { rows, total } for useServerPager. Handles both the paginated dict
    (page_size > 0) and the legacy list (page_size = 0) responses. */
 async function fetchHolidayLists(page, size) {
-	const params = { page, page_size: size }
+	const params = { page, page_size: size, order_by: orderParam.value }
 	if (searchQuery.value) {
 		params.search_text = searchQuery.value
 	}
@@ -144,11 +162,31 @@ async function fetchHolidayLists(page, size) {
 
 const pager = useServerPager((page, size) => fetchHolidayLists(page, size), { size: 10 })
 
+/* Sort state: the list whose period starts latest first is the default
+   reading order; Holiday list and Period headers toggle it server-side
+   (sorted on holiday_list_name / from_date). */
+const sortBy = ref('period') // 'period' | 'name'
+const sortDir = ref('desc') // 'asc' | 'desc'
+const orderParam = computed(() => `${sortBy.value === 'period' ? 'from_date' : 'holiday_list_name'} ${sortDir.value}`)
+
+function toggleSort(col) {
+	if (sortBy.value === col) {
+		sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+	} else {
+		sortBy.value = col
+		sortDir.value = 'asc'
+	}
+	if (pager.state.page !== 1) {
+		pager.state.page = 1
+	} else {
+		pager.fetchPage()
+	}
+}
+
 const listColumns = [
-	{ key: 'name', label: 'Holiday list', className: 'table-td-strong' },
-	{ key: 'period', label: 'Period', className: 'hidden sm:table-cell' },
-	{ key: 'weekly_off', label: 'Weekly off', className: 'hidden md:table-cell' },
-	{ key: 'days_off', label: 'Days off', align: 'right', className: 'text-right tabular-nums font-medium text-[#17181B] dark:text-white' },
+	{ key: 'name', label: 'Holiday list', className: 'table-td-strong min-w-[220px]', sortable: true },
+	{ key: 'period', label: 'Period', className: 'hidden sm:table-cell min-w-[200px]', sortable: true },
+	{ key: 'days_off', label: 'Days off', align: 'right', className: 'text-right tabular-nums font-medium text-[#17181B] dark:text-white w-[130px]' },
 ]
 
 function actionsForRow(hl) {
@@ -180,5 +218,11 @@ function formatDate(dateStr) {
 		day: "numeric",
 		year: "numeric",
 	});
+}
+
+function isCurrentList(row) {
+	if (!row?.from_date || !row?.to_date) return false
+	const today = new Date().toISOString().slice(0, 10)
+	return today >= row.from_date && today <= row.to_date
 }
 </script>

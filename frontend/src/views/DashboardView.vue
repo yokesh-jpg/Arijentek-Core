@@ -125,8 +125,21 @@
 
 		<!-- ===== Counts =====
 		     Four across on desktop, two across on a phone. Earnings joins them
-		     rather than owning a purple billboard — see the note on masking. -->
-		<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+		     rather than owning a purple billboard — see the note on masking.
+		     Skeleton until the first fetch lands (the leave-tab pattern) so the
+		     figures never read as zeros while loading; a refetch keeps the old
+		     figures up. -->
+		<div v-if="isStatsLoading" class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+			<div v-for="i in 4" :key="i" class="glass-card !p-4 sm:!p-5 animate-pulse">
+				<div class="flex items-center gap-2.5 mb-3">
+					<div class="w-8 h-8 rounded-[10px] shrink-0 bg-black/[0.07] dark:bg-white/10"></div>
+					<div class="h-3 w-20 rounded bg-black/[0.07] dark:bg-white/10"></div>
+				</div>
+				<div class="h-7 w-16 rounded bg-black/[0.07] dark:bg-white/10"></div>
+				<div class="h-3 w-24 rounded bg-black/[0.07] dark:bg-white/10 mt-2"></div>
+			</div>
+		</div>
+		<div v-else class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
 			<div v-for="stat in stats" :key="stat.label" class="glass-card !p-4 sm:!p-5">
 				<div class="flex items-center gap-2.5 mb-3">
 					<span
@@ -314,8 +327,9 @@ import ViewLeaveApplication from "@/views/page_views/leave/view_leave_applicatio
 import CreateExpenseClaim from "@/views/forms/expense/create_expense_claim.vue"
 import CreateIssue from "@/views/forms/issues/create_issue.vue"
 import { useLeaveStore } from "@/stores/leave"
-import { createResource } from "frappe-ui"
-import { ref, computed, onMounted } from 'vue'
+import { createResource, initSocket } from "frappe-ui"
+import { useQuery, useQueryClient } from "@tanstack/vue-query"
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useEmployeeStore } from '@/stores/employee'
@@ -330,7 +344,7 @@ const auth = useAuthStore()
 const employeeStore = useEmployeeStore()
 const attendance = useAttendanceStore()
 const tasksStore = useTasksStore()
-const loading = ref(true)
+const queryClient = useQueryClient()
 
 const leaveStore = useLeaveStore()
 const showRequestLeaveDialog = ref(false)
@@ -345,13 +359,33 @@ const canCreateAttendance = computed(() => {
 	return d === true || d === 1
 })
 const payrollStore = usePayrollStore()
-let loadInProgress = false
 
-// values for payroll card
-const currentPeriodEarnings = ref(0)
-const taxDeductions = ref(0)
+const empId = computed(() => employeeStore.employee?.name)
+
+const { data: dashboardData, isLoading, error: dashboardError, refetch: loadDashboard } = useQuery({
+	queryKey: computed(() => ['dashboard', empId.value]),
+	queryFn: async () => {
+		if (!empId.value) return null
+		const res = await fetch(
+			`/api/method/arijentek_core.api.dashboard.get_employee_dashboard_data?employee_id=${encodeURIComponent(empId.value)}`
+		)
+		const data = await res.json()
+		return data.message || {}
+	},
+	enabled: computed(() => Boolean(empId.value)),
+})
+
+/* No dashboard data yet and no error = the first fetch has not landed (it
+   cannot even start until empId resolves from the employee store). Skeleton
+   until then; a refetch keeps the old figures visible, never zeros. */
+const isStatsLoading = computed(() => !dashboardData.value && !dashboardError.value)
+
+// values for payroll card - dynamically derived from TanStack cache
+const latestSalarySlip = computed(() => dashboardData.value?.salary_slips?.[0] || null)
+const latestSlipId = computed(() => latestSalarySlip.value?.id || null)
+const currentPeriodEarnings = computed(() => latestSalarySlip.value?.gross_pay || 0)
+const taxDeductions = computed(() => latestSalarySlip.value?.total_deduction || 0)
 const bonusItems = ref(0)
-const latestSlipId = ref(null)
 
 const money = (n) => `$${Number(n || 0).toFixed(2)}`
 const mask = (n) => money(n)
@@ -448,10 +482,10 @@ const todayShift = computed(() => {
 	return { title: first.isOff ? `${first.shift_name} · Off` : first.shift_name }
 })
 
-// Leave / holiday / working days data
-const availableLeaves = ref(0)
-const precentInThisMonth = ref(0)
-const absentInThisMonth = ref(0)
+// Leave / holiday / working days data - dynamically derived from TanStack cache
+const availableLeaves = computed(() => dashboardData.value?.leave_balance ?? 0)
+const precentInThisMonth = computed(() => dashboardData.value?.attendance_summary?.present ?? 0)
+const absentInThisMonth = computed(() => dashboardData.value?.attendance_summary?.absent ?? 0)
 
 const stats = computed(() => [
 	{
@@ -517,58 +551,6 @@ function relativeTime(iso) {
 	return days === 1 ? 'yesterday' : `${days}d ago`
 }
 
-async function loadDashboard() {
-	const empId = employeeStore.employee?.name
-	if (loadInProgress || !empId) return
-	loadInProgress = true
-
-	try {
-		const res = await fetch(
-			`/api/method/arijentek_core.api.dashboard.get_employee_dashboard_data?employee_id=${encodeURIComponent(empId)}`
-		)
-		const data = await res.json()
-		if (data.message) {
-			const msg = data.message
-
-			// 1. Attendance status
-			if (msg.today_status) {
-				attendance.todayStatus = msg.today_status
-				attendance.syncTimerFromStatus()
-			}
-
-			// 2. Leave balance
-			if (msg.leave_balance !== undefined) {
-				availableLeaves.value = msg.leave_balance
-			}
-
-			// Attendance Summary
-			if (msg.attendance_summary) {
-				precentInThisMonth.value = msg.attendance_summary.present || 0
-				absentInThisMonth.value = msg.attendance_summary.absent || 0
-			}
-
-			// Next 3 days roster
-			if (Array.isArray(msg.roster)) {
-				upcomingRosterData.value = msg.roster
-			}
-
-			// Payroll
-			if (msg.salary_slips && msg.salary_slips.length > 0) {
-				const latest = msg.salary_slips[0]
-				latestSlipId.value = latest.id
-				currentPeriodEarnings.value = latest.gross_pay || 0
-				taxDeductions.value = latest.total_deduction || 0
-				bonusItems.value = 0
-			}
-		}
-	} catch (e) {
-		console.error('Failed to load dashboard data:', e)
-	} finally {
-		loading.value = false
-		loadInProgress = false
-	}
-}
-
 const priorityOrder = { High: 1, Medium: 2, Low: 3 }
 const sortedOpenTodos = computed(() =>
 	[...tasksStore.openTodos].sort(
@@ -577,7 +559,8 @@ const sortedOpenTodos = computed(() =>
 )
 const pendingTasksCount = computed(() => tasksStore.openTodos.length)
 
-const upcomingRosterData = ref([])
+// Upcoming roster data - dynamically derived from TanStack cache
+const upcomingRosterData = computed(() => dashboardData.value?.roster || [])
 const upcomingRoster = computed(() =>
 	upcomingRosterData.value.map((d) => ({
 		dayLabel: (d.day_name || '').slice(0, 3).toUpperCase(),
@@ -650,42 +633,78 @@ async function downloadStatement() {
 	const url = `/api/method/arijentek_core.api.payroll.download_salary_slip?slip_name=${encodeURIComponent(latestSlipId.value)}`
 	window.open(url, '_blank')
 }
+let socket = null
+
 onMounted(async () => {
 	await employeeStore.init()
-	const empId = employeeStore.employee?.name
-	if (empId) {
-		attendance.employeeId = empId
-		leaveStore.init(empId)
+	const id = employeeStore.employee?.name
+	if (id) {
+		attendance.employeeId = id
+		await attendance.fetchTodayStatus(id)
+		leaveStore.init(id)
 		tasksStore.init()
-		loadDashboard()
+	}
+
+	// Real-time synchronization: listen for attendance updates
+	try {
+		socket = initSocket()
+		if (socket) {
+			socket.on('attendance_updated', () => {
+				queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+				if (employeeStore.employee?.name) {
+					attendance.fetchTodayStatus(employeeStore.employee.name)
+				}
+			})
+		}
+	} catch (e) {
+		console.warn('Socket connection not initialized:', e)
+	}
+
+	if (window.frappe?.realtime) {
+		window.frappe.realtime.on('attendance_updated', () => {
+			queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+			if (employeeStore.employee?.name) {
+				attendance.fetchTodayStatus(employeeStore.employee.name)
+			}
+		})
+	}
+})
+
+onUnmounted(() => {
+	if (socket) {
+		socket.off('attendance_updated')
+		socket.disconnect()
+	}
+	if (window.frappe?.realtime) {
+		window.frappe.realtime.off('attendance_updated')
 	}
 })
 
 // Called from ClockWidget when punch changes
 async function refreshDashboard() {
 	await employeeStore.init()
-	const empId = employeeStore.employee?.name
-	if (empId) {
+	const id = employeeStore.employee?.name
+	if (id) {
 		// Clear caches and reload
 		localStorage.removeItem('cache_today_status')
-		await attendance.fetchTodayStatus(empId)
-		await loadDashboard()
+		await attendance.fetchTodayStatus(id)
+		await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
 	}
 }
 
 async function handleSaveLeaveFromDashboard() {
 	showRequestLeaveDialog.value = false
-	await loadDashboard()
+	await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
 }
 
 async function handleSaveExpenseFromDashboard() {
 	showCreateExpenseDialog.value = false
-	await loadDashboard()
+	await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
 }
 
 async function handleSaveIssueFromDashboard() {
 	showCreateIssueDialog.value = false
-	await loadDashboard()
+	await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
 }
 
 const taskMetadata = ref({

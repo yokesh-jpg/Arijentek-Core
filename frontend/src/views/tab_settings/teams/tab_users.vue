@@ -33,8 +33,10 @@
 			:total="pager.state.total"
 			:page="pager.state.page"
 			:page-size="pager.state.size"
+			:sort="{ key: sortBy, dir: sortDir }"
 			@update:page="pager.state.page = $event"
 			@update:page-size="pager.setPageSize($event)"
+			@sort="toggleSort"
 			:on-row-click="(row) => viewUser(row.name)"
 		>
 			<template #cell-user="{ row }">
@@ -91,7 +93,7 @@ const viewUserId = ref('')
 const searchTerm = ref('')
 
 const columns = [
-	{ key: 'user', label: 'User', className: 'table-td' },
+	{ key: 'user', label: 'User', className: 'table-td', sortable: true },
 	{ key: 'email', label: 'Email', className: 'table-td' },
 	{ key: 'username', label: 'Username', className: 'table-td' },
 	{ key: 'status', label: 'Status', className: 'table-td' }
@@ -171,7 +173,8 @@ async function fetchUsers(page, size) {
 		const params = {
 			page: page || 1,
 			page_size: size || pager.state.size || 10,
-			search_term: searchTerm.value || ''
+			search_term: searchTerm.value || '',
+			order_by: orderParam.value
 		}
 		const res = await call('arijentek_core.api.teams_permissons.get_users_details', params)
 		const rows = res?.rows || (Array.isArray(res) ? res : res?.data || [])
@@ -184,6 +187,26 @@ async function fetchUsers(page, size) {
 }
 
 const pager = useServerPager((page, size) => fetchUsers(page, size), { size: 10 })
+
+/* Sort state: A→Z by full name is the natural order for a user directory;
+   the User header toggles it server-side. */
+const sortBy = ref('user') // 'user' -> full_name
+const sortDir = ref('asc') // 'asc' | 'desc'
+const orderParam = computed(() => `full_name ${sortDir.value}`)
+
+function toggleSort(col) {
+	if (sortBy.value === col) {
+		sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+	} else {
+		sortBy.value = col
+		sortDir.value = 'asc'
+	}
+	if (pager.state.page !== 1) {
+		pager.state.page = 1
+	} else {
+		pager.fetchPage()
+	}
+}
 
 function triggerFilterRefresh() {
 	if (pager.state.page !== 1) {

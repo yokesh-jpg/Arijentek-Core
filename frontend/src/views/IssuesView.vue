@@ -25,16 +25,25 @@
 
 		<!-- Tab Content -->
 		<div class="px-2 pb-20 lg:pb-0 tab-fill">
-			<TabIssues v-if="activeTab === 'issues' && permissions.can_read_employee_grievance" />
-			<TabIssuesType v-if="activeTab === 'types' && permissions.can_read_grievance_type" />
+			<TabIssues 
+				v-if="visitedTabs.issues && permissions.can_read_employee_grievance" 
+				v-show="activeTab === 'issues'"
+				:is-active="activeTab === 'issues'"
+			/>
+			<TabIssuesType 
+				v-if="visitedTabs.types && permissions.can_read_grievance_type" 
+				v-show="activeTab === 'types'"
+			/>
 		</div>
 	</div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, reactive, watch, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { call } from 'frappe-ui';
+
+defineOptions({ name: 'IssuesView' });
 
 import TabIssues from './tab_settings/issues/tab_issues.vue';
 import TabIssuesType from './tab_settings/issues/tab_issues_type.vue';
@@ -42,6 +51,26 @@ import TabBar from "@/components/TabBar.vue";
 
 const route = useRoute();
 const activeTab = ref(route.query.tab || '');
+const visitedTabs = reactive({
+  issues: activeTab.value === 'issues',
+  types: activeTab.value === 'types',
+});
+
+watch(
+  () => route.query.tab,
+  (newTab) => {
+    if (newTab) {
+      activeTab.value = newTab;
+    }
+  }
+);
+
+watch(activeTab, (newTab) => {
+  if (newTab && visitedTabs[newTab] !== undefined) {
+    visitedTabs[newTab] = true;
+  }
+});
+
 const permissions = ref({
   can_read_employee_grievance: false,
   can_read_grievance_type: false,
@@ -62,6 +91,9 @@ const checkPermissions = async () => {
       } else if (permissions.value.can_read_grievance_type) {
         activeTab.value = 'types';
       }
+    }
+    if (activeTab.value && visitedTabs[activeTab.value] !== undefined) {
+      visitedTabs[activeTab.value] = true;
     }
   } catch (error) {
     console.error("Error checking permissions:", error);

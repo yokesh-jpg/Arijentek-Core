@@ -238,10 +238,12 @@
         :total="pager.state.total"
         :page="pager.state.page"
         :page-size="pager.state.size"
+        :sort="{ key: sortBy, dir: sortDir }"
         :empty-text="'No shift assignments match these filters.'"
         :on-row-click="(row) => openShiftDetails(row, row.start_date, row)"
         @update:page="pager.state.page = $event"
         @update:page-size="pager.setPageSize($event)"
+        @sort="toggleSort"
       >
         <template #cell-name="{ row }">
           <span class="font-mono text-xs font-semibold text-accent dark:text-accent-light">{{ row.name }}</span>
@@ -415,7 +417,7 @@ function initials(name) {
    fetches one page at a time. Changing the size always returns to the
    first page (useServerPager.setPageSize). */
 async function fetchAssignmentsPage(page, pageSize) {
-  const params = { month: selectedMonthAssignment.value, year: selectedYearAssignment.value, page, page_size: pageSize };
+  const params = { month: selectedMonthAssignment.value, year: selectedYearAssignment.value, page, page_size: pageSize, order_by: orderParam.value };
   if (filterMatrixDept.value)     params.department = filterMatrixDept.value;
   if (filterMatrixDesig.value)    params.designation = filterMatrixDesig.value;
   if (filterMatrixEmployee.value) params.employee = filterMatrixEmployee.value;
@@ -423,14 +425,36 @@ async function fetchAssignmentsPage(page, pageSize) {
   return { rows: res.assignments || [], total: Number(res.total) || 0 };
 }
 
-const pager = useServerPager((page, size) => fetchAssignmentsPage(page, size), { size: 10 });
+// No fetch on mount — the pager is fed when the list view is toggled on,
+// so opt out of the initial loading state.
+const pager = useServerPager((page, size) => fetchAssignmentsPage(page, size), { size: 10, initialLoading: false });
+
+/* Sort state: assignments starting latest first is the default reading
+   order; ID and From headers toggle it server-side. */
+const sortBy = ref('start_date'); // 'start_date' | 'name'
+const sortDir = ref('desc'); // 'asc' | 'desc'
+const orderParam = computed(() => `${sortBy.value} ${sortDir.value}`);
+
+function toggleSort(col) {
+  if (sortBy.value === col) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortBy.value = col;
+    sortDir.value = 'asc';
+  }
+  if (pager.state.page !== 1) {
+    pager.state.page = 1;
+  } else {
+    pager.fetchPage();
+  }
+}
 
 const listColumns = [
-  { key: 'name', label: 'ID', className: 'whitespace-nowrap' },
+  { key: 'name', label: 'ID', className: 'whitespace-nowrap', sortable: true },
   { key: 'employeeName', label: 'Employee', className: 'table-td-strong max-w-[180px] sm:max-w-none' },
   { key: 'department', label: 'Department', className: 'hidden md:table-cell' },
   { key: 'shift_type', label: 'Shift type' },
-  { key: 'start_date', label: 'From', className: 'hidden sm:table-cell' },
+  { key: 'start_date', label: 'From', className: 'hidden sm:table-cell', sortable: true },
   { key: 'end_date', label: 'To', className: 'hidden sm:table-cell' },
 ];
 
@@ -536,10 +560,23 @@ function formatTime(timeStr) {
 }
 
 onMounted(async () => {
-  try { canAddRoster.value   = await rosterStore.checkCanAddRoster(); }   catch { canAddRoster.value = false; }
-  try { canDeleteRoster.value = await rosterStore.checkCanDeleteRoster(); } catch { canDeleteRoster.value = false; }
+  // The mount fetch passes empty filters and depends on nothing else here,
+  // so start it FIRST: fetchShiftMatrix flips shiftMatrixLoading on
+  // synchronously, which keeps a first visit (store still empty) from
+  // flashing "No one matches these filters." behind the slower
+  // permission/designation checks.
+  const matrixReady = rosterStore
+    .fetchShiftMatrix(selectedMonthAssignment.value, selectedYearAssignment.value, '', '')
+    .catch(() => notify('Failed to load the shift matrix.'));
 
-  await rosterStore.fetchDeptDesignations();
-  await rosterStore.fetchShiftMatrix(selectedMonthAssignment.value, selectedYearAssignment.value, '', '');
+  // Permission checks gate buttons and dept designations feed the filter
+  // dropdowns — neither blocks the matrix, so run them alongside it.
+  await Promise.all([
+    rosterStore.checkCanAddRoster().then((v) => (canAddRoster.value = v)).catch(() => (canAddRoster.value = false)),
+    rosterStore.checkCanDeleteRoster().then((v) => (canDeleteRoster.value = v)).catch(() => (canDeleteRoster.value = false)),
+    rosterStore.fetchDeptDesignations(),
+  ]);
+
+  await matrixReady;
 });
 </script>

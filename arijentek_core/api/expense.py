@@ -903,6 +903,7 @@ def get_expense_claim(
 	search_text: str | None = None,
 	page: int = 1,
 	page_size: int = 0,
+	order_by: str = "posting_date desc",
 ):
 	"""
 	Return expense claims based on filters.
@@ -965,6 +966,18 @@ def get_expense_claim(
 
 	where_clause = " AND ".join(filters)
 
+	# Sort: order_by is client input going into raw SQL, so only whitelisted
+	# column/direction pairs are honoured; anything else falls back to the
+	# default (newest claims first).
+	sort_field, sort_dir = "posting_date", "desc"
+	if order_by:
+		_parts = str(order_by).strip().lower().split()
+		if _parts and _parts[0] in ("posting_date", "name"):
+			sort_field = _parts[0]
+		if len(_parts) > 1 and _parts[1] in ("asc", "desc"):
+			sort_dir = _parts[1]
+	order_clause = f"ORDER BY {sort_field} {sort_dir.upper()}, name DESC"
+
 	# Server-side paging: page_size > 0. The total and the stats come from
 	# the full filtered set (COUNT and SUM), so they are not affected
 	# by which page is being returned.
@@ -997,9 +1010,9 @@ def get_expense_claim(
 				remark, is_paid
 			FROM `tabExpense Claim`
 			WHERE {}
-			ORDER BY name DESC
+			{}
 			LIMIT %s OFFSET %s
-			""".format(where_clause),
+			""".format(where_clause, order_clause),
 			params + [page_size, offset],
 			as_dict=True,
 		)
@@ -1033,8 +1046,8 @@ def get_expense_claim(
 			remark, is_paid
 		FROM `tabExpense Claim`
 		WHERE {}
-		ORDER BY name DESC
-		""".format(where_clause),
+		{}
+		""".format(where_clause, order_clause),
 		params,
 		as_dict=True,
 	)

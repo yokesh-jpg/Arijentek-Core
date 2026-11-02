@@ -46,8 +46,10 @@
 			:total="pager.state.total"
 			:page="pager.state.page"
 			:page-size="pager.state.size"
+			:sort="{ key: sortBy, dir: sortDir }"
 			@update:page="pager.state.page = $event"
 			@update:page-size="pager.setPageSize($event)"
+			@sort="toggleSort"
 		>
 			<template #cell-name="{ row }">
 				<div class="max-w-[180px] sm:max-w-none">
@@ -88,7 +90,7 @@ import CreateLeaveAllocation from '../../forms/leave/create_leave_allocation.vue
 import { useLeaveStore } from '@/stores/leave'
 import { notify, ask } from '@/utils/feedback.js'
 import { getErrorMessage } from '@/utils'
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { call } from 'frappe-ui'
 
 const leaveStore = useLeaveStore()
@@ -99,11 +101,11 @@ const showCreateModal = ref(false)
 const editAllocationId = ref('')
 
 const listColumns = [
-	{ key: 'name', label: 'Allocation', className: 'table-td-strong max-w-[180px] sm:max-w-none' },
+	{ key: 'name', label: 'Allocation', className: 'table-td-strong max-w-[180px] sm:max-w-none', sortable: true },
 	{ key: 'employee', label: 'Employee', className: 'table-td hidden sm:table-cell' },
 	{ key: 'leave_type', label: 'Leave type', className: 'table-td hidden sm:table-cell whitespace-nowrap' },
 	{ key: 'days', label: 'Days', className: 'table-td tabular-nums whitespace-nowrap' },
-	{ key: 'period', label: 'Period', className: 'table-td tabular-nums whitespace-nowrap hidden lg:table-cell' },
+	{ key: 'period', label: 'Period', className: 'table-td tabular-nums whitespace-nowrap hidden lg:table-cell', sortable: true },
 ]
 
 function actionsForAllocation(row) {
@@ -161,6 +163,7 @@ async function fetchAllocations(page, size) {
 		if (searchQuery.value) {
 			params.search_text = searchQuery.value
 		}
+		params.order_by = orderParam.value
 		const res = await call('arijentek_core.api.leave.get_leave_allocations', params)
 		const rows = res?.rows || (Array.isArray(res) ? res : res?.data || [])
 		const total = res?.total != null ? Number(res.total) : rows.length
@@ -172,6 +175,26 @@ async function fetchAllocations(page, size) {
 }
 
 const pager = useServerPager((page, size) => fetchAllocations(page, size), { size: 10 })
+
+/* Sort state: the allocation whose period starts latest first is the default
+   reading order; Allocation and Period headers toggle it server-side. */
+const sortBy = ref('period') // 'period' | 'name'
+const sortDir = ref('desc') // 'asc' | 'desc'
+const orderParam = computed(() => `${sortBy.value === 'period' ? 'from_date' : 'name'} ${sortDir.value}`)
+
+function toggleSort(col) {
+	if (sortBy.value === col) {
+		sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+	} else {
+		sortBy.value = col
+		sortDir.value = 'asc'
+	}
+	if (pager.state.page !== 1) {
+		pager.state.page = 1
+	} else {
+		pager.fetchPage()
+	}
+}
 
 function triggerFilterRefresh() {
 	if (pager.state.page !== 1) {

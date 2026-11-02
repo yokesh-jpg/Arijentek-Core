@@ -22,21 +22,51 @@
 		</TabBar>
 
 		<!-- Tab Content -->
-		<TabExpenseDashboard v-if="activeTab === 'dashboard'" />
-		<TabExpenseTypes v-if="activeTab === 'expense_types' && canReadExpenseTypes" />
+		<TabExpenseDashboard 
+			v-if="visitedTabs.dashboard" 
+			v-show="activeTab === 'dashboard'" 
+			:is-active="activeTab === 'dashboard'" 
+		/>
+		<TabExpenseTypes 
+			v-if="visitedTabs.expense_types && canReadExpenseTypes" 
+			v-show="activeTab === 'expense_types'" 
+		/>
 	</div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, reactive, watch, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { call } from 'frappe-ui';
+
+defineOptions({ name: 'ExpenseView' });
+
 import TabExpenseDashboard from './tab_settings/expense/tab_expense_dashboard.vue';
 import TabExpenseTypes from './tab_settings/expense/tab_expense_types.vue';
 import TabBar from "@/components/TabBar.vue";
 
 const route = useRoute();
 const activeTab = ref(route.query.tab || 'dashboard');
+
+const visitedTabs = reactive({
+  dashboard: activeTab.value === 'dashboard',
+  expense_types: activeTab.value === 'expense_types',
+});
+
+watch(
+  () => route.query.tab,
+  (newTab) => {
+    if (newTab) {
+      activeTab.value = newTab;
+    }
+  }
+);
+
+watch(activeTab, (newTab) => {
+  if (newTab && visitedTabs[newTab] !== undefined) {
+    visitedTabs[newTab] = true;
+  }
+});
 const canReadExpenseTypes = ref(false);
 
 onMounted(async () => {

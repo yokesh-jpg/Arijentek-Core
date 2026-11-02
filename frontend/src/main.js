@@ -1,6 +1,7 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import { setConfig, frappeRequest, resourcesPlugin } from "frappe-ui";
+import { VueQueryPlugin } from "@tanstack/vue-query";
 import App from "./App.vue";
 import router from "./router";
 import "./index.css";
@@ -30,10 +31,25 @@ setConfig("resourceFetcher", frappeRequest);
 app.use(pinia);
 app.use(router);
 app.use(resourcesPlugin);
+app.use(VueQueryPlugin, {
+	queryClientConfig: {
+		defaultOptions: {
+			queries: {
+				staleTime: 1000 * 60 * 5, // 5 mins fresh cache
+				gcTime: 1000 * 60 * 15,   // 15 mins inactive retention
+				refetchOnWindowFocus: false,
+			},
+		},
+	},
+});
 
-app.mount("#app");
+router.isReady().then(() => {
+	app.mount("#app");
+});
 
 import { initializeWebPush } from "../notification/webPush";
 
-// Web Push Registration
-initializeWebPush(frappeRequest);
+// Web Push Registration - only for authenticated sessions
+if (typeof window !== "undefined" && window.frappe_user && window.frappe_user !== "Guest") {
+	initializeWebPush(frappeRequest);
+}

@@ -53,8 +53,17 @@
     </div>
 
     <!-- Counted over the full filtered set (server-side), so the strip
-         matches the whole result, not just the rows on screen. -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+         matches the whole result, not just the rows on screen.
+         Skeleton until the first fetch lands (the leave-tab pattern) so the
+         figures never read as zeros while loading; a refetch keeps the old
+         figures up. -->
+    <div v-if="isStatsLoading" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div v-for="i in 4" :key="i" class="glass-card !p-4 animate-pulse">
+        <div class="h-3 w-20 rounded bg-black/[0.07] dark:bg-white/10 mb-3"></div>
+        <div class="h-6 w-16 rounded bg-black/[0.07] dark:bg-white/10"></div>
+      </div>
+    </div>
+    <div v-else class="grid grid-cols-2 lg:grid-cols-4 gap-3">
       <div v-for="st in claimStats" :key="st.label" class="glass-card !p-4">
         <p class="text-xs font-medium text-[#5C6169] dark:text-white/60">{{ st.label }}</p>
         <p class="text-2xl font-semibold tracking-tight mt-1.5 tabular-nums" :class="st.tone || 'text-[#17181B] dark:text-white'">{{ st.value }}</p>
@@ -73,9 +82,11 @@
       :total="pager.state.total"
       :page="pager.state.page"
       :page-size="pager.state.size"
+      :sort="{ key: sortBy, dir: sortDir }"
       :on-row-click="(claim) => handleView(claim)"
       @update:page="pager.state.page = $event"
       @update:page-size="pager.setPageSize($event)"
+      @sort="toggleSort"
     >
       <template #cell-claim="{ row }">
         <span class="block tabular-nums break-words leading-snug sm:truncate">{{ row.name }}</span>
@@ -123,7 +134,8 @@
 import DataTable from '@/components/DataTable.vue'
 import { useServerPager } from '@/composables/useServerPager.js'
 import { notify, ask } from '@/utils/feedback.js'
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onActivated, watch } from 'vue';
+import { useQuery, useQueryClient } from '@tanstack/vue-query';
 import { call } from 'frappe-ui';
 import CreateExpenseClaim from '../../forms/expense/create_expense_claim.vue';
 import ViewExpenseClaim from '../../page_views/expense/view_expense_claim.vue';
@@ -132,9 +144,16 @@ import DateRangePicker from '@/components/DateRangePicker.vue';
 import { useEmployeeStore } from '@/stores/employee';
 import { getErrorMessage } from '@/utils';
 
+const props = defineProps({
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
+});
+
 const employeeStore = useEmployeeStore();
+const queryClient = useQueryClient();
 const showCreateClaimModal = ref(false);
-const canCreate = ref(false);
 
 const showViewModal = ref(false);
 const selectedViewId = ref('');
@@ -167,6 +186,7 @@ async function handleApprove(claim) {
       notify(res.error || 'Failed to approve claim');
       return;
     }
+    await queryClient.invalidateQueries({ queryKey: ['expense-claim-stats'] });
     await pager.fetchPage();
   } catch (e) {
     console.error('Failed to approve claim:', e);
@@ -185,6 +205,7 @@ async function handleReject(claim) {
       notify(res.error || 'Failed to reject claim');
       return;
     }
+    await queryClient.invalidateQueries({ queryKey: ['expense-claim-stats'] });
     await pager.fetchPage();
   } catch (e) {
     console.error('Failed to reject claim:', e);
@@ -202,6 +223,7 @@ async function handleDelete(claim) {
       notify(res.error || 'Failed to delete claim');
       return;
     }
+    await queryClient.invalidateQueries({ queryKey: ['expense-claim-stats'] });
     await pager.fetchPage();
   } catch (e) {
     console.error('Failed to delete claim:', e);
@@ -209,10 +231,36 @@ async function handleDelete(claim) {
   }
 }
 
-const canApprove = ref(false);
-const canEdit = ref(false);
-const canDelete = ref(false);
-const employeeList = ref([]);
+// Permissions with TanStack Query
+const { data: permissionsData } = useQuery({
+  queryKey: ['expense-permissions'],
+  queryFn: async () => {
+    const [approveRes, editRes, deleteRes, createRes] = await Promise.all([
+      call('arijentek_core.api.expense.can_approve_expense_claim').catch(() => false),
+      call('arijentek_core.api.expense.can_edit_expense_claim').catch(() => false),
+      call('arijentek_core.api.expense.can_delete_expense_claim').catch(() => false),
+      call('arijentek_core.api.expense.can_create_expense_claim').catch(() => false)
+    ]);
+    let employees = [];
+    if (approveRes) {
+      employees = (await call('arijentek_core.api.expense.get_employee_list').catch(() => [])) || [];
+    }
+    return {
+      canApprove: !!approveRes,
+      canEdit: !!editRes,
+      canDelete: !!deleteRes,
+      canCreate: !!createRes,
+      employeeList: employees,
+    };
+  },
+  staleTime: Infinity,
+});
+
+const canApprove = computed(() => permissionsData.value?.canApprove ?? false);
+const canEdit = computed(() => permissionsData.value?.canEdit ?? false);
+const canDelete = computed(() => permissionsData.value?.canDelete ?? false);
+const canCreate = computed(() => permissionsData.value?.canCreate ?? false);
+const employeeList = computed(() => permissionsData.value?.employeeList ?? []);
 const showEmployeeFilter = computed(() => canApprove.value && employeeList.value.length > 0);
 
 const selectedEmployee = ref('');
@@ -222,9 +270,48 @@ const filterToDate = ref('');
 const selectedPreset = ref('All Time');
 const filterSearchId = ref('');
 
-/* Server-side stats over the full filtered set (COUNT + SUM), so the strip
-   reflects the whole result, not just the rows on screen. */
-const serverStats = ref({ count: 0, total_amount: 0, approved_amount: 0, rejected_amount: 0 });
+// Expense Claim Stats with TanStack Query
+const statsQuery = useQuery({
+  queryKey: computed(() => [
+    'expense-claim-stats',
+    selectedEmployee.value,
+    filterStatus.value,
+    filterFromDate.value,
+    filterToDate.value,
+    filterSearchId.value,
+  ]),
+  queryFn: async () => {
+    const params = {
+      page: 1,
+      page_size: 10,
+      search_text: filterSearchId.value || "",
+    };
+    if (selectedEmployee.value && selectedEmployee.value !== 'All') {
+      params.employee = selectedEmployee.value;
+    }
+    if (filterStatus.value && filterStatus.value !== 'All') {
+      params.status = filterStatus.value;
+    }
+    const isAllTime = selectedPreset.value === "All Time";
+    if (!isAllTime && filterFromDate.value && filterToDate.value) {
+      params.start_date = filterFromDate.value;
+      params.end_date = filterToDate.value;
+    }
+    const res = await call('arijentek_core.api.expense.get_expense_claim', params);
+    if (res && !Array.isArray(res) && res.stats) {
+      return res.stats;
+    }
+    return { count: 0, total_amount: 0, approved_amount: 0, rejected_amount: 0 };
+  },
+  placeholderData: (previousData) => previousData,
+  staleTime: 1000 * 60 * 5,
+});
+
+const serverStats = computed(() => statsQuery.data.value || { count: 0, total_amount: 0, approved_amount: 0, rejected_amount: 0 });
+
+/* First load only: isLoading is false during refetches (placeholderData keeps
+   the previous figures), so filters swapping never flash the skeleton. */
+const isStatsLoading = computed(() => statsQuery.isLoading.value);
 
 /* Four facts off the server-side stats. */
 const claimStats = computed(() => [
@@ -262,30 +349,6 @@ const getStatusClasses = (status) => {
   return "tag-neutral";
 };
 
-async function checkPermissions() {
-  try {
-    const [approveRes, editRes, deleteRes, createRes] = await Promise.all([
-      call('arijentek_core.api.expense.can_approve_expense_claim'),
-      call('arijentek_core.api.expense.can_edit_expense_claim'),
-      call('arijentek_core.api.expense.can_delete_expense_claim'),
-      call('arijentek_core.api.expense.can_create_expense_claim')
-    ]);
-    canApprove.value = !!approveRes;
-    canEdit.value = !!editRes;
-    canDelete.value = !!deleteRes;
-    canCreate.value = !!createRes;
-
-    if (canApprove.value) {
-      const list = await call('arijentek_core.api.expense.get_employee_list');
-      employeeList.value = list || [];
-    } else {
-      employeeList.value = [];
-    }
-  } catch (e) {
-    console.error("Error checking permissions", e);
-  }
-}
-
 /* Server-side fetch: `page`/`page_size` are passed to the API (LIMIT/OFFSET),
    and the response holds the current page + total + stats. Returns { rows,
    total } for useServerPager. Handles both the paginated dict (page_size >
@@ -295,6 +358,7 @@ async function fetchClaims(page, size) {
     page: page,
     page_size: size,
     search_text: filterSearchId.value || "",
+    order_by: orderParam.value,
   };
   if (selectedEmployee.value && selectedEmployee.value !== 'All') {
     params.employee = selectedEmployee.value;
@@ -313,7 +377,14 @@ async function fetchClaims(page, size) {
     const rows = Array.isArray(res) ? res : (res?.data || []);
     const total = Array.isArray(res) ? res.length : Number(res?.total || 0);
     if (res && !Array.isArray(res) && res.stats) {
-      serverStats.value = res.stats;
+      queryClient.setQueryData([
+        'expense-claim-stats',
+        selectedEmployee.value,
+        filterStatus.value,
+        filterFromDate.value,
+        filterToDate.value,
+        filterSearchId.value,
+      ], res.stats);
     }
     return { rows, total };
   } catch (e) {
@@ -326,11 +397,31 @@ async function fetchClaims(page, size) {
    keeps the previous page visible while the next loads; a stale fetch is dropped. */
 const pager = useServerPager((page, size) => fetchClaims(page, size), { size: 10 });
 
+/* Sort state: date desc (newest claims first) is the default reading order;
+   Claim and Date headers toggle it server-side. */
+const sortBy = ref('date'); // 'date' | 'claim'
+const sortDir = ref('desc'); // 'asc' | 'desc'
+const orderParam = computed(() => `${sortBy.value === 'date' ? 'posting_date' : 'name'} ${sortDir.value}`);
+
+function toggleSort(col) {
+  if (sortBy.value === col) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortBy.value = col;
+    sortDir.value = 'asc';
+  }
+  if (pager.state.page !== 1) {
+    pager.state.page = 1;
+  } else {
+    pager.fetchPage();
+  }
+}
+
 /* Column declarations for the list (order = render order; `className`
    carries the responsive hiding). */
 const listColumns = [
-  { key: "claim", label: "Claim", className: "table-td-strong" },
-  { key: "date", label: "Date", className: "hidden lg:table-cell" },
+  { key: "claim", label: "Claim", className: "table-td-strong", sortable: true },
+  { key: "date", label: "Date", className: "hidden lg:table-cell", sortable: true },
   { key: "employee", label: "Employee", className: "hidden sm:table-cell" },
   { key: "approver", label: "Approver", className: "hidden xl:table-cell" },
   { key: "amount", label: "Amount", className: "text-right tabular-nums" },
@@ -349,12 +440,14 @@ function actionsForClaim(claim) {
   ];
 }
 
-function onSaveClaim() {
-  pager.fetchPage();
+async function onSaveClaim() {
+  await queryClient.invalidateQueries({ queryKey: ['expense-claim-stats'] });
+  await pager.fetchPage();
 }
 
-function onViewRefresh() {
-  pager.fetchPage();
+async function onViewRefresh() {
+  await queryClient.invalidateQueries({ queryKey: ['expense-claim-stats'] });
+  await pager.fetchPage();
 }
 
 // Filter changes reset to page 1. The pager's own [page, size] watch re-fetches
@@ -370,7 +463,17 @@ watch([filterSearchId, selectedEmployee, filterStatus, filterFromDate, filterToD
 
 onMounted(async () => {
   await employeeStore.init();
-  await checkPermissions();
-  await pager.fetchPage();
+  // Always fetch fresh claims on mount
+  pager.fetchPage();
+});
+
+onActivated(() => {
+  pager.fetchPage();
+});
+
+watch(() => props.isActive, (active) => {
+  if (active) {
+    pager.fetchPage();
+  }
 });
 </script>

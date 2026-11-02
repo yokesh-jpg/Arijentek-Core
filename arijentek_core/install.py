@@ -162,13 +162,13 @@ def _expected_shortcuts():
 		{
 			"type": "URL",
 			"label": "Leave Management",
-			"url": "/employee-portal#/leave",
+			"url": "/employee-portal/leave",
 			"color": "#f59e0b",
 		},
 		{
 			"type": "URL",
 			"label": "Payroll & Salary Slip",
-			"url": "/employee-portal#/payroll",
+			"url": "/employee-portal/payroll",
 			"color": "#8b5cf6",
 		},
 	]

@@ -315,13 +315,10 @@ async function handleClockIn() {
 
 /* Mis-punch guards.
    A double click on Clock in used to land on Clock out the moment the button
-   re-rendered, ending the shift one second in. Two things stop that:
-     1. a short cooldown after any punch, during which the primary is inert;
-     2. a confirm step when the shift is younger than MIN_SHIFT_SECONDS, since
-        nobody means to end a shift a minute after starting it.
-   Both are client-side; the real backend should reject or flag a sub-minute
-   shift too, because this guard is only as good as the client. */
-const PUNCH_COOLDOWN_MS = 2500;
+   re-rendered, ending the shift prematurely.
+   A 5-second cooldown after any punch keeps the buttons inert to prevent double-clicks.
+   A confirmation step asks if the user wants to end a shift younger than MIN_SHIFT_SECONDS. */
+const PUNCH_COOLDOWN_MS = 5000;
 const MIN_SHIFT_SECONDS = 60;
 const cooldown = ref(false);
 let cooldownTimer = null;

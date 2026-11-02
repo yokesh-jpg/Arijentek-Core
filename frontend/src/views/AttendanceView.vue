@@ -49,27 +49,38 @@
 		</TabBar>
 
 		<!-- Tab Content -->
-		<TabDashboardAttendance v-if="activeTab === 'dashboard'" />
+		<TabDashboardAttendance 
+			v-if="visitedTabs.dashboard" 
+			v-show="activeTab === 'dashboard'" 
+		/>
 		
 		<TabAttendance 
-			v-if="activeTab === 'attendance'" 
+			v-if="visitedTabs.attendance"
+			v-show="activeTab === 'attendance'" 
 			@request-attendance="activeTab = 'requests'; openRequestDialogOnTabChange = true" 
 		/>
 		
-		<TabCheckins v-if="activeTab === 'checkins'" />
+		<TabCheckins 
+			v-if="visitedTabs.checkins" 
+			v-show="activeTab === 'checkins'" 
+		/>
 		
 		<TabAttendanceRequests 
-			v-if="activeTab === 'requests'" 
+			v-if="visitedTabs.requests" 
+			v-show="activeTab === 'requests'" 
 			:open-dialog-on-mount="openRequestDialogOnTabChange" 
 			@close-dialog="openRequestDialogOnTabChange = false" 
 		/>
 
-		<TabTimesheet v-if="activeTab === 'timesheet'" />
+		<TabTimesheet 
+			v-if="visitedTabs.timesheet" 
+			v-show="activeTab === 'timesheet'" 
+		/>
 	</div>
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { ref, reactive, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useAttendanceStore } from "@/stores/attendance";
 import TabDashboardAttendance from "./tab_settings/attendance/tab_dashboard_attendance.vue";
@@ -79,10 +90,25 @@ import TabAttendanceRequests from "./tab_settings/attendance/tab_attendance_requ
 import TabTimesheet from "./tab_settings/attendance/tab_timesheet.vue";
 import TabBar from "@/components/TabBar.vue";
 
+defineOptions({ name: "AttendanceView" });
+
 const route = useRoute();
 const attendanceStore = useAttendanceStore();
 const activeTab = ref(route.query.tab || "dashboard");
+const visitedTabs = reactive({
+	dashboard: activeTab.value === "dashboard",
+	attendance: activeTab.value === "attendance",
+	checkins: activeTab.value === "checkins",
+	requests: activeTab.value === "requests",
+	timesheet: activeTab.value === "timesheet",
+});
 const openRequestDialogOnTabChange = ref(false);
+
+watch(activeTab, (newTab) => {
+	if (newTab && visitedTabs[newTab] !== undefined) {
+		visitedTabs[newTab] = true;
+	}
+});
 
 watch(
   () => route.query.tab,
