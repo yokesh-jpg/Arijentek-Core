@@ -773,4 +773,13 @@ function step(n) {
 	viewMonth.value = m
 	viewYear.value = y
 }
+
+function focus() {
+	inputEl.value?.focus()
+}
+
+defineExpose({
+	focus,
+	inputEl
+})
 </script>

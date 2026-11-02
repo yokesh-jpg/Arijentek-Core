@@ -4,7 +4,10 @@
 		<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
 			<div>
 				<h2 class="section-title">This month</h2>
-				<p class="section-subtitle">{{ monthLabel }} · {{ statusSummary.Present }} of {{ workingDaysInMonth }} days present</p>
+				<p class="section-subtitle">
+					<template v-if="isSummaryLoading">Loading your month…</template>
+					<template v-else>{{ monthLabel }} · {{ statusSummary.Present }} of {{ workingDaysInMonth }} days present</template>
+				</p>
 			</div>
 
 			<div class="flex items-center gap-2 flex-wrap">
@@ -53,8 +56,19 @@
 
 		<!-- ===== Month summary =====
 		     One strip instead of four cards. These are counts you read together
-		     ("22 present, 1 absent"), not four separate headline figures. -->
-		<div class="glass-card !p-0 overflow-hidden">
+		     ("22 present, 1 absent"), not four separate headline figures.
+		     Skeleton until the first fetch lands (the leave-tab pattern) so the
+		     counts never read as zeros while loading; a refetch keeps the old
+		     month's numbers up. -->
+		<div v-if="isSummaryLoading" class="glass-card !p-0 overflow-hidden">
+			<div class="grid grid-cols-3 divide-x divide-black/[0.06] dark:divide-white/[0.07]">
+				<div v-for="i in 3" :key="i" class="p-4 animate-pulse">
+					<div class="h-3 w-20 rounded bg-black/[0.07] dark:bg-white/10 mb-3"></div>
+					<div class="h-7 w-10 rounded bg-black/[0.07] dark:bg-white/10"></div>
+				</div>
+			</div>
+		</div>
+		<div v-else class="glass-card !p-0 overflow-hidden">
 			<div class="grid grid-cols-3 divide-x divide-black/[0.06] dark:divide-white/[0.07]">
 				<div v-for="m in summaryTiles" :key="m.label" class="p-4">
 					<div class="flex items-center gap-2">
@@ -241,6 +255,13 @@ async function fetchMonthlyRoster() {
 		await attendanceStore.fetchMonthlyRoster(empId, selectedYear.value, selectedMonth.value);
 	}
 }
+
+/* No data yet and no error = the first fetch has not landed (it may not even
+   have started — mount awaits employee init first). Skeleton until then; once
+   data exists, refetches keep the old numbers visible instead of flashing 0. */
+const isSummaryLoading = computed(
+	() => !currentUserHistoryResource.data && !currentUserHistoryResource.error
+);
 
 const statusSummary = computed(() => {
 	const summary = currentUserHistoryResource.data?.summary || {};

@@ -177,7 +177,7 @@ def create_personal_todo(description: str, date: str | None = None, priority: st
 				user=allocated_to,
 				title="New Task Assigned",
 				body=f"{creator_name} assigned you a task: {description.strip()[:80]}",
-				url="/employee-portal#/tasks"
+				url="/employee-portal/tasks"
 			)
 		except Exception:
 			frappe.log_error(frappe.get_traceback(), "Task Assignment Notification Error")
@@ -252,7 +252,7 @@ def update_personal_todo(
 				user=final_assignee,
 				title="Task Assigned to You",
 				body=f"{updater_name} assigned you a task: {desc_preview}",
-				url="/employee-portal#/tasks"
+				url="/employee-portal/tasks"
 			)
 
 		# Status-change bidirectional notifications
@@ -262,7 +262,7 @@ def update_personal_todo(
 				user=final_assignee,
 				title=f"Task Status Updated to {status}",
 				body=f"{updater_name} updated the status of your task '{desc_preview}' to {status}.",
-				url="/employee-portal#/tasks"
+				url="/employee-portal/tasks"
 			)
 		# Assignee changed status → notify creator
 		elif user == final_assignee and creator and creator != user:
@@ -270,7 +270,7 @@ def update_personal_todo(
 				user=creator,
 				title=f"Task Status Updated to {status}",
 				body=f"{updater_name} marked your task '{desc_preview}' as {status}.",
-				url="/employee-portal#/tasks"
+				url="/employee-portal/tasks"
 			)
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Task Update Notification Error")
@@ -327,7 +327,7 @@ def update_todo_status(todo_id: str, status: str = "Closed"):
 				user=assignee,
 				title=f"Task Status Updated to {status}",
 				body=f"{updater_name} updated the status of your task '{desc_preview}' to {status}.",
-				url="/employee-portal#/tasks"
+				url="/employee-portal/tasks"
 			)
 
 		# Assignee changed the status → notify the creator
@@ -336,7 +336,7 @@ def update_todo_status(todo_id: str, status: str = "Closed"):
 				user=creator,
 				title=f"Task Status Updated to {status}",
 				body=f"{updater_name} marked your task '{desc_preview}' as {status}.",
-				url="/employee-portal#/tasks"
+				url="/employee-portal/tasks"
 			)
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Task Status Notification Error")

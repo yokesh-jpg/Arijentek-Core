@@ -24,23 +24,20 @@ def get_context(context):
 
 	user = frappe.session.user
 
-	# Gate 1: guests must log in.
-	if user == "Guest":
-		frappe.local.flags.redirect_location = "/login?redirect-to=/employee-portal"
-		raise frappe.Redirect
-
-	# Gate 2: authenticated users must have an Employee record OR a portal/HR/manager role.
-	roles = set(frappe.get_roles(user))
-	has_employee = bool(
-		frappe.db.exists("Employee", {"user_id": user, "status": "Active"})
-	) if user != "Administrator" else True
-	if user != "Administrator" and not has_employee and not (roles & _PORTAL_ROLES):
-		frappe.redirect_to_message(
-			_("Not authorized"),
-			_("Your account is not linked to an employee record and lacks portal roles."),
-			indicator="red",
-		)
-		raise frappe.Redirect
+	# Guests are permitted to load the host page so the SPA's custom Login view can render.
+	# Authenticated users must have an Employee record OR a portal/HR/manager role.
+	if user != "Guest":
+		roles = set(frappe.get_roles(user))
+		has_employee = bool(
+			frappe.db.exists("Employee", {"user_id": user, "status": "Active"})
+		) if user != "Administrator" else True
+		if user != "Administrator" and not has_employee and not (roles & _PORTAL_ROLES):
+			frappe.redirect_to_message(
+				_("Not authorized"),
+				_("Your account is not linked to an employee record and lacks portal roles."),
+				indicator="red",
+			)
+			raise frappe.Redirect
 
 	# Only render the on-page error/debug overlay when Developer Mode is on (site_config.json).
 	context.is_developer = bool(frappe.conf.get("developer_mode"))

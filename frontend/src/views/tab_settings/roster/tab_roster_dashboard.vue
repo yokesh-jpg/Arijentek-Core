@@ -73,7 +73,7 @@
     <!-- ===== Summary =====
          Four across, matching the rest of the app. The target card is the one
          filled surface, because it is the only figure you are measured on. -->
-    <div v-if="rosterStore.loading" class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div v-if="isLoading" class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
       <div v-for="i in 4" :key="i" class="glass-card !p-4 sm:!p-5 animate-pulse">
         <div class="h-3 w-20 rounded bg-black/[0.07] dark:bg-white/10 mb-3"></div>
         <div class="h-7 w-16 rounded bg-black/[0.07] dark:bg-white/10"></div>
@@ -83,7 +83,7 @@
       <div class="glass-card !p-4 sm:!p-5">
         <p class="text-xs font-medium text-[#5C6169] dark:text-white/65">Working days</p>
         <p class="mt-2 flex items-baseline gap-1">
-          <span class="text-2xl font-semibold text-[#17181B] dark:text-white tabular-nums leading-none">{{ viewMode === 'weekly' ? rosterStore.workingDays : rosterStore.monthlyWorkingDays }}</span>
+          <span class="text-2xl font-semibold text-[#17181B] dark:text-white tabular-nums leading-none">{{ workingDays }}</span>
           <span class="text-[13px] text-[#656A72] dark:text-white/55 tabular-nums">/ {{ viewMode === 'weekly' ? '07' : new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate() }}</span>
         </p>
         <p class="text-xs text-[#5C6169] dark:text-white/60 mt-2 flex items-center gap-1.5">
@@ -103,7 +103,7 @@
       <div class="glass-card !p-4 sm:!p-5">
         <p class="text-xs font-medium text-[#5C6169] dark:text-white/65">Hours worked</p>
         <p class="mt-2 flex items-baseline gap-1">
-          <span class="text-2xl font-semibold text-[#17181B] dark:text-white tabular-nums leading-none">{{ viewMode === 'weekly' ? rosterStore.hoursWorked.toFixed(1) : rosterStore.monthlyHoursWorked.toFixed(1) }}</span>
+          <span class="text-2xl font-semibold text-[#17181B] dark:text-white tabular-nums leading-none">{{ hoursWorked.toFixed(1) }}</span>
           <span class="text-[13px] text-[#656A72] dark:text-white/55">hrs</span>
         </p>
         <p class="text-xs text-[#5C6169] dark:text-white/60 mt-2">this {{ viewMode === 'weekly' ? 'week' : 'month' }}</p>
@@ -111,10 +111,10 @@
 
       <div class="rounded-[18px] p-4 sm:p-5 text-white bg-gradient-to-br from-accent to-accent-hover shadow-[0_14px_34px_-14px_rgb(var(--accent-rgb)/0.55)]">
         <p class="text-xs font-medium text-white/85">Target hours</p>
-        <p class="text-2xl font-semibold tabular-nums leading-none mt-2">{{ viewMode === 'weekly' ? rosterStore.targetHours.toFixed(1) : rosterStore.monthlyTargetHours.toFixed(1) }}</p>
+        <p class="text-2xl font-semibold tabular-nums leading-none mt-2">{{ targetHours.toFixed(1) }}</p>
         <p class="text-xs text-white/85 mt-2 flex items-center gap-1.5">
           <span class="material-symbols-outlined !text-[14px]">info</span>
-          {{ viewMode === 'weekly' ? rosterStore.remainingHours.toFixed(1) : rosterStore.monthlyRemainingHours.toFixed(1) }} remaining
+          {{ remainingHours.toFixed(1) }} remaining
         </p>
       </div>
     </div>
@@ -130,13 +130,23 @@
       @mouseup="handleMouseUp"
       @mousemove="handleMouseMove"
     >
-      <div
-        v-for="day in rosterStore.weeklySchedule"
-        :key="day.date"
-        :data-today="day.is_today"
-        class="min-w-[170px] lg:min-w-0 flex flex-col rounded-[16px] p-3.5 transition-colors"
-        :class="dayIsEmpty(day) ? 'border border-dashed border-black/[0.10] dark:border-white/[0.14]' : day.is_today ? 'border-2 border-accent bg-white dark:bg-surface-2 shadow-[0_10px_30px_-16px_rgb(var(--accent-rgb)/0.6)]' : 'border border-black/[0.07] dark:border-white/[0.08] bg-white dark:bg-surface-2'"
-      >
+      <template v-if="isLoading && (!weeklySchedule || weeklySchedule.length === 0)">
+        <div v-for="i in 7" :key="'week-skel-' + i" class="min-w-[170px] lg:min-w-0 glass-card !p-3.5 animate-pulse min-h-[160px] flex flex-col justify-between">
+          <div class="space-y-2">
+            <div class="h-3 w-10 rounded bg-black/[0.07] dark:bg-white/10"></div>
+            <div class="h-5 w-8 rounded bg-black/[0.07] dark:bg-white/10"></div>
+          </div>
+          <div class="h-8 w-full rounded bg-black/[0.07] dark:bg-white/10"></div>
+        </div>
+      </template>
+      <template v-else>
+        <div
+          v-for="day in weeklySchedule"
+          :key="day.date"
+          :data-today="day.is_today"
+          class="min-w-[170px] lg:min-w-0 flex flex-col rounded-[16px] p-3.5 transition-colors"
+          :class="dayIsEmpty(day) ? 'border border-dashed border-black/[0.10] dark:border-white/[0.14]' : day.is_today ? 'border-2 border-accent bg-white dark:bg-surface-2 shadow-[0_10px_30px_-16px_rgb(var(--accent-rgb)/0.6)]' : 'border border-black/[0.07] dark:border-white/[0.08] bg-white dark:bg-surface-2'"
+        >
         <!-- Date header -->
         <!-- flex-wrap: only the today cell carries both the chip and the add
              button, and at large text those two do not fit a 111px day cell.
@@ -235,22 +245,14 @@
               {{ dayState(day).label }}
             </p>
           </div>
-
-          <router-link
-            v-if="day.is_today"
-            to="/attendance?tab=timesheet"
-            class="mt-auto btn-primary w-full"
-          >
-            <span class="material-symbols-outlined !text-[16px]">schedule</span>
-            Open timesheet
-          </router-link>
         </div>
       </div>
+      </template>
     </div>
 
     <!-- Monthly View — 7-column calendar grid -->
     <div v-if="viewMode === 'monthly'" class="bg-white dark:bg-white/5 rounded-[12px] shadow-sm overflow-hidden">
-      <div v-if="rosterStore.monthlyLoading" class="p-8 text-center">
+      <div v-if="isLoading && (!monthlyCalendar || monthlyCalendar.length === 0)" class="p-8 text-center">
         <p class="text-[#656A72] dark:text-white/55 text-sm">Loading...</p>
       </div>
       <div v-else>
@@ -352,9 +354,11 @@
       :total="pager.state.total"
       :page="pager.state.page"
       :page-size="pager.state.size"
+      :sort="{ key: sortBy, dir: sortDir }"
       :empty-text="hasActiveFilter ? 'No matching shift requests' : 'No shift requests yet'"
       @update:page="pager.state.page = $event"
       @update:page-size="pager.setPageSize($event)"
+      @sort="toggleSort"
     >
       <template #cell-name="{ row }">
         <span class="text-[13px] font-semibold font-mono text-accent dark:text-accent-light">{{ row.name }}</span>
@@ -413,10 +417,10 @@
 <script setup>
 import { notify, ask } from '@/utils/feedback.js'
 import DataTable from '@/components/DataTable.vue'
-import { ref, computed, onMounted, nextTick, watch } from 'vue';
+import { ref, computed, onMounted, onActivated, nextTick, watch } from 'vue';
+import { useQuery, useQueryClient } from '@tanstack/vue-query';
 import { useEmployeeStore } from '@/stores/employee';
 import { useRosterStore } from '@/stores/roster';
-import { useAttendanceStore } from '@/stores/attendance';
 import SearchableDropdown from '@/components/SearchableDropdown.vue';
 import CreateShiftAssignment from '@/views/forms/roster/create_shift_assignment.vue';
 import CreateShiftRequest from '@/views/forms/roster/create_shift_request.vue';
@@ -425,200 +429,11 @@ import SelectField from '../../../components/SelectField.vue'
 import { useServerPager } from '@/composables/useServerPager'
 import { call } from 'frappe-ui'
 
-/* A day with no shifts is "empty" regardless of what the backend calls its
-   status — the old markup treated 'pending' as an orange warning, which is how
-   every Saturday ended up looking like a problem. */
-/* One bar per rostered day. Scheduled is the full bar, worked is the fill, so
-   an under-run reads as a gap rather than as a second number to compare. */
-const chartDays = computed(() =>
-	(rosterStore.weeklySchedule || [])
-		.filter((d) => !dayIsEmpty(d))
-		.map((d) => ({
-			date: d.date,
-			day_short: d.day_short,
-			is_today: d.is_today,
-			scheduled: Number(d.scheduled_hours ?? 0),
-			actual: Number(d.actual_hours ?? 0),
-		}))
-);
-
-const scheduledTotal = computed(() =>
-	chartDays.value.reduce((sum, d) => sum + d.scheduled, 0)
-);
-
-const chartMax = computed(() =>
-	Math.max(1, ...chartDays.value.map((d) => Math.max(d.scheduled, d.actual)))
-);
-
-function barHeight(hours) {
-	return `${Math.max(6, (Number(hours || 0) / chartMax.value) * 100)}%`;
-}
-
-/* DEMO BUILD: there is no roster-report endpoint. Emits the week as CSV from
-   what is already on screen so the button does something honest; devs should
-   point this at the real export. */
-function downloadRosterReport() {
-	const rows = [['Date', 'Day', 'Scheduled hours', 'Worked hours']];
-	for (const d of chartDays.value) rows.push([d.date, d.day_short, d.scheduled, d.actual]);
-	const csv = rows.map((r) => r.join(',')).join('\n');
-	const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-	const a = document.createElement('a');
-	a.href = url;
-	a.download = `roster-${chartDays.value[0]?.date || 'week'}.csv`;
-	a.click();
-	URL.revokeObjectURL(url);
-}
-
-const completedShifts = computed(() => {
-	const today = new Date();
-	today.setHours(0, 0, 0, 0);
-	return (rosterStore.weeklySchedule || []).filter((d) => {
-		if (dayIsEmpty(d)) return false;
-		return new Date(d.date + 'T00:00:00') < today;
-	}).length;
-});
-const completedPercent = computed(() => {
-	const total = (rosterStore.weeklySchedule || []).filter((d) => !dayIsEmpty(d)).length;
-	return total ? Math.round((completedShifts.value / total) * 100) : 0;
-});
-
-function dayIsEmpty(day) {
-	const list = day?.shifts || (day?.shift ? [day.shift] : [])
-	return list.filter(Boolean).length === 0
-}
-
-function isShiftYetToAssign(sh) {
-	if (!sh) return true;
-	const name = String(sh.shift_name || sh.name || '').trim().toLowerCase();
-	return (
-		name === 'yet to assign' ||
-		name === 'pending' ||
-		(!sh.start_time && !sh.end_time && !sh.shift_type && !sh.shift_assignment)
-	);
-}
-
-function isYetToAssign(day) {
-	if (!day) return false;
-	if (day.status === 'holiday' || day.status === 'on_leave') return false;
-	if (day.status === 'pending') return true;
-	const list = day.shifts || (day.shift ? [day.shift] : []);
-	if (list.length === 0) return true;
-	return list.some((s) => isShiftYetToAssign(s));
-}
-
-function canAddOrRequestForDay(day) {
-	if (!day) return false;
-	return isYetToAssign(day) || dayIsEmpty(day) || day.status === 'holiday' || allowMultipleShifts.value;
-}
-
-function isWeekend(day) {
-	if (!day?.date) return false
-	const d = new Date(day.date + 'T00:00:00').getDay()
-	return d === 0 || d === 6
-}
-
-/* Where the day stands, which is the thing the reference's cards lead with. */
-function dayState(day) {
-	if (day?.is_today) {
-		return { label: 'Active shift', icon: 'radio_button_checked', tone: 'text-accent dark:text-accent-light' }
-	}
-	const today = new Date()
-	today.setHours(0, 0, 0, 0)
-	const d = new Date(day.date + 'T00:00:00')
-	if (d < today) {
-		return { label: 'Completed', icon: 'check_circle', tone: 'text-green-700 dark:text-green-400' }
-	}
-	return { label: 'Ready to start', icon: 'schedule', tone: 'text-[#5C6169] dark:text-white/60' }
-}
-
-const employeeStore = useEmployeeStore();
-const rosterStore = useRosterStore();
-const attendanceStore = useAttendanceStore();
-const scrollContainer = ref(null);
-const quickAssignData = ref({});
-
-// Permissions
-const canAddRoster = ref(false);
-const canSubmitShiftAssignment = ref(false);
-const allowMultipleShifts = ref(false);
-const isShiftApprover = ref(false);
-const canAssignShift = computed(() => Boolean(canSubmitShiftAssignment.value || canAddRoster.value));
-const requestInitialDate = ref('');
-
-// View state
-const viewMode = ref('weekly');
-const weekStart = ref(new Date());
-const monthStart = ref(new Date());
-const today = new Date().toISOString().split('T')[0];
-const selectedEmployee = ref('');
-
-// Filters
-const filterEmployee = ref('');
-const filterStatus = ref('');
-
-// Approve/reject state
-const updatingStatusId = ref(null);
-const targetStatus = ref(null);
-
-// Drag-to-scroll
-const isMouseDown = ref(false);
-let startX = 0;
-let scrollLeft = 0;
-
-// Server-side pagination for shift requests
-async function fetchShiftRequestsPage(page, pageSize) {
-  const res = await call('arijentek_core.api.roster.get_shift_requests_list', {
-    page,
-    page_size: pageSize,
-    status: filterStatus.value || undefined,
-    employee: filterEmployee.value || undefined,
-  });
-  return { rows: res.data || [], total: Number(res.total) || 0 };
-}
-
-const pager = useServerPager((page, size) => fetchShiftRequestsPage(page, size), { size: 10 });
-const hasActiveFilter = computed(() => Boolean(filterEmployee.value || filterStatus.value));
-
-const listColumns = [
-  { key: 'name', label: 'Reference' },
-  { key: 'employeeName', label: 'Employee' },
-  { key: 'shift', label: 'Shift request' },
-  { key: 'status', label: 'Status' },
-];
-
-function actionsForRow(row) {
-  const canEditDelete = row.status === 'Draft' && (row.employee === employeeStore.employee?.name || row.can_approve);
-  return [
-    { label: 'Approve', icon: 'check', show: row.status === 'Draft' && row.can_approve, disabled: updatingStatusId.value === row.name, onClick: () => handleApproveReject(row.name, 'Approved') },
-    { label: 'Reject', icon: 'close', show: row.status === 'Draft' && row.can_approve, disabled: updatingStatusId.value === row.name, onClick: () => handleApproveReject(row.name, 'Rejected') },
-    { label: 'Edit', icon: 'edit', show: canEditDelete, onClick: () => handleEdit(row.name) },
-    { label: 'Delete', icon: 'delete', danger: true, show: canEditDelete, disabled: rosterStore.cancelingId === row.name, onClick: () => handleDelete(row.name) },
-  ];
-}
-
-watch([filterEmployee, filterStatus], () => {
-  if (pager.state.page !== 1) pager.state.page = 1;
-  else pager.fetchPage();
-});
-
-// Calendar
-const calendarWeeks = computed(() => {
-  const days = rosterStore.monthlyCalendar;
-  if (!days.length) return [];
-  const weeks = [];
-  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
-  return weeks;
-});
-
-const rangeDisplay = computed(() => {
-  const opts = { month: 'short', day: 'numeric' };
-  if (viewMode.value === 'weekly') {
-    const start = weekStart.value;
-    const end = new Date(start);
-    end.setDate(end.getDate() + 6);
-    return `${start.toLocaleDateString('en-US', opts)} – ${end.toLocaleDateString('en-US', opts)}, ${end.getFullYear()}`;
-  }
-  return monthStart.value.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+const props = defineProps({
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 function getWeekStart(date) {
@@ -640,17 +455,305 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-async function loadWeek() {
-  const empId = selectedEmployee.value || employeeStore.employee?.name;
-  if (!empId) return;
-  await rosterStore.fetchWeekly(empId, toStr(weekStart.value));
+const employeeStore = useEmployeeStore();
+const rosterStore = useRosterStore();
+const queryClient = useQueryClient();
+
+const scrollContainer = ref(null);
+const quickAssignData = ref({});
+
+// Permissions
+const canAddRoster = ref(false);
+const canSubmitShiftAssignment = ref(false);
+const allowMultipleShifts = ref(false);
+const isShiftApprover = ref(false);
+const canAssignShift = computed(() => Boolean(canSubmitShiftAssignment.value || canAddRoster.value));
+const requestInitialDate = ref('');
+
+// View state
+const viewMode = ref('weekly');
+const weekStart = ref(getWeekStart(new Date()));
+const monthStart = ref(new Date());
+const today = new Date().toISOString().split('T')[0];
+const selectedEmployee = ref('');
+const targetEmpId = computed(() => selectedEmployee.value || employeeStore.employee?.name || '');
+const currentWeekStartStr = computed(() => toStr(weekStart.value));
+const currentMonthYear = computed(() => monthStart.value.getFullYear());
+const currentMonthNum = computed(() => monthStart.value.getMonth() + 1);
+
+// TanStack Queries
+const weeklyQuery = useQuery({
+  queryKey: computed(() => ['roster-weekly', targetEmpId.value, currentWeekStartStr.value]),
+  queryFn: async () => {
+    if (!targetEmpId.value) return { schedule: [], summary: null, notes: [] };
+    const res = await call('arijentek_core.api.roster.get_weekly_roster', {
+      employee_id: targetEmpId.value,
+      start_date: currentWeekStartStr.value,
+    });
+    return res || { schedule: [], summary: null, notes: [] };
+  },
+  enabled: computed(() => Boolean(targetEmpId.value)),
+  placeholderData: (previousData) => previousData,
+  staleTime: 1000 * 60 * 5,
+});
+
+const monthlyQuery = useQuery({
+  queryKey: computed(() => ['roster-monthly', targetEmpId.value, currentMonthYear.value, currentMonthNum.value]),
+  queryFn: async () => {
+    if (!targetEmpId.value) return { calendar: [], summary: null };
+    const res = await call('arijentek_core.api.roster.get_monthly_roster', {
+      employee_id: targetEmpId.value,
+      year: currentMonthYear.value,
+      month: currentMonthNum.value,
+    });
+    return res || { calendar: [], summary: null };
+  },
+  enabled: computed(() => Boolean(targetEmpId.value)),
+  placeholderData: (previousData) => previousData,
+  staleTime: 1000 * 60 * 5,
+});
+
+const weeklySchedule = computed(() => weeklyQuery.data.value?.schedule || []);
+const weeklySummary = computed(() => weeklyQuery.data.value?.summary || null);
+
+const monthlyCalendar = computed(() => monthlyQuery.data.value?.calendar || []);
+const monthlySummary = computed(() => monthlyQuery.data.value?.summary || null);
+
+watch(weeklyQuery.data, (data) => {
+  if (data) {
+    rosterStore.weeklySchedule = data.schedule || [];
+    rosterStore.weeklySummary = data.summary || null;
+    rosterStore.weeklyNotes = data.notes || [];
+  }
+}, { immediate: true });
+
+watch(monthlyQuery.data, (data) => {
+  if (data) {
+    rosterStore.monthlyCalendar = data.calendar || [];
+    rosterStore.monthlySummary = data.summary || null;
+  }
+}, { immediate: true });
+
+// Working stats for cards
+const workingDays = computed(() =>
+  viewMode.value === 'weekly'
+    ? (weeklySummary.value?.total_working_days ?? 0)
+    : (monthlySummary.value?.total_working_days ?? 0)
+);
+
+const hoursWorked = computed(() =>
+  Number(viewMode.value === 'weekly'
+    ? (weeklySummary.value?.total_hours ?? 0)
+    : (monthlySummary.value?.total_hours ?? 0))
+);
+
+const targetHours = computed(() =>
+  Number(viewMode.value === 'weekly'
+    ? (weeklySummary.value?.target_hours ?? 0)
+    : (monthlySummary.value?.target_hours ?? 0))
+);
+
+const remainingHours = computed(() =>
+  Math.max(0, Number((targetHours.value - hoursWorked.value).toFixed(1)))
+);
+
+const isLoading = computed(() => {
+  if (viewMode.value === 'weekly') {
+    return weeklyQuery.isLoading.value && weeklySchedule.value.length === 0;
+  }
+  return monthlyQuery.isLoading.value && monthlyCalendar.value.length === 0;
+});
+
+function dayIsEmpty(day) {
+  const list = day?.shifts || (day?.shift ? [day.shift] : []);
+  return list.filter(Boolean).length === 0;
 }
 
-async function loadMonth() {
-  const empId = selectedEmployee.value || employeeStore.employee?.name;
-  if (!empId) return;
-  await rosterStore.fetchMonthly(empId, monthStart.value.getFullYear(), monthStart.value.getMonth() + 1);
+function isShiftYetToAssign(sh) {
+  if (!sh) return true;
+  const name = String(sh.shift_name || sh.name || '').trim().toLowerCase();
+  return (
+    name === 'yet to assign' ||
+    name === 'pending' ||
+    (!sh.start_time && !sh.end_time && !sh.shift_type && !sh.shift_assignment)
+  );
 }
+
+function isYetToAssign(day) {
+  if (!day) return false;
+  if (day.status === 'holiday' || day.status === 'on_leave') return false;
+  if (day.status === 'pending') return true;
+  const list = day.shifts || (day.shift ? [day.shift] : []);
+  if (list.length === 0) return true;
+  return list.some((s) => isShiftYetToAssign(s));
+}
+
+function canAddOrRequestForDay(day) {
+  if (!day) return false;
+  return isYetToAssign(day) || dayIsEmpty(day) || day.status === 'holiday' || allowMultipleShifts.value;
+}
+
+function isWeekend(day) {
+  if (!day?.date) return false;
+  const d = new Date(day.date + 'T00:00:00').getDay();
+  return d === 0 || d === 6;
+}
+
+function dayState(day) {
+  if (day?.is_today) {
+    return { label: 'Active shift', icon: 'radio_button_checked', tone: 'text-accent dark:text-accent-light' };
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(day.date + 'T00:00:00');
+  if (d < today) {
+    return { label: 'Completed', icon: 'check_circle', tone: 'text-green-700 dark:text-green-400' };
+  }
+  return { label: 'Ready to start', icon: 'schedule', tone: 'text-[#5C6169] dark:text-white/60' };
+}
+
+const chartDays = computed(() =>
+  (weeklySchedule.value || [])
+    .filter((d) => !dayIsEmpty(d))
+    .map((d) => ({
+      date: d.date,
+      day_short: d.day_short,
+      is_today: d.is_today,
+      scheduled: Number(d.scheduled_hours ?? 0),
+      actual: Number(d.actual_hours ?? 0),
+    }))
+);
+
+const scheduledTotal = computed(() =>
+  chartDays.value.reduce((sum, d) => sum + d.scheduled, 0)
+);
+
+const chartMax = computed(() =>
+  Math.max(1, ...chartDays.value.map((d) => Math.max(d.scheduled, d.actual)))
+);
+
+function barHeight(hours) {
+  return `${Math.max(6, (Number(hours || 0) / chartMax.value) * 100)}%`;
+}
+
+function downloadRosterReport() {
+  const rows = [['Date', 'Day', 'Scheduled hours', 'Worked hours']];
+  for (const d of chartDays.value) rows.push([d.date, d.day_short, d.scheduled, d.actual]);
+  const csv = rows.map((r) => r.join(',')).join('\n');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `roster-${chartDays.value[0]?.date || 'week'}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+const completedShifts = computed(() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const list = viewMode.value === 'monthly' ? monthlyCalendar.value : weeklySchedule.value;
+  return (list || []).filter((d) => {
+    if (dayIsEmpty(d)) return false;
+    return new Date(d.date + 'T00:00:00') < today;
+  }).length;
+});
+
+const completedPercent = computed(() => {
+  const list = viewMode.value === 'monthly' ? monthlyCalendar.value : weeklySchedule.value;
+  const total = (list || []).filter((d) => !dayIsEmpty(d)).length;
+  return total ? Math.round((completedShifts.value / total) * 100) : 0;
+});
+
+// Filters
+const filterEmployee = ref('');
+const filterStatus = ref('');
+
+// Approve/reject state
+const updatingStatusId = ref(null);
+const targetStatus = ref(null);
+
+// Drag-to-scroll
+const isMouseDown = ref(false);
+let startX = 0;
+let scrollLeft = 0;
+
+// Server-side pagination for shift requests
+async function fetchShiftRequestsPage(page, pageSize) {
+  const res = await call('arijentek_core.api.roster.get_shift_requests_list', {
+    page,
+    page_size: pageSize,
+    status: filterStatus.value || undefined,
+    employee: filterEmployee.value || undefined,
+    order_by: orderParam.value,
+  });
+  return { rows: res.data || [], total: Number(res.total) || 0 };
+}
+
+const pager = useServerPager((page, size) => fetchShiftRequestsPage(page, size), { size: 10 });
+const hasActiveFilter = computed(() => Boolean(filterEmployee.value || filterStatus.value));
+
+/* Sort state: date desc (newest requested dates first) is the default reading
+   order; Reference and Shift request headers toggle it server-side (the
+   composite shift column sorts on from_date). */
+const sortBy = ref('shift'); // 'shift' | 'name'
+const sortDir = ref('desc'); // 'asc' | 'desc'
+const orderParam = computed(() => `${sortBy.value === 'shift' ? 'from_date' : 'name'} ${sortDir.value}`);
+
+function toggleSort(col) {
+  if (sortBy.value === col) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortBy.value = col;
+    sortDir.value = 'asc';
+  }
+  if (pager.state.page !== 1) {
+    pager.state.page = 1;
+  } else {
+    pager.fetchPage();
+  }
+}
+
+const listColumns = [
+  { key: 'name', label: 'Reference', sortable: true },
+  { key: 'employeeName', label: 'Employee' },
+  { key: 'shift', label: 'Shift request', sortable: true },
+  { key: 'status', label: 'Status' },
+];
+
+function actionsForRow(row) {
+  const canEditDelete = row.status === 'Draft' && (row.employee === employeeStore.employee?.name || row.can_approve);
+  return [
+    { label: 'Approve', icon: 'check', show: row.status === 'Draft' && row.can_approve, disabled: updatingStatusId.value === row.name, onClick: () => handleApproveReject(row.name, 'Approved') },
+    { label: 'Reject', icon: 'close', show: row.status === 'Draft' && row.can_approve, disabled: updatingStatusId.value === row.name, onClick: () => handleApproveReject(row.name, 'Rejected') },
+    { label: 'Edit', icon: 'edit', show: canEditDelete, onClick: () => handleEdit(row.name) },
+    { label: 'Delete', icon: 'delete', danger: true, show: canEditDelete, disabled: rosterStore.cancelingId === row.name, onClick: () => handleDelete(row.name) },
+  ];
+}
+
+watch([filterEmployee, filterStatus], () => {
+  if (pager.state.page !== 1) pager.state.page = 1;
+  else pager.fetchPage();
+});
+
+// Calendar
+const calendarWeeks = computed(() => {
+  const days = monthlyCalendar.value;
+  if (!days || !days.length) return [];
+  const weeks = [];
+  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+  return weeks;
+});
+
+const rangeDisplay = computed(() => {
+  const opts = { month: 'short', day: 'numeric' };
+  if (viewMode.value === 'weekly') {
+    const start = weekStart.value;
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    return `${start.toLocaleDateString('en-US', opts)} – ${end.toLocaleDateString('en-US', opts)}, ${end.getFullYear()}`;
+  }
+  return monthStart.value.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+});
 
 async function snapToToday() {
   await nextTick();
@@ -659,44 +762,44 @@ async function snapToToday() {
   if (todayEl) todayEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 }
 
-async function goToPrev() {
+function goToPrev() {
   if (viewMode.value === 'weekly') {
     const d = new Date(weekStart.value); d.setDate(d.getDate() - 7); weekStart.value = d;
-    await loadWeek(); snapToToday();
+    snapToToday();
   } else {
     const d = new Date(monthStart.value); d.setMonth(d.getMonth() - 1); monthStart.value = d;
-    await loadMonth();
   }
 }
 
-async function goToNext() {
+function goToNext() {
   if (viewMode.value === 'weekly') {
     const d = new Date(weekStart.value); d.setDate(d.getDate() + 7); weekStart.value = d;
-    await loadWeek(); snapToToday();
+    snapToToday();
   } else {
     const d = new Date(monthStart.value); d.setMonth(d.getMonth() + 1); monthStart.value = d;
-    await loadMonth();
   }
 }
 
-async function goToToday() {
+function goToToday() {
   if (viewMode.value === 'weekly') {
-    weekStart.value = getWeekStart(new Date()); await loadWeek(); snapToToday();
+    weekStart.value = getWeekStart(new Date());
+    snapToToday();
   } else {
-    monthStart.value = new Date(); await loadMonth(); await snapToToday();
+    monthStart.value = new Date();
+    snapToToday();
   }
 }
 
-watch(viewMode, (newMode) => {
-  const empId = selectedEmployee.value || employeeStore.employee?.name;
-  if (newMode === 'monthly' && empId) { monthStart.value = new Date(); loadMonth(); snapToToday(); }
-});
+async function loadWeek() {
+  await weeklyQuery.refetch();
+}
 
-watch(selectedEmployee, async (newEmp) => {
-  if (newEmp) {
-    await attendanceStore.init(newEmp);
-    if (viewMode.value === 'weekly') await loadWeek(); else await loadMonth();
-  }
+async function loadMonth() {
+  await monthlyQuery.refetch();
+}
+
+watch(viewMode, () => {
+  snapToToday();
 });
 
 // Drag-to-scroll handlers
@@ -716,7 +819,12 @@ function handleMouseMove(e) {
 }
 
 function handleEdit(name) { openRequestModal(name); }
-async function handleDelete(name) { await rosterStore.handleCancelRequest(name); await pager.fetchPage(); }
+async function handleDelete(name) {
+  await rosterStore.handleCancelRequest(name);
+  await queryClient.invalidateQueries({ queryKey: ['roster-weekly'] });
+  await queryClient.invalidateQueries({ queryKey: ['roster-monthly'] });
+  await pager.fetchPage();
+}
 
 async function handleApproveReject(id, status) {
   const action = status === 'Approved' ? 'approve' : 'reject';
@@ -725,7 +833,8 @@ async function handleApproveReject(id, status) {
   updatingStatusId.value = id; targetStatus.value = status;
   try {
     await rosterStore.updateRequestStatus(id, status);
-    if (status === 'Approved') await loadWeek();
+    await queryClient.invalidateQueries({ queryKey: ['roster-weekly'] });
+    await queryClient.invalidateQueries({ queryKey: ['roster-monthly'] });
     await pager.fetchPage();
   } catch (err) {
     notify(getErrorMessage(err, 'Failed to update status'));
@@ -748,7 +857,8 @@ function handleAddShiftClick(date) {
 }
 
 async function handleRequestSuccess() {
-  if (viewMode.value === 'weekly') await loadWeek(); else await loadMonth();
+  await queryClient.invalidateQueries({ queryKey: ['roster-weekly'] });
+  await queryClient.invalidateQueries({ queryKey: ['roster-monthly'] });
   await pager.fetchPage();
 }
 
@@ -778,25 +888,48 @@ function openAddRosterForDate(date) {
 }
 
 async function handleAssignmentSuccess() {
-  if (viewMode.value === 'weekly') await loadWeek(); else await loadMonth();
+  await queryClient.invalidateQueries({ queryKey: ['roster-weekly'] });
+  await queryClient.invalidateQueries({ queryKey: ['roster-monthly'] });
 }
 
 onMounted(async () => {
   await employeeStore.init();
-  weekStart.value = getWeekStart(new Date());
-  monthStart.value = new Date();
-
-  try { canAddRoster.value = await rosterStore.checkCanAddRoster(); } catch { canAddRoster.value = false; }
-  try { canSubmitShiftAssignment.value = await rosterStore.checkCanSubmitShiftAssignment(); } catch { canSubmitShiftAssignment.value = false; }
-  try { isShiftApprover.value = await rosterStore.checkIsShiftApprover(); if (isShiftApprover.value) await rosterStore.fetchAddRosterEmployees(); } catch { isShiftApprover.value = false; }
-  try { allowMultipleShifts.value = await rosterStore.checkAllowMultipleShifts(); } catch { allowMultipleShifts.value = false; }
-
-  if (employeeStore.employee?.name) selectedEmployee.value = employeeStore.employee.name;
-  if (selectedEmployee.value) {
-    await attendanceStore.init(selectedEmployee.value);
-    await loadWeek();
+  if (employeeStore.employee?.name && !selectedEmployee.value) {
+    selectedEmployee.value = employeeStore.employee.name;
   }
-  await pager.fetchPage();
+
+  // The shift requests table must render every time to ensure updated data
+  pager.fetchPage();
+
+  // Permission checks in parallel
+  rosterStore.checkCanAddRoster()
+    .then((val) => { canAddRoster.value = Boolean(val); })
+    .catch(() => { canAddRoster.value = false; });
+
+  rosterStore.checkCanSubmitShiftAssignment()
+    .then((val) => { canSubmitShiftAssignment.value = Boolean(val); })
+    .catch(() => { canSubmitShiftAssignment.value = false; });
+
+  rosterStore.checkIsShiftApprover()
+    .then(async (val) => {
+      isShiftApprover.value = Boolean(val);
+      if (val) await rosterStore.fetchAddRosterEmployees();
+    })
+    .catch(() => { isShiftApprover.value = false; });
+
+  rosterStore.checkAllowMultipleShifts()
+    .then((val) => { allowMultipleShifts.value = Boolean(val); })
+    .catch(() => { allowMultipleShifts.value = false; });
+});
+
+onActivated(() => {
+  pager.fetchPage();
+});
+
+watch(() => props.isActive, (active) => {
+  if (active) {
+    pager.fetchPage();
+  }
 });
 </script>
 

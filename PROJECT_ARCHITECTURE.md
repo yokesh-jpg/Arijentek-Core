@@ -517,7 +517,7 @@ arijentek_core/                          # Root of the Frappe app
 |--------|---------|
 | `init()` | Fetch CSRF token + session info; set state or fallback to cookie |
 | `login(usr, pwd)` | POST to `arijentek_core.api.v1.auth.login`; update state on success |
-| `logout()` | POST to `/api/method/logout`; reset; redirect to `/employee-portal#/login` |
+| `logout()` | POST to `/api/method/logout`; reset; redirect to `/employee-portal/login` |
 
 ---
 

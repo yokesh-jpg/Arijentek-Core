@@ -351,6 +351,7 @@ def get_leave_applications_for_all(
 	search_text: str | None = None,
 	page: int = 1,
 	page_size: int = 0,
+	order_by: str = "from_date desc",
 ) -> dict | list[dict]:
 	"""Return all leave applications for employees the current user can access.
 
@@ -423,6 +424,18 @@ def get_leave_applications_for_all(
 
 	where_clause = " AND ".join(where_conditions)
 
+	# Sort: order_by is client input going into raw SQL, so only whitelisted
+	# column/direction pairs are honoured; anything else falls back to the
+	# default (newest leave periods first).
+	sort_field, sort_dir = "from_date", "desc"
+	if order_by:
+		_parts = str(order_by).strip().lower().split()
+		if _parts and _parts[0] in ("from_date", "name"):
+			sort_field = _parts[0]
+		if len(_parts) > 1 and _parts[1] in ("asc", "desc"):
+			sort_dir = _parts[1]
+	order_clause = f"ORDER BY la.{sort_field} {sort_dir.upper()}, la.creation DESC"
+
 	total = 0
 	if page_size > 0:
 		count_query = f"SELECT COUNT(*) FROM `tabLeave Application` la WHERE {where_clause}"
@@ -442,7 +455,7 @@ def get_leave_applications_for_all(
 			la.total_leave_days, la.leave_balance, la.leave_approver, la.creation
 		FROM `tabLeave Application` la
 		WHERE {where_clause}
-		ORDER BY la.from_date DESC, la.creation DESC
+		{order_clause}
 		{limit_clause}
 		""",
 		tuple(query_params),
@@ -581,7 +594,7 @@ def _handle_exception(e):
 
 @frappe.whitelist()
 def get_compensatory_leave_requests(
-	name=None, employee=None, month_year=None, start_date=None, end_date=None, search_text: str | None = None, page: int = 1, page_size: int = 0
+	name=None, employee=None, month_year=None, start_date=None, end_date=None, search_text: str | None = None, page: int = 1, page_size: int = 0, order_by: str = "work_from_date desc"
 ):
 	"""Return compensatory leave requests.
 
@@ -621,6 +634,18 @@ def get_compensatory_leave_requests(
 	limit_start = (max(1, page) - 1) * page_size if page_size > 0 else 0
 	limit_page_length = page_size if page_size > 0 else 0
 
+	# Sort: order_by is client input, so only whitelisted column/direction
+	# pairs are honoured; anything else falls back to the default (days
+	# worked latest first).
+	sort_field, sort_dir = "work_from_date", "desc"
+	if order_by:
+		_parts = str(order_by).strip().lower().split()
+		if _parts and _parts[0] in ("work_from_date", "name"):
+			sort_field = _parts[0]
+		if len(_parts) > 1 and _parts[1] in ("asc", "desc"):
+			sort_dir = _parts[1]
+	order_by_clause = f"{sort_field} {sort_dir}, creation desc"
+
 	requests = frappe.get_all(
 		"Zevar Compensatory Leave Request",
 		filters=filters,
@@ -640,7 +665,7 @@ def get_compensatory_leave_requests(
 			"status",
 			"creation",
 		],
-		order_by="creation desc",
+		order_by=order_by_clause,
 		limit_start=limit_start,
 		limit_page_length=limit_page_length,
 	)
@@ -1815,7 +1840,7 @@ def get_leave_periods(name: str | None = None, search_text: str | None = None, p
 
 
 @frappe.whitelist()
-def get_leave_allocations(name: str | None = None, search_text: str | None = None, employee: str | None = None, page: int = 1, page_size: int = 0):
+def get_leave_allocations(name: str | None = None, search_text: str | None = None, employee: str | None = None, page: int = 1, page_size: int = 0, order_by: str = "from_date desc"):
 	"""
 	If 'name' is provided, fetch a single Leave Allocation document as a dict.
 	Otherwise, return a list of Leave Allocation records, optionally filtered by 'search_text' and 'employee'.
@@ -1836,11 +1861,23 @@ def get_leave_allocations(name: str | None = None, search_text: str | None = Non
 	limit_start = (max(1, page) - 1) * page_size if page_size > 0 else 0
 	limit_page_length = page_size if page_size > 0 else 0
 
+	# Sort: order_by is client input, so only whitelisted column/direction
+	# pairs are honoured; anything else falls back to the default (period
+	# starting latest first).
+	sort_field, sort_dir = "from_date", "desc"
+	if order_by:
+		_parts = str(order_by).strip().lower().split()
+		if _parts and _parts[0] in ("from_date", "name"):
+			sort_field = _parts[0]
+		if len(_parts) > 1 and _parts[1] in ("asc", "desc"):
+			sort_dir = _parts[1]
+	order_by_clause = f"{sort_field} {sort_dir}, creation desc"
+
 	allocations = frappe.get_all(
 		"Leave Allocation",
 		filters=filters,
 		fields=["*"],
-		order_by="creation desc",
+		order_by=order_by_clause,
 		limit_start=limit_start,
 		limit_page_length=limit_page_length,
 	)
@@ -2486,7 +2523,7 @@ def can_delete_holiday_list_assignment():
 
 
 @frappe.whitelist()
-def get_holiday_list(name: str | None = None, search_text: str | None = None, page: int = 0, page_size: int = 0):
+def get_holiday_list(name: str | None = None, search_text: str | None = None, page: int = 0, page_size: int = 0, order_by: str = "from_date desc"):
 	"""
 	If 'name' is provided, fetch a single Holiday List document as a dict.
 	Otherwise, return a list of Holiday List records, optionally filtered by 'search_text'.
@@ -2507,11 +2544,23 @@ def get_holiday_list(name: str | None = None, search_text: str | None = None, pa
 	if search_text:
 		filters["holiday_list_name"] = ["like", f"%{search_text}%"]
 
+	# Sort: order_by is client input, so only whitelisted column/direction
+	# pairs are honoured; anything else falls back to the default (the list
+	# whose period starts latest first).
+	sort_field, sort_dir = "from_date", "desc"
+	if order_by:
+		_parts = str(order_by).strip().lower().split()
+		if _parts and _parts[0] in ("from_date", "holiday_list_name"):
+			sort_field = _parts[0]
+		if len(_parts) > 1 and _parts[1] in ("asc", "desc"):
+			sort_dir = _parts[1]
+	order_by_clause = f"{sort_field} {sort_dir}, creation desc"
+
 	holiday_lists = frappe.get_all(
 		"Holiday List",
 		filters=filters,
 		fields=["*"],
-		order_by="creation desc",
+		order_by=order_by_clause,
 		limit_page_length=page_size if page_size > 0 else 0,
 		limit_start=(max(1, page) - 1) * page_size if page_size > 0 else 0,
 	)
