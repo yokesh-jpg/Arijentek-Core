@@ -85,26 +85,41 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { createResource } from 'frappe-ui'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { call } from 'frappe-ui'
 import { notify } from '@/utils/feedback.js'
 import { getErrorMessage } from '@/utils'
 
+defineOptions({ name: 'SettingsView' })
+
 const router = useRouter()
+const queryClient = useQueryClient()
 
 const timesheetWithClockin = ref(false)
 const markPresentOnClockOut = ref(false)
 const disableAutoAttendance = ref(false)
-const initialLoading = ref(true)
+
 const loadingTimesheet = ref(false)
 const loadingMarkPresent = ref(false)
 const loadingDisableAutoAttendance = ref(false)
 
-const getSettingsResource = createResource({
-	url: 'arijentek_core.api.hr_settings.get_hr_settings',
-	auto: false,
-	onSuccess(data) {
+const settingsQuery = useQuery({
+	queryKey: ['hr-settings'],
+	queryFn: async () => {
+		const res = await call('arijentek_core.api.hr_settings.get_hr_settings')
+		return res || {}
+	},
+	placeholderData: (previousData) => previousData,
+	staleTime: 1000 * 60 * 5,
+})
+
+const initialLoading = computed(() => settingsQuery.isLoading.value && !settingsQuery.data.value)
+
+watch(
+	() => settingsQuery.data.value,
+	(data) => {
 		if (data) {
 			if (data.timesheet_with_clockin !== undefined) {
 				timesheetWithClockin.value = Boolean(data.timesheet_with_clockin)
@@ -116,31 +131,29 @@ const getSettingsResource = createResource({
 				disableAutoAttendance.value = Boolean(data.disable_auto_attendance)
 			}
 		}
+	},
+	{ immediate: true }
+)
+
+watch(
+	() => settingsQuery.error.value,
+	(err) => {
+		if (err) {
+			console.error('Error fetching settings:', err)
+			notify('You do not have permission to access HR Settings')
+			router.push('/')
+		}
 	}
-})
-
-const updateSettingsResource = createResource({
-	url: 'arijentek_core.api.hr_settings.update_timesheet_automation',
-	auto: false,
-})
-
-const updateMarkPresentResource = createResource({
-	url: 'arijentek_core.api.hr_settings.update_mark_present_on_clock_out',
-	auto: false,
-})
-
-const updateDisableAutoAttendanceResource = createResource({
-	url: 'arijentek_core.api.hr_settings.update_disable_auto_attendance',
-	auto: false,
-})
+)
 
 const toggleTimesheetAutomation = async () => {
 	loadingTimesheet.value = true
 	const newVal = timesheetWithClockin.value
 	try {
-		await updateSettingsResource.submit({
+		await call('arijentek_core.api.hr_settings.update_timesheet_automation', {
 			timesheet_with_clockin: newVal ? 1 : 0
 		})
+		queryClient.setQueryData(['hr-settings'], (old) => old ? { ...old, timesheet_with_clockin: newVal ? 1 : 0 } : old)
 		notify(newVal ? 'Timesheet automation enabled' : 'Timesheet automation disabled')
 	} catch (error) {
 		console.error('Failed to update timesheet settings', error)
@@ -155,9 +168,10 @@ const toggleMarkPresentOnClockOut = async () => {
 	loadingMarkPresent.value = true
 	const newVal = markPresentOnClockOut.value
 	try {
-		await updateMarkPresentResource.submit({
+		await call('arijentek_core.api.hr_settings.update_mark_present_on_clock_out', {
 			mark_present_on_clock_out: newVal ? 1 : 0
 		})
+		queryClient.setQueryData(['hr-settings'], (old) => old ? { ...old, mark_present_on_clock_out: newVal ? 1 : 0 } : old)
 		notify(newVal ? 'Mark present on clock-out enabled' : 'Mark present on clock-out disabled')
 	} catch (error) {
 		console.error('Failed to update mark present settings', error)
@@ -172,9 +186,10 @@ const toggleDisableAutoAttendance = async () => {
 	loadingDisableAutoAttendance.value = true
 	const newVal = disableAutoAttendance.value
 	try {
-		await updateDisableAutoAttendanceResource.submit({
+		await call('arijentek_core.api.hr_settings.update_disable_auto_attendance', {
 			disable_auto_attendance: newVal ? 1 : 0
 		})
+		queryClient.setQueryData(['hr-settings'], (old) => old ? { ...old, disable_auto_attendance: newVal ? 1 : 0 } : old)
 		notify(newVal ? 'Auto attendance disabled' : 'Auto attendance enabled')
 	} catch (error) {
 		console.error('Failed to update auto attendance settings', error)
@@ -184,17 +199,4 @@ const toggleDisableAutoAttendance = async () => {
 		loadingDisableAutoAttendance.value = false
 	}
 }
-
-onMounted(async () => {
-	initialLoading.value = true
-	try {
-		await getSettingsResource.fetch()
-	} catch (error) {
-		console.error('Error fetching settings on mount:', error)
-		notify('You do not have permission to access HR Settings')
-		router.push('/')
-	} finally {
-		initialLoading.value = false
-	}
-})
 </script>

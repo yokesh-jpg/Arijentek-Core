@@ -47,8 +47,10 @@
 			:total="pager.state.total"
 			:page="pager.state.page"
 			:page-size="pager.state.size"
+			:sort="{ key: sortBy, dir: sortDir }"
 			@update:page="pager.state.page = $event"
 			@update:page-size="pager.setPageSize($event)"
+			@sort="toggleSort"
 			:on-row-click="(row) => viewEmployee(row.name)"
 		>
 			<template #cell-employee="{ row }">
@@ -136,7 +138,7 @@ const employmentTypeOptions = computed(() => [
 ])
 
 const columns = [
-	{ key: 'employee', label: 'Employee', className: 'table-td' },
+	{ key: 'employee', label: 'Employee', className: 'table-td', sortable: true },
 	{ key: 'department', label: 'Department', className: 'table-td' },
 	{ key: 'designation', label: 'Designation', className: 'table-td' },
 	{ key: 'cell_number', label: 'Phone', className: 'table-td' }
@@ -232,7 +234,8 @@ async function fetchEmployees(page, size) {
 			department: filters.department || '',
 			designation: filters.designation || '',
 			gender: filters.gender || '',
-			employment_type: filters.employment_type || ''
+			employment_type: filters.employment_type || '',
+			order_by: orderParam.value
 		}
 		const res = await call('arijentek_core.api.teams_permissons.get_employee_list', params)
 		const rows = res?.rows || (Array.isArray(res) ? res : res?.data || [])
@@ -245,6 +248,26 @@ async function fetchEmployees(page, size) {
 }
 
 const pager = useServerPager((page, size) => fetchEmployees(page, size), { size: 10 })
+
+/* Sort state: A→Z by name is the natural order for a staff directory; the
+   Employee header toggles it server-side. */
+const sortBy = ref('employee') // 'employee' -> employee_name
+const sortDir = ref('asc') // 'asc' | 'desc'
+const orderParam = computed(() => `employee_name ${sortDir.value}`)
+
+function toggleSort(col) {
+	if (sortBy.value === col) {
+		sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+	} else {
+		sortBy.value = col
+		sortDir.value = 'asc'
+	}
+	if (pager.state.page !== 1) {
+		pager.state.page = 1
+	} else {
+		pager.fetchPage()
+	}
+}
 
 function triggerFilterRefresh() {
 	if (pager.state.page !== 1) {

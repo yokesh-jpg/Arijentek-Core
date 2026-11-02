@@ -65,7 +65,7 @@
                         <p class="text-xs font-medium text-gray-600 dark:text-white/80">{{ getDayOfWeek(holiday.holiday_date) }}</p>
                       </td>
                       <td class="table-td">
-                        {{ holiday.description }}
+                        {{ formatDescription(holiday.description) }}
                       </td>
                       <td class="!text-center table-td">
                         <span v-if="holiday.is_half_day" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold tag-accent">Half day</span>
@@ -94,7 +94,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { Dialog, call } from 'frappe-ui';
-import { getErrorMessage } from '@/utils.js';
+import { getErrorMessage, stripHtml } from '@/utils.js';
 
 const props = defineProps({
   /* Passed down by the list so the dialog offers the same actions as its row. */
@@ -170,5 +170,9 @@ const getDayOfWeek = (dateStr) => {
   return new Date(dateStr).toLocaleDateString("en-US", {
     weekday: "long"
   });
+};
+
+const formatDescription = (desc) => {
+  return stripHtml(desc) || '—';
 };
 </script>

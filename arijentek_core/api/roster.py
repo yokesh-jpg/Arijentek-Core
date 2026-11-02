@@ -198,7 +198,7 @@ def get_shift_requests(employee_id=None):
 
 
 @frappe.whitelist()
-def get_shift_requests_list(page=1, page_size=10, status=None, employee=None):
+def get_shift_requests_list(page=1, page_size=10, status=None, employee=None, order_by: str = "from_date desc"):
 	"""
 	Return paginated Shift Request documents the current user is permitted to see,
 	ordered by creation desc.
@@ -234,6 +234,18 @@ def get_shift_requests_list(page=1, page_size=10, status=None, employee=None):
 
 	where_clause = " AND ".join(conditions)
 
+	# Sort: order_by is client input going into raw SQL, so only whitelisted
+	# column/direction pairs are honoured; anything else falls back to the
+	# default (newest requested dates first).
+	sort_field, sort_dir = "from_date", "desc"
+	if order_by:
+		_parts = str(order_by).strip().lower().split()
+		if _parts and _parts[0] in ("from_date", "name"):
+			sort_field = _parts[0]
+		if len(_parts) > 1 and _parts[1] in ("asc", "desc"):
+			sort_dir = _parts[1]
+	order_clause = f"ORDER BY {sort_field} {sort_dir.upper()}, creation DESC"
+
 	# Count total matching rows
 	total_row = frappe.db.sql(
 		f"""
@@ -252,7 +264,7 @@ def get_shift_requests_list(page=1, page_size=10, status=None, employee=None):
 			name, employee, shift_type, from_date, to_date, status, approver, docstatus, creation
 		FROM `tabShift Request`
 		WHERE {where_clause}
-		ORDER BY creation DESC
+		{order_clause}
 		LIMIT %s OFFSET %s
 		""",
 		tuple(params + [page_size, (page - 1) * page_size]),
@@ -1618,7 +1630,7 @@ def get_shift_assignments(employee_id=None, month=None, year=None):
 
 
 @frappe.whitelist()
-def get_shift_assignment_list(month=None, year=None, department=None, designation=None, employee=None, page=1, page_size=10):
+def get_shift_assignment_list(month=None, year=None, department=None, designation=None, employee=None, page=1, page_size=10, order_by: str = "start_date desc"):
 	"""
 	Return shift assignments as a flat list for the list view.
 	Fetches actual Shift Assignment Doctype records.
@@ -1694,9 +1706,18 @@ def get_shift_assignment_list(month=None, year=None, department=None, designatio
 		WHERE {base_conditions}
 	""", params, as_dict=True)[0].count
 
-	# Add pagination
+	# Add pagination. Sort first: order_by is client input going into raw
+	# SQL, so only whitelisted column/direction pairs are honoured; anything
+	# else falls back to the default (assignments starting latest first).
 	offset = (int(page) - 1) * int(page_size)
-	query += " ORDER BY sa.start_date DESC LIMIT %(page_size)s OFFSET %(offset)s"
+	sort_field, sort_dir = "start_date", "desc"
+	if order_by:
+		_parts = str(order_by).strip().lower().split()
+		if _parts and _parts[0] in ("start_date", "name"):
+			sort_field = _parts[0]
+		if len(_parts) > 1 and _parts[1] in ("asc", "desc"):
+			sort_dir = _parts[1]
+	query += f" ORDER BY sa.{sort_field} {sort_dir.upper()} LIMIT %(page_size)s OFFSET %(offset)s"
 	params["page_size"] = int(page_size)
 	params["offset"] = offset
 

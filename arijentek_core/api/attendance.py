@@ -791,20 +791,6 @@ def clock_out(latitude: float | None = None, longitude: float | None = None, not
 		return {"success": False, "message": _("No active check-in found. Please check in first.")}
 
 	is_break = notes and "Break" in notes
-
-	# Mis-punch guard: an OUT within a minute of the IN is nearly always a
-	# double-tap (the portal's clock widget confirms under-a-minute check-outs;
-	# the server rejects them outright). Uses the same tz-aware comparison as
-	# _is_recent_duplicate. Break start actions are exempt.
-	if last_log.log_type == "IN" and not is_break:
-		elapsed_since_in = (get_employee_now_datetime(employee_id) - last_log.time).total_seconds()
-		if 0 <= elapsed_since_in < 60:
-			return {
-				"success": False,
-				"message": _("Checked out {0}s after check-in. Mis-punch guard: please wait a minute and try again.").format(
-					int(elapsed_since_in)
-				),
-			}
 	try:
 		checkout = frappe.get_doc(
 			{
@@ -1140,7 +1126,7 @@ def _build_attendance_records(records):
 
 
 @frappe.whitelist()
-def get_attendance_history(employee_id: str | None = None, month=None, year=None, days: int = 30, status: str | None = None, start_date: str | None = None, end_date: str | None = None, override_employee_id: str | None = None, page: int = 1, page_size: int = 0):
+def get_attendance_history(employee_id: str | None = None, month=None, year=None, days: int = 30, status: str | None = None, start_date: str | None = None, end_date: str | None = None, override_employee_id: str | None = None, page: int = 1, page_size: int = 0, order_by: str = "attendance_date desc"):
 	"""
 	Get attendance history for an employee from the Attendance table.
 
@@ -1156,6 +1142,9 @@ def get_attendance_history(employee_id: str | None = None, month=None, year=None
 	        If empty, returns attendance for ALL employees.
 	    page: Page number (1-based; used when page_size > 0).
 	    page_size: Rows per page (0 = no limit / legacy, returns all records).
+	    order_by: Sort as "<field> <asc|desc>"; whitelisted fields are
+	        attendance_date and name. Anything else falls back to the default
+	        (attendance_date desc, name desc within a day).
 
 	Returns:
 	    When page_size == 0 (legacy): Dict with 'records' list
@@ -1218,6 +1207,19 @@ def get_attendance_history(employee_id: str | None = None, month=None, year=None
 
 	where_clause = " AND ".join(filters)
 
+	# Sort: order_by is client input going into raw SQL, so only whitelisted
+	# column/direction pairs are honoured and anything else falls back to the
+	# default. The other sortable column rides along as the tiebreaker.
+	sort_field, sort_dir = "attendance_date", "desc"
+	if order_by:
+		_parts = str(order_by).strip().lower().split()
+		if _parts and _parts[0] in ("attendance_date", "name"):
+			sort_field = _parts[0]
+		if len(_parts) > 1 and _parts[1] in ("asc", "desc"):
+			sort_dir = _parts[1]
+	secondary_field = "name" if sort_field == "attendance_date" else "attendance_date"
+	order_clause = f"ORDER BY {sort_field} {sort_dir.upper()}, {secondary_field} DESC"
+
 	# Server-side paging: page_size > 0. The total and the summary come from
 	# the full filtered set (COUNT and GROUP BY), so they are not affected
 	# by which page is being returned.
@@ -1243,9 +1245,9 @@ def get_attendance_history(employee_id: str | None = None, month=None, year=None
 			SELECT name, attendance_date, status, working_hours, in_time, out_time, employee
 			FROM `tabAttendance`
 			WHERE {}
-			ORDER BY name DESC, attendance_date DESC
+			{}
 			LIMIT %s OFFSET %s
-			""".format(where_clause),
+			""".format(where_clause, order_clause),
 			params + [page_size, offset],
 			as_dict=True,
 		)
@@ -1264,8 +1266,8 @@ def get_attendance_history(employee_id: str | None = None, month=None, year=None
 		SELECT name, attendance_date, status, working_hours, in_time, out_time, employee
 		FROM `tabAttendance`
 		WHERE {}
-		ORDER BY name DESC, attendance_date DESC
-		""".format(where_clause),
+		{}
+		""".format(where_clause, order_clause),
 		params,
 		as_dict=True,
 	)
@@ -2158,6 +2160,7 @@ def get_employee_checkins(
 	end_date: str | None = None,
 	page: int = 1,
 	page_size: int = 0,
+	order_by: str = "time desc",
 ):
 	"""
 	Get all check-in/out logs, optionally filtered by date and employee.
@@ -2218,12 +2221,23 @@ def get_employee_checkins(
 
 		filters["time"] = ["between", [start_date_val, end_date_val]]
 
+	# Sort: order_by is client input, so only whitelisted column/direction
+	# pairs are honoured; anything else falls back to the default.
+	sort_field, sort_dir = "time", "desc"
+	if order_by:
+		_parts = str(order_by).strip().lower().split()
+		if _parts and _parts[0] in ("time", "name"):
+			sort_field = _parts[0]
+		if len(_parts) > 1 and _parts[1] in ("asc", "desc"):
+			sort_dir = _parts[1]
+	order_by_clause = f"{sort_field} {sort_dir}, name desc"
+
 	# Server-side paging: page_size > 0 limits the query; 0 = legacy (all rows).
 	logs = frappe.get_all(
 		"Employee Checkin",
 		filters=filters,
 		fields=["name", "log_type", "time", "device_id", "latitude", "longitude", "shift", "employee"],
-		order_by="name desc",
+		order_by=order_by_clause,
 		limit_page_length=page_size if page_size > 0 else 0,
 		limit_start=(max(1, page) - 1) * page_size if page_size > 0 else 0,
 	)
@@ -2478,7 +2492,7 @@ def validate_attendance_request(doc, method=None):
 
 
 @frappe.whitelist()
-def get_attendance_requests(employee_id=None, status=None, start_date=None, end_date=None, page: int = 1, page_size: int = 0):
+def get_attendance_requests(employee_id=None, status=None, start_date=None, end_date=None, page: int = 1, page_size: int = 0, order_by: str = "from_date desc"):
 	"""
 	Fetch attendance requests based on permissions and filters.
 
@@ -2524,12 +2538,23 @@ def get_attendance_requests(employee_id=None, status=None, start_date=None, end_
 		filters["from_date"] = [">=", start_date]
 		filters["to_date"] = ["<=", end_date]
 
+	# Sort: order_by is client input, so only whitelisted column/direction
+	# pairs are honoured; anything else falls back to the default.
+	sort_field, sort_dir = "from_date", "desc"
+	if order_by:
+		_parts = str(order_by).strip().lower().split()
+		if _parts and _parts[0] in ("from_date", "name"):
+			sort_field = _parts[0]
+		if len(_parts) > 1 and _parts[1] in ("asc", "desc"):
+			sort_dir = _parts[1]
+	order_by_clause = f"{sort_field} {sort_dir}, creation desc"
+
 	# Server-side paging: page_size > 0 limits the query; 0 = legacy (all rows).
 	requests = frappe.get_all(
 		"Attendance Request",
 		filters=filters,
 		fields=["name", "employee", "employee_name", "from_date", "to_date", "reason", "explanation", "docstatus", "owner"],
-		order_by="creation desc",
+		order_by=order_by_clause,
 		limit_page_length=page_size if page_size > 0 else 0,
 		limit_start=(max(1, page) - 1) * page_size if page_size > 0 else 0,
 	)
@@ -3443,7 +3468,7 @@ def can_delete_timesheet():
 
 
 @frappe.whitelist()
-def get_time_sheet_list(search_text=None, employee=None, include_void=False, page=1, page_size=0):
+def get_time_sheet_list(search_text=None, employee=None, include_void=False, page=1, page_size=0, order_by: str = "start_date desc"):
 	"""
 	Fetch a list of Timesheets.
 	Supports searching by Timesheet ID (name), filtering by employee,
@@ -3468,11 +3493,22 @@ def get_time_sheet_list(search_text=None, employee=None, include_void=False, pag
 			return []
 		filters["employee"] = current_employee
 
+	# Sort: order_by is client input, so only whitelisted column/direction
+	# pairs are honoured; anything else falls back to the default.
+	sort_field, sort_dir = "start_date", "desc"
+	if order_by:
+		_parts = str(order_by).strip().lower().split()
+		if _parts and _parts[0] in ("start_date", "name"):
+			sort_field = _parts[0]
+		if len(_parts) > 1 and _parts[1] in ("asc", "desc"):
+			sort_dir = _parts[1]
+	order_by_clause = f"{sort_field} {sort_dir}, creation desc"
+
 	timesheets = frappe.get_list(
 		"Timesheet",
 		filters=filters,
 		fields=["name", "employee", "employee_name", "status", "start_date", "end_date", "total_hours"],
-		order_by="creation desc",
+		order_by=order_by_clause,
 		limit_page_length=page_size if page_size > 0 else 0,
 		limit_start=(max(1, page) - 1) * page_size if page_size > 0 else 0
 	)

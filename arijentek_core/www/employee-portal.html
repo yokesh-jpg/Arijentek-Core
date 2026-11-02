@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Zevar — Staff Hub</title>
+    <title>Arijentek - EP</title>
     <link rel="icon" href="/assets/arijentek_core/images/employee_portal_logo.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,6 +15,15 @@
     <script>
         window.csrf_token = "{{ frappe.session.csrf_token }}";
         window.frappe_user = "{{ frappe.session.user }}";
+
+        // Seamless migration: automatically convert any legacy # URL to clean / URL
+        if (window.location.hash) {
+            var raw = window.location.hash.replace(/^#\/?/, '');
+            if (raw) {
+                var clean = '/' + raw.replace(/^\/+/, '');
+                window.history.replaceState(null, '', '/employee-portal' + clean);
+            }
+        }
     </script>
     {% set employee_portal_js = get_frontend_asset('employee-portal', 'index.js') %}
     {% set employee_portal_css = get_frontend_asset('employee-portal', 'index.css') %}

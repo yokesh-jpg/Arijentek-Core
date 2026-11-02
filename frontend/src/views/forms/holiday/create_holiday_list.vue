@@ -115,7 +115,7 @@
             <div v-else class="sm:hidden space-y-2">
               <div
                 v-for="(h, i) in holidays"
-                :key="'m' + i"
+                :key="h._uid || ('m' + i)"
                 class="rounded-[14px] border border-black/[0.07] dark:border-white/[0.09] bg-black/[0.02] dark:bg-white/[0.03] p-3 space-y-2"
               >
                 <div class="flex items-center justify-between gap-2">
@@ -124,7 +124,11 @@
                     <span class="material-symbols-outlined !text-[18px]">delete</span>
                   </button>
                 </div>
-                <DateField v-model="h.date" aria-label="Holiday date" />
+                <DateField
+                  :ref="(el) => { if (i === 0) firstMobileDateFieldRef = el; }"
+                  v-model="h.date"
+                  aria-label="Holiday date"
+                />
                 <input v-model="h.description" type="text" class="field-input !h-10" placeholder="What it is" aria-label="Holiday description" />
                 <label class="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" v-model="h.is_half_day" class="w-4 h-4 rounded accent-accent" />
@@ -145,10 +149,14 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(h, i) in holidays" :key="i" class="table-row">
+                  <tr v-for="(h, i) in holidays" :key="h._uid || i" class="table-row">
                     <td class="table-td text-right tabular-nums !px-2 text-[#656A72] dark:text-white/55">{{ i + 1 }}</td>
                     <td class="table-td !py-2">
-                      <DateField v-model="h.date" aria-label="Holiday date" />
+                      <DateField
+                        :ref="(el) => { if (i === 0) firstDateFieldRef = el; }"
+                        v-model="h.date"
+                        aria-label="Holiday date"
+                      />
                     </td>
                     <td class="table-td !py-2">
                       <input v-model="h.description" type="text" class="field-input !h-9 !text-[13px]" placeholder="What it is" aria-label="Holiday description" />
@@ -186,7 +194,7 @@
 import { ask } from '@/utils/feedback.js'
 import { ref, computed, watch, nextTick } from 'vue';
 import { Dialog, call } from 'frappe-ui';
-import { getErrorMessage } from '../../../utils.js';
+import { getErrorMessage, stripHtml } from '../../../utils.js';
 import { useLeaveStore } from '../../../stores/leave.js';
 import SearchableDropdown from '../../../components/SearchableDropdown.vue';
 import DateField from '../../../components/DateField.vue'
@@ -245,6 +253,17 @@ const errors = ref({});
 const submitError = ref('');
 const submitting = ref(false);
 
+let holidayUid = 0;
+const createHolidayRow = (data = {}) => ({
+  _uid: `hl_${Date.now()}_${++holidayUid}`,
+  date: data.date || '',
+  description: data.description || '',
+  is_half_day: data.is_half_day || false
+});
+
+const firstDateFieldRef = ref(null);
+const firstMobileDateFieldRef = ref(null);
+
 watch(show, async (newVal) => {
   if (newVal) {
     formData.value = getInitialFormData();
@@ -292,9 +311,9 @@ const fetchDetails = async () => {
       formData.value.from_date = data.from_date || '';
       formData.value.to_date = data.to_date || '';
       if (data.holidays) {
-        holidays.value = data.holidays.map(h => ({
+        holidays.value = data.holidays.map(h => createHolidayRow({
           date: h.holiday_date || h.date,
-          description: h.description,
+          description: stripHtml(h.description),
           is_half_day: h.is_half_day || false
         }));
       }
@@ -324,8 +343,18 @@ watch(() => formData.value.from_date, (newFrom, oldFrom) => {
   }
 });
 
-const addSingleHoliday = () => {
-  holidays.value.push({ date: '', description: '', is_half_day: false });
+const addSingleHoliday = async () => {
+  holidays.value.unshift(createHolidayRow());
+  await nextTick();
+  if (firstDateFieldRef.value?.focus) {
+    firstDateFieldRef.value.focus();
+  } else if (firstMobileDateFieldRef.value?.focus) {
+    firstMobileDateFieldRef.value.focus();
+  } else if (firstDateFieldRef.value?.$el) {
+    firstDateFieldRef.value.$el.querySelector('input')?.focus();
+  } else if (firstMobileDateFieldRef.value?.$el) {
+    firstMobileDateFieldRef.value.$el.querySelector('input')?.focus();
+  }
 };
 
 const removeHoliday = (index) => {
@@ -353,11 +382,11 @@ const addWeeklyHolidays = () => {
       const dateStr = ymd(current);
       const existing = holidays.value.some(h => h.date === dateStr);
       if (!existing) {
-        holidays.value.push({
+        holidays.value.push(createHolidayRow({
           date: dateStr,
           description: `${weeklyDay.value} - Weekly Holiday`,
           is_half_day: weeklyIsHalfDay.value
-        });
+        }));
       }
     }
     current.setDate(current.getDate() + 1);
@@ -385,7 +414,7 @@ const fetchRegionalHolidays = async () => {
       data.forEach(h => {
         const existing = holidays.value.some(eh => eh.date === h.date);
         if (!existing) {
-          newHolidays.push(h);
+          newHolidays.push(createHolidayRow(h));
         }
       });
       holidays.value = [...holidays.value, ...newHolidays].sort((a, b) => a.date.localeCompare(b.date));
@@ -445,7 +474,11 @@ const handleSave = async () => {
         holiday_list_data: {
           name: props.editId || '',
           ...formData.value,
-          holidays: holidays.value
+          holidays: holidays.value.map(h => ({
+            date: h.date,
+            description: h.description,
+            is_half_day: !!h.is_half_day
+          }))
         }
       });
       emit('save', formData.value);

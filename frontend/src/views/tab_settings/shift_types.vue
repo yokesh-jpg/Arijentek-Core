@@ -146,7 +146,9 @@ async function fetchShiftTypes(page, pageSize) {
 	return { rows: data || [], total: Number(total) || 0 };
 }
 
-const pager = useServerPager((page, size) => fetchShiftTypes(page, size), { size: 10 });
+// Fetched only when canView is granted, so opt out of the initial loading
+// state (a denied user must not see a spinner that never clears).
+const pager = useServerPager((page, size) => fetchShiftTypes(page, size), { size: 10, initialLoading: false });
 
 /* Column declarations for the list view (order = render order; `className`
    carries the responsive hiding). */

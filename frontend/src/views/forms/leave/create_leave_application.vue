@@ -67,7 +67,7 @@
 							<SearchableDropdown
 								v-model="formData.leave_type"
 								:options="availableLeaveTypes"
-								labelKey="name"
+								labelKey="label"
 								valueKey="name"
 								placeholder="Select leave type"
 							/>
@@ -421,12 +421,29 @@ function fetchApprovalDetails(empId) {
 // Available leave types from store
 const availableLeaveTypes = computed(() => {
 	const types = leaveStore.leaveTypes || [];
+	const balances = leaveStore.leaveBalances || [];
+
+	const withAvailable = types.map((type) => {
+		const typeName = type.name || type.leave_type_name;
+		const balance = balances.find(b => b.leave_type === typeName);
+		const days = balance ? balance.balance_leaves : null;
+		const suffix = days === null || days === undefined
+			? ''
+			: ` - ${days} Day${days !== 1 ? 's' : ''}`;
+		return { ...type, label: `${typeName}${suffix}` };
+	});
+
 	// Ensure current selection is in the list
 	const currentSelected = formData.value.leave_type;
-	if (currentSelected && !types.some(t => t.name === currentSelected)) {
-		return [...types, { name: currentSelected, leave_type_name: currentSelected }];
+	if (currentSelected && !withAvailable.some(t => t.name === currentSelected)) {
+		const balance = balances.find(b => b.leave_type === currentSelected);
+		const days = balance ? balance.balance_leaves : null;
+		const suffix = days === null || days === undefined
+			? ''
+			: ` - ${days} Day${days !== 1 ? 's' : ''}`;
+		return [...withAvailable, { name: currentSelected, leave_type_name: currentSelected, label: `${currentSelected}${suffix}` }];
 	}
-	return types;
+	return withAvailable;
 });
 
 // Balance label for selected leave type

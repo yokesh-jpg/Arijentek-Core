@@ -41,9 +41,11 @@
 			:total="pager.state.total"
 			:page="pager.state.page"
 			:page-size="pager.state.size"
+			:sort="{ key: sortBy, dir: sortDir }"
 			:on-row-click="(req) => showCompViewModal(req.name)"
 			@update:page="pager.state.page = $event"
 			@update:page-size="pager.setPageSize($event)"
+			@sort="toggleSort"
 		>
 			<template #cell-name="{ row }">
 				<div class="max-w-[180px] sm:max-w-none">
@@ -167,9 +169,9 @@ const compEmployeeOptions = computed(() => {
 })
 
 const listColumns = [
-	{ key: 'name', label: 'Request', className: 'table-td-strong max-w-[180px] sm:max-w-none' },
+	{ key: 'name', label: 'Request', className: 'table-td-strong max-w-[180px] sm:max-w-none', sortable: true },
 	{ key: 'employee', label: 'Employee', className: 'table-td hidden sm:table-cell' },
-	{ key: 'worked', label: 'Worked', className: 'table-td tabular-nums whitespace-nowrap hidden sm:table-cell' },
+	{ key: 'worked', label: 'Worked', className: 'table-td tabular-nums whitespace-nowrap hidden sm:table-cell', sortable: true },
 	{ key: 'status', label: 'Status', className: 'table-td' },
 ]
 
@@ -236,6 +238,7 @@ async function fetchCompRequests(page, size) {
 		if (searchQuery.value) {
 			params.search_text = searchQuery.value
 		}
+		params.order_by = orderParam.value
 		const res = await call('arijentek_core.api.leave.get_compensatory_leave_requests', params)
 		const rows = res?.rows || (Array.isArray(res) ? res : res?.data || [])
 		const total = res?.total != null ? Number(res.total) : rows.length
@@ -247,6 +250,26 @@ async function fetchCompRequests(page, size) {
 }
 
 const pager = useServerPager((page, size) => fetchCompRequests(page, size), { size: 10 })
+
+/* Sort state: days worked latest first is the default reading order; Request
+   and Worked headers toggle it server-side (sorted on work_from_date). */
+const sortBy = ref('worked') // 'worked' | 'name'
+const sortDir = ref('desc') // 'asc' | 'desc'
+const orderParam = computed(() => `${sortBy.value === 'worked' ? 'work_from_date' : 'name'} ${sortDir.value}`)
+
+function toggleSort(col) {
+	if (sortBy.value === col) {
+		sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+	} else {
+		sortBy.value = col
+		sortDir.value = 'asc'
+	}
+	if (pager.state.page !== 1) {
+		pager.state.page = 1
+	} else {
+		pager.fetchPage()
+	}
+}
 
 function triggerFilterRefresh() {
 	if (pager.state.page !== 1) {

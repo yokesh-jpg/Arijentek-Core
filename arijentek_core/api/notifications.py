@@ -756,7 +756,7 @@ def notify_approvers(doc, title, body, module="hrm", route=""):
 	if not users_to_notify:
 		return
 
-	base_url = "/employee-portal#" if module == "hrm" else "/pos#"
+	base_url = "/employee-portal" if module == "hrm" else "/pos"
 	url = f"{base_url}{route}"
 
 	for user in users_to_notify:
@@ -772,7 +772,7 @@ def notify_owner(doc, title, body, module="hrm", route=""):
 	if not doc.owner:
 		return
 
-	base_url = "/employee-portal#" if module == "hrm" else "/pos#"
+	base_url = "/employee-portal" if module == "hrm" else "/pos"
 	url = f"{base_url}{route}"
 
 	try:

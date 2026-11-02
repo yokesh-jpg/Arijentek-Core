@@ -24,7 +24,13 @@
 		</div>
 
 		<!-- ===== Balances ===== -->
-		<div v-if="balanceEmployee && displayedLeaveBalances?.length" class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+		<div v-if="balanceEmployee && isBalancesLoading && !displayedLeaveBalances.length" class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+			<div v-for="i in 5" :key="i" class="glass-card !p-4 animate-pulse">
+				<div class="h-3 w-20 rounded bg-black/[0.07] dark:bg-white/10 mb-3"></div>
+				<div class="h-6 w-16 rounded bg-black/[0.07] dark:bg-white/10"></div>
+			</div>
+		</div>
+		<div v-else-if="balanceEmployee && displayedLeaveBalances?.length" class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
 			<div v-for="lb in displayedLeaveBalances" :key="lb.leave_type" class="glass-card !p-4">
 				<p class="text-xs text-[#5C6169] dark:text-white/60 truncate" :title="lb.leave_type">{{ lb.leave_type }}</p>
 				<div class="flex items-baseline gap-1.5 mt-1">
@@ -69,9 +75,11 @@
 			:total="pager.state.total"
 			:page="pager.state.page"
 			:page-size="pager.state.size"
+			:sort="{ key: sortBy, dir: sortDir }"
 			:on-row-click="(app) => showViewModal(app.name)"
 			@update:page="pager.state.page = $event"
 			@update:page-size="pager.setPageSize($event)"
+			@sort="toggleSort"
 		>
 			<template #cell-name="{ row }">
 				<div class="max-w-[180px] sm:max-w-none">
@@ -164,17 +172,27 @@ import ViewLeaveApplication from '../../page_views/leave/view_leave_application.
 import { useLeaveStore } from '@/stores/leave'
 import { useEmployeeStore } from '@/stores/employee'
 import { notify, ask } from '@/utils/feedback.js'
-import { ref, computed, watch, onMounted } from 'vue'
-import { call, createResource } from 'frappe-ui'
+import { ref, computed, watch, onMounted, onActivated } from 'vue'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { call } from 'frappe-ui'
+
+const props = defineProps({
+	isActive: {
+		type: Boolean,
+		default: true,
+	},
+})
 
 const leaveStore = useLeaveStore()
 const employeeStore = useEmployeeStore()
+const queryClient = useQueryClient()
 
 const currEmployee = computed(() => employeeStore.employee?.name || '')
 const currEmployeeName = computed(() => employeeStore.employee?.employee_name || employeeStore.employee?.name || '')
 const canSubmitLeaveApplication = computed(() => leaveStore.canSubmit)
 
 const balanceEmployee = ref('')
+const targetBalanceEmployee = computed(() => balanceEmployee.value || '')
 const searchQuery = ref('')
 const statusFilter = ref('')
 
@@ -197,13 +215,43 @@ const leaveToDelete = ref(null)
 const deleteError = ref('')
 
 const listColumns = [
-	{ key: 'name', label: 'Application', className: 'table-td-strong max-w-[180px] sm:max-w-none' },
+	{ key: 'name', label: 'Application', className: 'table-td-strong max-w-[180px] sm:max-w-none', sortable: true },
 	{ key: 'employee', label: 'Employee', className: 'table-td hidden sm:table-cell' },
-	{ key: 'period', label: 'Period', className: 'table-td tabular-nums whitespace-nowrap hidden sm:table-cell' },
+	{ key: 'period', label: 'Period', className: 'table-td tabular-nums whitespace-nowrap hidden sm:table-cell', sortable: true },
 	{ key: 'leave_type', label: 'Type', className: 'table-td hidden md:table-cell whitespace-nowrap' },
 	{ key: 'total_leave_days', label: 'Days', className: 'table-td tabular-nums whitespace-nowrap hidden sm:table-cell' },
 	{ key: 'status', label: 'Status', className: 'table-td w-[78px] sm:w-auto' },
 ]
+
+// TanStack Query for Leave Balances
+const balancesQuery = useQuery({
+	queryKey: computed(() => ['leave-balances', targetBalanceEmployee.value]),
+	queryFn: async () => {
+		if (!targetBalanceEmployee.value) return []
+		const res = await call('arijentek_core.api.leave.get_employee_leave_balance_map', {
+			employee: targetBalanceEmployee.value,
+		})
+		if (res) {
+			return Object.entries(res).map(([key, value]) => ({
+				leave_type: key,
+				...value,
+			}))
+		}
+		return []
+	},
+	enabled: computed(() => Boolean(targetBalanceEmployee.value)),
+	placeholderData: (previousData) => previousData,
+	staleTime: 1000 * 60 * 5,
+})
+
+const isBalancesLoading = computed(() => balancesQuery.isLoading.value)
+
+// Keep leaveStore.leaveBalances synchronized
+watch(balancesQuery.data, (data) => {
+	if (data) {
+		leaveStore.leaveBalances = data
+	}
+}, { immediate: true })
 
 const availableEmployeeList = computed(() => {
 	if (leaveStore.isApprover && leaveStore.approvedEmployeeList?.length > 0) {
@@ -233,6 +281,9 @@ function balancePct(lb) {
 }
 
 const displayedLeaveBalances = computed(() => {
+	if (balancesQuery.data.value && balancesQuery.data.value.length > 0) {
+		return balancesQuery.data.value
+	}
 	if (leaveStore.leaveBalances && leaveStore.leaveBalances.length > 0) {
 		return leaveStore.leaveBalances
 	}
@@ -295,6 +346,7 @@ async function fetchApplications(page, size) {
 		if (searchQuery.value) {
 			params.search_text = searchQuery.value
 		}
+		params.order_by = orderParam.value
 		const res = await call('arijentek_core.api.leave.get_leave_applications_for_all', params)
 		const rows = res?.rows || (Array.isArray(res) ? res : res?.data || [])
 		const total = res?.total != null ? Number(res.total) : rows.length
@@ -306,6 +358,26 @@ async function fetchApplications(page, size) {
 }
 
 const pager = useServerPager((page, size) => fetchApplications(page, size), { size: 10 })
+
+/* Sort state: date desc (newest leave periods first) is the default reading
+   order; Application and Period headers toggle it server-side. */
+const sortBy = ref('period') // 'period' | 'name'
+const sortDir = ref('desc') // 'asc' | 'desc'
+const orderParam = computed(() => `${sortBy.value === 'period' ? 'from_date' : 'name'} ${sortDir.value}`)
+
+function toggleSort(col) {
+	if (sortBy.value === col) {
+		sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+	} else {
+		sortBy.value = col
+		sortDir.value = 'asc'
+	}
+	if (pager.state.page !== 1) {
+		pager.state.page = 1
+	} else {
+		pager.fetchPage()
+	}
+}
 
 function triggerFilterRefresh() {
 	if (pager.state.page !== 1) {
@@ -332,20 +404,16 @@ function showViewModal(name) {
 	showDetailModal.value = true
 }
 
-function onLeaveSaved() {
+async function onLeaveSaved() {
 	showCreateForm.value = false
 	editApplicationName.value = ''
-	pager.fetchPage()
-	if (balanceEmployee.value) {
-		leaveStore.fetchLeaveBalances(balanceEmployee.value)
-	}
+	await queryClient.invalidateQueries({ queryKey: ['leave-balances'] })
+	await pager.fetchPage()
 }
 
-function onStatusUpdated() {
-	pager.fetchPage()
-	if (balanceEmployee.value) {
-		leaveStore.fetchLeaveBalances(balanceEmployee.value)
-	}
+async function onStatusUpdated() {
+	await queryClient.invalidateQueries({ queryKey: ['leave-balances'] })
+	await pager.fetchPage()
 }
 
 async function handleUpdateStatus(name, status) {
@@ -355,10 +423,8 @@ async function handleUpdateStatus(name, status) {
 		if (res && res.success === false) {
 			notify(res.error || 'Failed to update status')
 		} else {
+			await queryClient.invalidateQueries({ queryKey: ['leave-balances'] })
 			await pager.fetchPage()
-			if (balanceEmployee.value) {
-				leaveStore.fetchLeaveBalances(balanceEmployee.value)
-			}
 			if (showDetailModal.value && viewApplicationName.value === name) {
 				showDetailModal.value = false
 			}
@@ -375,10 +441,8 @@ async function handleDelete(name) {
 		if (res && res.success === false) {
 			notify(res.error || 'Failed to delete')
 		} else {
+			await queryClient.invalidateQueries({ queryKey: ['leave-balances'] })
 			await pager.fetchPage()
-			if (balanceEmployee.value) {
-				leaveStore.fetchLeaveBalances(balanceEmployee.value)
-			}
 		}
 	} catch (e) {
 		notify(e.message || 'Failed to delete leave application')
@@ -402,10 +466,8 @@ async function handleApprovedRejectedDelete() {
 		if (res && res.success) {
 			showDeletePopup.value = false
 			leaveToDelete.value = null
+			await queryClient.invalidateQueries({ queryKey: ['leave-balances'] })
 			await pager.fetchPage()
-			if (balanceEmployee.value) {
-				leaveStore.fetchLeaveBalances(balanceEmployee.value)
-			}
 		} else {
 			deleteError.value = res?.error || 'Failed to delete'
 		}
@@ -428,12 +490,7 @@ watch(statusFilter, () => {
 	triggerFilterRefresh()
 })
 
-watch(balanceEmployee, (newVal) => {
-	if (newVal) {
-		leaveStore.fetchLeaveBalances(newVal)
-	} else {
-		leaveStore.leaveBalances = []
-	}
+watch(balanceEmployee, () => {
 	triggerFilterRefresh()
 })
 
@@ -443,23 +500,34 @@ onMounted(async () => {
 	if (employeeId && !balanceEmployee.value) {
 		balanceEmployee.value = employeeId
 	}
-	await leaveStore.checkApproverStatus()
-	if (leaveStore.isApprover || leaveStore.canSubmit) {
-		await leaveStore.fetchEmployeeList()
-	}
-	if (employeeId && leaveStore.isApprover) {
-		const hasSelf = leaveStore.approvedEmployeeList.some((e) => e.name === employeeId)
-		if (!hasSelf) {
-			leaveStore.approvedEmployeeList.unshift({
-				name: employeeId,
-				employee_name: currEmployeeName.value,
-			})
-		}
-	}
-	if (balanceEmployee.value) {
-		leaveStore.fetchLeaveBalances(balanceEmployee.value)
-	}
+	// Always fetch fresh leave applications on mount
 	pager.fetchPage()
+
+	// Load approver status and employee list in parallel
+	leaveStore.checkApproverStatus().then(async () => {
+		if (leaveStore.isApprover || leaveStore.canSubmit) {
+			await leaveStore.fetchEmployeeList()
+		}
+		if (employeeId && leaveStore.isApprover) {
+			const hasSelf = leaveStore.approvedEmployeeList.some((e) => e.name === employeeId)
+			if (!hasSelf) {
+				leaveStore.approvedEmployeeList.unshift({
+					name: employeeId,
+					employee_name: currEmployeeName.value,
+				})
+			}
+		}
+	}).catch(() => {})
+})
+
+onActivated(() => {
+	pager.fetchPage()
+})
+
+watch(() => props.isActive, (active) => {
+	if (active) {
+		pager.fetchPage()
+	}
 })
 
 function getStatusStyle(status) {

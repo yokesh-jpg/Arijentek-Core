@@ -72,9 +72,11 @@
 			:total="pager.state.total"
 			:page="pager.state.page"
 			:page-size="pager.state.size"
+			:sort="{ key: sortBy, dir: sortDir }"
 			:on-row-click="(slip) => openViewSalarySlip(slip.name)"
 			@update:page="pager.state.page = $event"
 			@update:page-size="pager.setPageSize($event)"
+			@sort="toggleSort"
 		>
 			<template #cell-name="{ row }">
 				<div class="max-w-[180px] sm:max-w-none">
@@ -125,7 +127,7 @@
 <script setup>
 import DataTable from '@/components/DataTable.vue'
 import { useServerPager } from '@/composables/useServerPager.js'
-import { ref, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { call } from 'frappe-ui';
 import { storeToRefs } from 'pinia';
 import { usePayrollStore } from '../../../stores/payroll';
@@ -171,10 +173,32 @@ const selectedEditData = ref(null);
 const showViewModal = ref(false);
 const selectedViewName = ref('');
 
+/* Sort state: newest slips first is the default reading order; Slip (ID)
+   and Period headers toggle it server-side. */
+const sortBy = ref('period'); // 'period' | 'name'
+const sortDir = ref('desc'); // 'asc' | 'desc'
+const orderParam = computed(() => `${sortBy.value === 'period' ? 'start_date' : 'name'} ${sortDir.value}`);
+
+function toggleSort(col) {
+	if (sortBy.value === col) {
+		sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+	} else {
+		sortBy.value = col;
+		sortDir.value = 'asc';
+	}
+	if (pager.state.page !== 1) {
+		pager.state.page = 1;
+	} else {
+		pager.fetchPage();
+	}
+}
+
+/* Column declarations for the list view (order = render order; `className`
+   carries responsive hiding). Slip (ID) and Period (date) are server-side sortable. */
 const listColumns = [
-	{ key: 'name', label: 'Slip', className: 'table-td-strong max-w-[180px] sm:max-w-none' },
+	{ key: 'name', label: 'Slip', className: 'table-td-strong max-w-[180px] sm:max-w-none', sortable: true },
 	{ key: 'employee', label: 'Employee', className: 'table-td hidden sm:table-cell' },
-	{ key: 'period', label: 'Period', className: 'table-td hidden sm:table-cell whitespace-nowrap tabular-nums' },
+	{ key: 'period', label: 'Period', className: 'table-td hidden sm:table-cell whitespace-nowrap tabular-nums', sortable: true },
 	{ key: 'gross_pay', label: 'Gross', align: 'right', className: 'table-td text-right tabular-nums hidden lg:table-cell whitespace-nowrap' },
 	{ key: 'net_pay', label: 'Net pay', align: 'right', className: 'table-td text-right tabular-nums hidden md:table-cell whitespace-nowrap font-medium text-[#17181B] dark:text-white' },
 	{ key: 'status', label: 'Status', className: 'table-td w-[92px] sm:w-auto' },
@@ -219,6 +243,7 @@ async function fetchSalarySlips(page, size) {
 		const params = {
 			page: page || 1,
 			page_size: size || pager.state.size || 10,
+			order_by: orderParam.value,
 		};
 		if (canCreateSalarySlip.value) {
 			if (searchQuery.value) params.id = searchQuery.value;

@@ -49,9 +49,11 @@
 			:total="pager.state.total"
 			:page="pager.state.page"
 			:page-size="pager.state.size"
+			:sort="{ key: sortBy, dir: sortDir }"
 			:on-row-click="(row) => openViewDialog(row.name)"
 			@update:page="pager.state.page = $event"
 			@update:page-size="pager.setPageSize($event)"
+			@sort="toggleSort"
 		>
 			<template #cell-period="{ row }">
 				<span class="block whitespace-normal sm:whitespace-nowrap">{{ formatDate(row.start_date) }} – {{ formatDate(row.end_date) }}</span>
@@ -122,6 +124,7 @@ async function fetchTimesheets(page, size) {
 		search_text: searchText.value || "",
 		employee: selectedEmployee.value || "",
 		include_void: includeVoid.value,
+		order_by: orderParam.value,
 	};
 	try {
 		const res = await call("arijentek_core.api.attendance.get_time_sheet_list", params);
@@ -138,10 +141,30 @@ async function fetchTimesheets(page, size) {
    keeps the previous page visible while the next loads; a stale fetch is dropped. */
 const pager = useServerPager((page, size) => fetchTimesheets(page, size), { size: 10 });
 
+/* Sort state: newest periods first is the default reading order; the Period
+   header toggles it server-side (sorted on start_date). */
+const sortBy = ref('period'); // 'period' -> start_date
+const sortDir = ref('desc'); // 'asc' | 'desc'
+const orderParam = computed(() => `start_date ${sortDir.value}`);
+
+function toggleSort(col) {
+	if (sortBy.value === col) {
+		sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+	} else {
+		sortBy.value = col;
+		sortDir.value = 'asc';
+	}
+	if (pager.state.page !== 1) {
+		pager.state.page = 1;
+	} else {
+		pager.fetchPage();
+	}
+}
+
 /* Column declarations for the list (order = render order; `className`
    carries the responsive hiding). */
 const listColumns = [
-	{ key: "period", label: "Period", className: "table-td-strong" },
+	{ key: "period", label: "Period", className: "table-td-strong", sortable: true },
 	{ key: "employee", label: "Employee", className: "hidden md:table-cell" },
 	{ key: "hours", label: "Hours", className: "tabular-nums whitespace-nowrap hidden sm:table-cell" },
 	{ key: "status", label: "Status" },

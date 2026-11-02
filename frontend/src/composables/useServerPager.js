@@ -11,15 +11,22 @@ import { reactive, watch } from 'vue'
    is being fetched the previous rows stay visible (stale-while-revalidate)
    with `loading` true, so the table does not flash empty on every page
    turn. A stale fetch (one that started on an older page) is dropped when
-   it resolves, so a slow page 1 can never overwrite a fresh page 2. */
-export function useServerPager(fetchFn, { size = 10 } = {}) {
+   it resolves, so a slow page 1 can never overwrite a fresh page 2.
+
+   The state starts in `loading` (unless `initialLoading: false` is
+   passed): a pager is always fetched on mount, so the first paint is a
+   pending fetch and DataTable must not flash its empty state before the
+   first request even starts. Views that fetch conditionally (e.g. only
+   after a permission check passes) opt out so they can't show a spinner
+   that never clears. */
+export function useServerPager(fetchFn, { size = 10, initialLoading = true } = {}) {
 	let seq = 0
 	const state = reactive({
 		page: 1,
 		size,
 		total: 0,
 		rows: [],
-		loading: false,
+		loading: initialLoading,
 	})
 
 	async function fetchPage() {

@@ -23,8 +23,10 @@
 			:total="pager.state.total"
 			:page="pager.state.page"
 			:page-size="pager.state.size"
+			:sort="{ key: sortBy, dir: sortDir }"
 			@update:page="pager.state.page = $event"
 			@update:page-size="pager.setPageSize($event)"
+			@sort="toggleSort"
 		>
 			<template #cell-name="{ row }">
 				<span class="block tabular-nums break-words leading-snug sm:truncate">{{ row.name }}</span>
@@ -113,6 +115,7 @@ async function fetchRequests(page, size) {
 		status: requestsStatus.value || null,
 		start_date: filterFromDate.value || null,
 		end_date: filterToDate.value || null,
+		order_by: orderParam.value,
 	};
 	try {
 		await requestsListResource.fetch(params);
@@ -130,13 +133,33 @@ async function fetchRequests(page, size) {
    keeps the previous page visible while the next loads; a stale fetch is dropped. */
 const pager = useServerPager((page, size) => fetchRequests(page, size), { size: 10 });
 
+/* Sort state: date desc (newest requests first) is the default reading
+   order; Request and Date headers toggle it server-side. */
+const sortBy = ref('date'); // 'date' | 'name'
+const sortDir = ref('desc'); // 'asc' | 'desc'
+const orderParam = computed(() => `${sortBy.value === 'date' ? 'from_date' : 'name'} ${sortDir.value}`);
+
+function toggleSort(col) {
+	if (sortBy.value === col) {
+		sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+	} else {
+		sortBy.value = col;
+		sortDir.value = 'asc';
+	}
+	if (pager.state.page !== 1) {
+		pager.state.page = 1;
+	} else {
+		pager.fetchPage();
+	}
+}
+
 /* Column declarations for the list (order = render order; `className`
    carries the responsive hiding). */
 const listColumns = [
-	{ key: "name", label: "Request", className: "table-td-strong max-w-[180px] sm:max-w-none" },
+	{ key: "name", label: "Request", className: "table-td-strong max-w-[180px] sm:max-w-none", sortable: true },
 	{ key: "employeeName", label: "Employee", className: "hidden sm:table-cell" },
 	{ key: "reason", label: "Reason", className: "hidden md:table-cell max-w-[280px]" },
-	{ key: "date", label: "Date", className: "tabular-nums whitespace-nowrap hidden sm:table-cell" },
+	{ key: "date", label: "Date", className: "tabular-nums whitespace-nowrap hidden sm:table-cell", sortable: true },
 	{ key: "status", label: "Status" },
 ];
 

@@ -26,7 +26,23 @@
 							:class="col.className"
 							:style="col.align ? { textAlign: col.align } : {}"
 						>
-							{{ col.label }}
+							<!-- Sortable header: a real button so it is focusable; the arrow
+							     names the active column and its direction. -->
+							<button
+								v-if="col.sortable"
+								type="button"
+								class="inline-flex items-center gap-0.5 hover:text-accent dark:hover:text-accent-light transition-colors"
+								:aria-label="`Sort by ${col.label}`"
+								@click="emit('sort', col.key)"
+							>
+								{{ col.label }}
+								<span
+									v-if="sort && sort.key === col.key"
+									class="material-symbols-outlined !text-[14px]"
+									aria-hidden="true"
+								>{{ sort.dir === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+							</button>
+							<template v-else>{{ col.label }}</template>
 						</th>
 						<th v-if="hasActions" class="table-th text-right">Actions</th>
 					</tr>
@@ -117,8 +133,11 @@ const props = defineProps({
 	pageSize: { type: [Number, String], default: null },
 	/* Page-size options for the pager. */
 	sizes: { type: Array, default: () => [10, 20, 50] },
+	/* The active sort { key, dir: 'asc' | 'desc' } shown with an arrow on the
+	   matching `sortable` column; clicks come back as the `sort` event. */
+	sort: { type: Object, default: null },
 })
-const emit = defineEmits(['update:page', 'update:page-size'])
+const emit = defineEmits(['update:page', 'update:page-size', 'sort'])
 
 const visibleColumns = computed(() => props.columns.filter((c) => c.hidden !== true))
 

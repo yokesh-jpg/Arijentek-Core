@@ -16,8 +16,17 @@
 
 		<!-- ===== Stats =====
 		     Open and Investigated are the two that need somebody to act, so
-		     they lead; Resolved is the count you check against them. -->
-		<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+		     they lead; Resolved is the count you check against them.
+		     Skeleton until the first fetch lands (the leave-tab pattern) so the
+		     figures never read as zeros while loading; a refetch keeps the old
+		     figures up. -->
+		<div v-if="isStatsLoading" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+			<div v-for="i in 4" :key="i" class="glass-card !p-4 animate-pulse">
+				<div class="h-3 w-20 rounded bg-black/[0.07] dark:bg-white/10 mb-3"></div>
+				<div class="h-6 w-16 rounded bg-black/[0.07] dark:bg-white/10"></div>
+			</div>
+		</div>
+		<div v-else class="grid grid-cols-2 lg:grid-cols-4 gap-3">
 			<div v-for="st in issueStats" :key="st.label" class="glass-card !p-4">
 				<p class="text-xs font-medium text-[#5C6169] dark:text-white/60">{{ st.label }}</p>
 				<p class="text-2xl font-semibold tracking-tight mt-1.5 tabular-nums" :class="st.tone || 'text-[#17181B] dark:text-white'">{{ st.value }}</p>
@@ -85,13 +94,17 @@
 			:total="pager.state.total"
 			:page="pager.state.page"
 			:page-size="pager.state.size"
+			:sort="{ key: sortBy, dir: sortDir }"
 			@update:page="pager.state.page = $event"
 			@update:page-size="pager.setPageSize($event)"
+			@sort="toggleSort"
 		>
+			<template #cell-name="{ row }">
+				<span class="block tabular-nums break-words leading-snug sm:truncate">{{ row.name }}</span>
+			</template>
 			<template #cell-subject="{ row }">
 				<div class="max-w-[320px]">
 					<span class="block truncate font-medium text-[#17181B] dark:text-white">{{ row.subject }}</span>
-					<span class="block text-[12px] font-normal text-[#656A72] dark:text-white/55 tabular-nums">{{ row.name }}</span>
 					<span class="sm:hidden block text-xs font-normal text-[#5C6169] dark:text-white/60 mt-0.5">
 						{{ row.employee_name || row.raised_by || '—' }} · {{ formatDate(row.date) }}
 					</span>
@@ -116,7 +129,7 @@
 			v-model="showCreateModal"
 			:editData="selectedEditData"
 			:targetStatus="selectedTargetStatus"
-			@save="pager.fetchPage"
+			@save="onSaveIssue"
 		/>
 
 		<!-- View Issue Modal -->
@@ -134,7 +147,8 @@
 import DataTable from '@/components/DataTable.vue'
 import { useServerPager } from '@/composables/useServerPager.js'
 import { notify, ask } from '@/utils/feedback.js'
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onActivated, watch } from 'vue';
+import { useQuery, useQueryClient } from '@tanstack/vue-query';
 import { call } from 'frappe-ui';
 import DateRangePicker from '../../../components/DateRangePicker.vue';
 import SearchableDropdown from '../../../components/SearchableDropdown.vue';
@@ -142,9 +156,14 @@ import CreateIssue from '../../forms/issues/create_issue.vue';
 import ViewIssue from '../../page_views/issues/view_issue.vue';
 import { getErrorMessage } from '@/utils';
 
-const issueTypes = ref([]);
-const employees = ref([]);
-const statsData = ref({ total: 0, Open: 0, Investigated: 0, Resolved: 0, Invalid: 0 });
+const props = defineProps({
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
+});
+
+const queryClient = useQueryClient();
 
 const showCreateModal = ref(false);
 const selectedEditData = ref(null);
@@ -166,43 +185,41 @@ const filters = ref({
   grievance_type: ''
 });
 
-const permissions = ref({
+// Permissions and filter dropdown options with TanStack Query
+const { data: initialData } = useQuery({
+  queryKey: ['issues-initial-data'],
+  queryFn: async () => {
+    const [editPerm, deletePerm, createPerm, submitPerm, typeRes, empRes] = await Promise.all([
+      call('arijentek_core.api.issues.can_edit_employee_grievance').catch(() => false),
+      call('arijentek_core.api.issues.can_delete_employee_grievance').catch(() => false),
+      call('arijentek_core.api.issues.can_create_employee_grievance').catch(() => false),
+      call('arijentek_core.api.issues.can_submit_employee_grievance').catch(() => false),
+      call('arijentek_core.api.issues.get_issues_types').catch(() => []),
+      call('arijentek_core.api.issues.get_employees').catch(() => []),
+    ]);
+    return {
+      permissions: {
+        can_edit: !!editPerm,
+        can_delete: !!deletePerm,
+        can_create: !!createPerm,
+        can_submit: !!submitPerm,
+      },
+      issueTypes: typeRes || [],
+      employees: empRes || [],
+    };
+  },
+  staleTime: Infinity,
+});
+
+const permissions = computed(() => initialData.value?.permissions || {
   can_edit: false,
   can_delete: false,
   can_create: false,
-  can_submit: false
+  can_submit: false,
 });
 
-const fetchPermissions = async () => {
-  try {
-    const editPerm = await call('arijentek_core.api.issues.can_edit_employee_grievance');
-    permissions.value.can_edit = !!editPerm;
-    
-    const deletePerm = await call('arijentek_core.api.issues.can_delete_employee_grievance');
-    permissions.value.can_delete = !!deletePerm;
-
-    const createPerm = await call('arijentek_core.api.issues.can_create_employee_grievance');
-    permissions.value.can_create = !!createPerm;
-
-    const submitPerm = await call('arijentek_core.api.issues.can_submit_employee_grievance');
-    permissions.value.can_submit = !!submitPerm;
-  } catch (error) {
-    console.error("Failed to fetch permissions:", error);
-  }
-};
-
-const fetchFilterOptions = async () => {
-  try {
-    const [typeRes, empRes] = await Promise.all([
-      call('arijentek_core.api.issues.get_issues_types'),
-      call('arijentek_core.api.issues.get_employees')
-    ]);
-    issueTypes.value = typeRes || [];
-    employees.value = empRes || [];
-  } catch (error) {
-    console.error("Failed to fetch filter options:", error);
-  }
-};
+const issueTypes = computed(() => initialData.value?.issueTypes || []);
+const employees = computed(() => initialData.value?.employees || []);
 
 const handleDateChange = (val) => {
   if (val && val.fromDate && val.toDate) {
@@ -212,15 +229,77 @@ const handleDateChange = (val) => {
   }
 };
 
+const debouncedSearch = ref('');
 let debounceTimer;
 const debouncedFetch = () => {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
+    debouncedSearch.value = filters.value.search;
     triggerFilterRefresh();
   }, 300);
 };
 
 function triggerFilterRefresh() {
+  if (pager.state.page !== 1) {
+    pager.state.page = 1;
+  } else {
+    pager.fetchPage();
+  }
+}
+
+// Issue Stats with TanStack Query
+const statsQuery = useQuery({
+  queryKey: computed(() => [
+    'issue-stats',
+    debouncedSearch.value,
+    filters.value.status,
+    filters.value.grievance_type,
+    filters.value.employee,
+    filters.value.dateRange ? filters.value.dateRange[0] : null,
+    filters.value.dateRange ? filters.value.dateRange[1] : null,
+  ]),
+  queryFn: async () => {
+    const params = {
+      page: 1,
+      page_size: 10,
+      search_term: debouncedSearch.value || null,
+      status: filters.value.status || null,
+      grievance_type: filters.value.grievance_type || null,
+      employee: filters.value.employee || null,
+    };
+    if (filters.value.dateRange && filters.value.dateRange.length === 2) {
+      params.from_date = filters.value.dateRange[0];
+      params.to_date = filters.value.dateRange[1];
+    }
+    const res = await call('arijentek_core.api.issues.get_issues', params);
+    if (res && res.stats) {
+      return res.stats;
+    }
+    return { total: 0, Open: 0, Investigated: 0, Resolved: 0, Invalid: 0 };
+  },
+  placeholderData: (previousData) => previousData,
+  staleTime: 1000 * 60 * 5,
+});
+
+const statsData = computed(() => statsQuery.data.value || { total: 0, Open: 0, Investigated: 0, Resolved: 0, Invalid: 0 });
+
+/* First load only: isLoading is false during refetches (placeholderData keeps
+   the previous figures), so filters swapping never flash the skeleton. */
+const isStatsLoading = computed(() => statsQuery.isLoading.value);
+
+/* Sort state for the list. Date desc is the natural reading order (newest
+   first); Date and ID headers toggle it server-side. */
+const sortBy = ref('date'); // 'date' | 'name'
+const sortDir = ref('desc'); // 'asc' | 'desc'
+const orderParam = computed(() => `${sortBy.value === 'date' ? 'date' : 'name'} ${sortDir.value}`);
+
+function toggleSort(col) {
+  if (sortBy.value === col) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortBy.value = col;
+    sortDir.value = 'asc';
+  }
   if (pager.state.page !== 1) {
     pager.state.page = 1;
   } else {
@@ -239,6 +318,7 @@ const fetchIssues = async (page, pageSize) => {
       status: filters.value.status || null,
       grievance_type: filters.value.grievance_type || null,
       employee: filters.value.employee || null,
+      order_by: orderParam.value,
     };
     
     if (filters.value.dateRange && filters.value.dateRange.length === 2) {
@@ -248,7 +328,15 @@ const fetchIssues = async (page, pageSize) => {
     
     const res = await call('arijentek_core.api.issues.get_issues', params);
     if (res && res.stats) {
-      statsData.value = res.stats;
+      queryClient.setQueryData([
+        'issue-stats',
+        debouncedSearch.value,
+        filters.value.status,
+        filters.value.grievance_type,
+        filters.value.employee,
+        filters.value.dateRange ? filters.value.dateRange[0] : null,
+        filters.value.dateRange ? filters.value.dateRange[1] : null,
+      ], res.stats);
     }
     const rows = Array.isArray(res) ? res : (res?.data || []);
     const total = Array.isArray(res) ? res.length : Number(res?.total || 0);
@@ -264,12 +352,14 @@ const fetchIssues = async (page, pageSize) => {
 const pager = useServerPager((page, size) => fetchIssues(page, size), { size: 10 });
 
 /* Column declarations for the list view (order = render order; `className`
-   carries responsive hiding). */
+   carries responsive hiding). Date leads for scanning; the doctype name is
+   the row's ID anchor. Date and ID are server-side sortable via the header buttons. */
 const listColumns = [
-  { key: 'subject', label: 'Issue', className: 'table-td-strong' },
+  { key: 'name', label: 'ID', className: 'table-td-strong max-w-[180px] sm:max-w-none whitespace-nowrap', sortable: true },
+  { key: 'subject', label: 'Issue', className: 'table-td-strong max-w-[320px]' },
   { key: 'raised_by', label: 'Raised by', className: 'hidden md:table-cell' },
   { key: 'grievance_type', label: 'Type', className: 'hidden sm:table-cell' },
-  { key: 'date', label: 'Date', className: 'whitespace-nowrap tabular-nums hidden sm:table-cell' },
+  { key: 'date', label: 'Date', className: 'whitespace-nowrap tabular-nums hidden sm:table-cell', sortable: true },
   { key: 'status', label: 'Status' },
 ];
 
@@ -331,11 +421,17 @@ function issueActions(issue) {
   ];
 }
 
+const onSaveIssue = async () => {
+  await queryClient.invalidateQueries({ queryKey: ['issue-stats'] });
+  await pager.fetchPage();
+};
+
 const deleteIssue = async (issue) => {
   if (!await ask(`Are you sure you want to delete issue ${issue.name}?`)) return;
   
   try {
     await call('arijentek_core.api.issues.delete_issues', { name: issue.name });
+    await queryClient.invalidateQueries({ queryKey: ['issue-stats'] });
     await pager.fetchPage();
   } catch (err) {
     console.error(err);
@@ -355,10 +451,18 @@ watch(
   }
 );
 
-onMounted(async () => {
-  await fetchPermissions();
-  await fetchFilterOptions();
-  await pager.fetchPage();
+onMounted(() => {
+  pager.fetchPage();
+});
+
+onActivated(() => {
+  pager.fetchPage();
+});
+
+watch(() => props.isActive, (active) => {
+  if (active) {
+    pager.fetchPage();
+  }
 });
 
 /* ---- presentation helpers -------------------------------------------- */
@@ -379,6 +483,7 @@ const hasFilters = computed(() => {
 
 function clearFilters() {
   filters.value = { search: '', dateRange: null, status: '', employee: '', grievance_type: '' };
+  debouncedSearch.value = '';
   triggerFilterRefresh();
 }
 

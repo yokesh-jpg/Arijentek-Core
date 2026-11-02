@@ -419,7 +419,7 @@ def can_delete_employee_type():
 	return False
 
 @frappe.whitelist()
-def get_employee_list(employee_id="", search_term="", department="", designation="", gender="", employment_type="", page=1, page_size=0):
+def get_employee_list(employee_id="", search_term="", department="", designation="", gender="", employment_type="", page=1, page_size=0, order_by: str = "employee_name asc"):
 	user = frappe.session.user
 	roles = frappe.get_roles(user)
 	is_manager = user == "Administrator" or "HR Manager" in roles or "System Manager" in roles
@@ -461,6 +461,18 @@ def get_employee_list(employee_id="", search_term="", department="", designation
 	page = int(page or 1)
 	page_size = int(page_size or 0)
 
+	# Sort: order_by is client input, so only whitelisted column/direction
+	# pairs are honoured; anything else falls back to the default (staff
+	# listed A→Z by name).
+	sort_field, sort_dir = "employee_name", "asc"
+	if order_by:
+		_parts = str(order_by).strip().lower().split()
+		if _parts and _parts[0] in ("employee_name", "name"):
+			sort_field = _parts[0]
+		if len(_parts) > 1 and _parts[1] in ("asc", "desc"):
+			sort_dir = _parts[1]
+	order_by_clause = f"{sort_field} {sort_dir}"
+
 	if not employee_id and page_size > 0:
 		total = _count_records("Employee", filters=filters, or_filters=or_filters)
 		start = (page - 1) * page_size
@@ -471,7 +483,7 @@ def get_employee_list(employee_id="", search_term="", department="", designation
 			fields=fields,
 			limit_start=start,
 			limit_page_length=page_size,
-			order_by="employee_name asc"
+			order_by=order_by_clause
 		)
 		return {"rows": employees, "total": total}
 
@@ -480,7 +492,7 @@ def get_employee_list(employee_id="", search_term="", department="", designation
 		filters=filters,
 		or_filters=or_filters,
 		fields=fields,
-		order_by="employee_name asc"
+		order_by=order_by_clause
 	)
 
 	if employee_id and employees:
@@ -529,7 +541,7 @@ def get_genders():
 		return ["Male", "Female", "Other"]
 
 @frappe.whitelist()
-def get_users_details(user_id="", search_term="", page=1, page_size=0):
+def get_users_details(user_id="", search_term="", page=1, page_size=0, order_by: str = "full_name asc"):
 	if not can_read_users():
 		return {} if user_id else []
 
@@ -562,6 +574,18 @@ def get_users_details(user_id="", search_term="", page=1, page_size=0):
 	page = int(page or 1)
 	page_size = int(page_size or 0)
 
+	# Sort: order_by is client input, so only whitelisted column/direction
+	# pairs are honoured; anything else falls back to the default (users
+	# listed A→Z by full name).
+	sort_field, sort_dir = "full_name", "asc"
+	if order_by:
+		_parts = str(order_by).strip().lower().split()
+		if _parts and _parts[0] in ("full_name", "name"):
+			sort_field = _parts[0]
+		if len(_parts) > 1 and _parts[1] in ("asc", "desc"):
+			sort_dir = _parts[1]
+	order_by_clause = f"{sort_field} {sort_dir}"
+
 	if not user_id and page_size > 0:
 		total = _count_records("User", filters=filters, or_filters=or_filters)
 		start = (page - 1) * page_size
@@ -572,7 +596,7 @@ def get_users_details(user_id="", search_term="", page=1, page_size=0):
 			fields=fields,
 			limit_start=start,
 			limit_page_length=page_size,
-			order_by="name asc"
+			order_by=order_by_clause
 		)
 		return {"rows": users, "total": total}
 
@@ -581,7 +605,7 @@ def get_users_details(user_id="", search_term="", page=1, page_size=0):
 		filters=filters,
 		or_filters=or_filters,
 		fields=fields,
-		order_by="name asc"
+		order_by=order_by_clause
 	)
 
 	if user_id and users:

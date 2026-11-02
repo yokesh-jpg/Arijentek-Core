@@ -33,9 +33,11 @@
 			:total="pager.state.total"
 			:page="pager.state.page"
 			:page-size="pager.state.size"
+			:sort="{ key: sortBy, dir: sortDir }"
 			:on-row-click="(entry) => openViewPayroll(entry.name)"
 			@update:page="pager.state.page = $event"
 			@update:page-size="pager.setPageSize($event)"
+			@sort="toggleSort"
 		>
 			<template #cell-name="{ row }">
 				<div class="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -89,7 +91,7 @@
 import DataTable from '@/components/DataTable.vue'
 import { useServerPager } from '@/composables/useServerPager.js'
 import { notify, ask } from '@/utils/feedback.js'
-import { ref, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { call } from 'frappe-ui';
 import { storeToRefs } from 'pinia';
 import { usePayrollStore } from '../../../stores/payroll';
@@ -115,9 +117,31 @@ const postingDateEnd = ref('');
 const postingDatePreset = ref('All Time');
 const hourlyPaidFilter = ref(false);
 
+/* Sort state: newest runs first is the default reading order; Run and Period
+   headers toggle it server-side (period sorts by start_date). */
+const sortBy = ref('period'); // 'period' | 'name'
+const sortDir = ref('desc'); // 'asc' | 'desc'
+const orderParam = computed(() => `${sortBy.value === 'period' ? 'start_date' : 'name'} ${sortDir.value}`);
+
+function toggleSort(col) {
+	if (sortBy.value === col) {
+		sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+	} else {
+		sortBy.value = col;
+		sortDir.value = 'asc';
+	}
+	if (pager.state.page !== 1) {
+		pager.state.page = 1;
+	} else {
+		pager.fetchPage();
+	}
+}
+
+/* Column declarations for the list (order = render order; `className`
+   carries the responsive hiding). Run (ID) and Period (date) are server-side sortable. */
 const listColumns = [
-	{ key: 'name', label: 'Run', className: 'table-td-strong max-w-[170px] sm:max-w-none' },
-	{ key: 'period', label: 'Period', className: 'table-td hidden sm:table-cell whitespace-nowrap tabular-nums' },
+	{ key: 'name', label: 'Run', className: 'table-td-strong max-w-[170px] sm:max-w-none', sortable: true },
+	{ key: 'period', label: 'Period', className: 'table-td hidden sm:table-cell whitespace-nowrap tabular-nums', sortable: true },
 	{ key: 'basis', label: 'Basis', className: 'table-td hidden lg:table-cell whitespace-nowrap' },
 	{ key: 'total_net_pay', label: 'Net pay', align: 'right', className: 'table-td text-right tabular-nums hidden md:table-cell whitespace-nowrap' },
 	{ key: 'status', label: 'Status', className: 'table-td w-[92px] sm:w-auto' },
@@ -177,6 +201,7 @@ async function fetchPayrollEntries(page, size) {
 		const params = {
 			page: page || 1,
 			page_size: size || pager.state.size || 10,
+			order_by: orderParam.value,
 		};
 		if (searchQuery.value) {
 			params.id = searchQuery.value;

@@ -39,17 +39,32 @@
 		</TabBar>
 
 		<!-- Tab Content -->
-		<TabRosterDashboard  v-if="activeTab === 'dashboard'" />
-		<TabShiftAssignment  v-if="activeTab === 'assignment'" />
-		<TabShiftLocation    v-if="activeTab === 'shift_location' && canManageShiftLocation" />
-		<TabShiftTypes       v-if="activeTab === 'shift_types'   && canViewShiftType" />
+		<TabRosterDashboard  
+			v-if="visitedTabs.dashboard" 
+			v-show="activeTab === 'dashboard'" 
+			:is-active="activeTab === 'dashboard'"
+		/>
+		<TabShiftAssignment  
+			v-if="visitedTabs.assignment" 
+			v-show="activeTab === 'assignment'" 
+		/>
+		<TabShiftLocation    
+			v-if="visitedTabs.shift_location && canManageShiftLocation" 
+			v-show="activeTab === 'shift_location'" 
+		/>
+		<TabShiftTypes       
+			v-if="visitedTabs.shift_types && canViewShiftType" 
+			v-show="activeTab === 'shift_types'" 
+		/>
 	</div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, reactive, watch, onMounted } from 'vue';
 import { createResource } from 'frappe-ui';
 import { useRosterStore } from '@/stores/roster';
+
+defineOptions({ name: 'RosterView' });
 
 import TabRosterDashboard from './tab_settings/roster/tab_roster_dashboard.vue';
 import TabShiftAssignment from './tab_settings/roster/tab_shift_assignment.vue';
@@ -60,6 +75,19 @@ import TabBar from "@/components/TabBar.vue";
 const rosterStore = useRosterStore();
 
 const activeTab              = ref('dashboard');
+const visitedTabs = reactive({
+	dashboard: activeTab.value === 'dashboard',
+	assignment: activeTab.value === 'assignment',
+	shift_location: activeTab.value === 'shift_location',
+	shift_types: activeTab.value === 'shift_types',
+});
+
+watch(activeTab, (newTab) => {
+	if (newTab && visitedTabs[newTab] !== undefined) {
+		visitedTabs[newTab] = true;
+	}
+});
+
 const canManageShiftLocation = ref(false);
 const canViewShiftType       = ref(false);
 

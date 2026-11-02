@@ -1654,12 +1654,16 @@ def get_payroll_entries(
 	posting_date_end: str | None = None,
 	salary_slip_based_on_timesheet: int | str | None = None,
 	page: int = 1,
-	page_size: int = 0
+	page_size: int = 0,
+	order_by: str = "start_date desc",
 ):
 	"""
 	Returns a single Payroll Entry (as dict) if 'id' matches exactly.
 	Otherwise, returns a filtered list of payroll entries for the UI.
 	Supports server-side pagination when page_size > 0.
+	order_by: Sort as "<field> <asc|desc>"; whitelisted fields are
+	    start_date, posting_date, and name. Anything else falls back to the default
+	    (start_date desc, name desc).
 	"""
 	if not can_read_payroll_entry():
 		if page_size > 0:
@@ -1694,6 +1698,18 @@ def get_payroll_entries(
 		else:
 			filters["salary_slip_based_on_timesheet"] = 1 if salary_slip_based_on_timesheet else 0
 
+	# Sort whitelist: order_by is client input, so only whitelisted columns
+	# and directions are accepted; falls back safely to start_date desc.
+	sort_field, sort_dir = "start_date", "desc"
+	if order_by:
+		_parts = str(order_by).strip().lower().split()
+		if _parts and _parts[0] in ("start_date", "posting_date", "name"):
+			sort_field = _parts[0]
+		if len(_parts) > 1 and _parts[1] in ("asc", "desc"):
+			sort_dir = _parts[1]
+	secondary_field = "name" if sort_field != "name" else "start_date"
+	order_clause = f"{sort_field} {sort_dir}, {secondary_field} desc"
+
 	if page_size > 0:
 		total = frappe.db.count("Payroll Entry", filters=filters)
 		offset = (page - 1) * page_size
@@ -1701,7 +1717,7 @@ def get_payroll_entries(
 			"Payroll Entry",
 			filters=filters,
 			fields=["*"],
-			order_by="creation desc",
+			order_by=order_clause,
 			limit_start=offset,
 			limit_page_length=page_size
 		)
@@ -1716,7 +1732,7 @@ def get_payroll_entries(
 		"Payroll Entry",
 		filters=filters,
 		fields=["*"],
-		order_by="creation desc"
+		order_by=order_clause
 	)
 
 	return entries
@@ -1786,12 +1802,16 @@ def get_salary_Slip(
 	status: str | None = None,
 	payroll_entry: str | None = None,
 	page: int = 1,
-	page_size: int = 0
+	page_size: int = 0,
+	order_by: str = "start_date desc",
 ):
 	"""
 	Returns a single Salary Slip (as dict) if 'id' matches exactly.
 	Otherwise, returns a filtered list of salary slips for the UI.
 	Supports server-side pagination when page_size > 0.
+	order_by: Sort as "<field> <asc|desc>"; whitelisted fields are
+	    start_date, posting_date, end_date, name, and net_pay.
+	    Anything else falls back to the default (start_date desc, name desc).
 	"""
 	if not can_read_salary_slip():
 		if page_size > 0:
@@ -1830,6 +1850,18 @@ def get_salary_Slip(
 	if payroll_entry and payroll_entry not in ["All", ""]:
 		filters["payroll_entry"] = payroll_entry
 
+	# Sort whitelist: order_by is client input, so only whitelisted columns
+	# and directions are accepted; falls back safely to start_date desc.
+	sort_field, sort_dir = "start_date", "desc"
+	if order_by:
+		_parts = str(order_by).strip().lower().split()
+		if _parts and _parts[0] in ("start_date", "posting_date", "end_date", "name", "net_pay"):
+			sort_field = _parts[0]
+		if len(_parts) > 1 and _parts[1] in ("asc", "desc"):
+			sort_dir = _parts[1]
+	secondary_field = "name" if sort_field != "name" else "start_date"
+	order_clause = f"{sort_field} {sort_dir}, {secondary_field} desc"
+
 	if page_size > 0:
 		total = frappe.db.count("Salary Slip", filters=filters)
 		offset = (page - 1) * page_size
@@ -1837,7 +1869,7 @@ def get_salary_Slip(
 			"Salary Slip",
 			filters=filters,
 			fields=["*"],
-			order_by="creation desc",
+			order_by=order_clause,
 			limit_start=offset,
 			limit_page_length=page_size
 		)
@@ -1852,7 +1884,7 @@ def get_salary_Slip(
 		"Salary Slip",
 		filters=filters,
 		fields=["*"],
-		order_by="creation desc"
+		order_by=order_clause
 	)
 
 	return entries
@@ -2299,7 +2331,7 @@ def save_salary_slip(doc):
 			if user_id:
 				title = "Salary Slip Available"
 				body = f"Your Salary Slip ({ss.name}) is now available."
-				send_push_notification(user=user_id, title=title, body=body, url="/employee-portal#/payroll?tab=salary_slip")
+				send_push_notification(user=user_id, title=title, body=body, url="/employee-portal/payroll?tab=salary_slip")
 		except Exception:
 			frappe.log_error(frappe.get_traceback(), "Salary Slip Submission Notification Error")
 

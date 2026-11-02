@@ -12,6 +12,7 @@
         "test:watch": "vitest"
     },
     "dependencies": {
+        "@tanstack/vue-query": "^5.105.0",
         "frappe-ui": "^0.1.62",
         "pinia": "^2.1.7",
         "sortablejs": "^1.15.7",

@@ -1,8 +1,17 @@
-import { createRouter, createWebHashHistory } from "vue-router";
+import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "./stores/auth";
 
+// Automatically migrate legacy hash URLs (/#/attendance or #login -> /attendance, /login)
+if (typeof window !== "undefined" && window.location.hash) {
+	const raw = window.location.hash.replace(/^#\/?/, "");
+	if (raw) {
+		const clean = "/" + raw.replace(/^\/+/, "");
+		window.history.replaceState(null, "", "/employee-portal" + clean);
+	}
+}
+
 const router = createRouter({
-	history: createWebHashHistory(),
+	history: createWebHistory("/employee-portal"),
 	routes: [
 		{
 			path: "/login",
@@ -152,6 +161,10 @@ router.beforeEach(async (to, _from, next) => {
 	} else {
 		next();
 	}
+});
+
+router.afterEach(() => {
+	document.title = "Arijentek - EP";
 });
 
 router.onError((error, to) => {

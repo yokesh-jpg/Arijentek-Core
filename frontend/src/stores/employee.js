@@ -5,12 +5,13 @@ import { ref, watch } from "vue";
 
 
 export const useEmployeeStore = defineStore("employee", () => {
+	const isGuest = typeof window !== "undefined" && (!window.frappe_user || window.frappe_user === "Guest");
 	const employee = ref(null);
-	const ready = ref(false);
+	const ready = ref(isGuest);
 
 	const employeeResource = createResource({
 		url: "arijentek_core.api.attendance.get_current_employee",
-		auto: true,
+		auto: !isGuest,
 		onSuccess(data) {
 			if (data) {
 				employee.value = data;
@@ -27,17 +28,21 @@ export const useEmployeeStore = defineStore("employee", () => {
 	});
 
 	function init() {
+		if (typeof window !== "undefined" && (!window.frappe_user || window.frappe_user === "Guest")) {
+			employee.value = null;
+			ready.value = true;
+			return Promise.resolve();
+		}
+		if (ready.value) {
+			return Promise.resolve();
+		}
 		return new Promise((resolve) => {
-			if (ready.value) {
-				resolve();
-			} else {
-				const unwatch = watch(ready, (val) => {
-					if (val) {
-						unwatch();
-						resolve();
-					}
-				});
-			}
+			const unwatch = watch(ready, (val) => {
+				if (val) {
+					unwatch();
+					resolve();
+				}
+			});
 		});
 	}
 

@@ -182,12 +182,16 @@ def get_issues(
 	from_date=None,
 	to_date=None,
 	page: int = 1,
-	page_size: int = 0
+	page_size: int = 0,
+	order_by: str = "date desc",
 ):
 	"""
 	Fetch Employee Grievances with optional filters and server-side pagination.
 	When page_size > 0: returns dict with 'data', 'total', 'page', 'page_size', and 'stats'.
 	When page_size == 0: returns list of issues (legacy format).
+	order_by: Sort as "<field> <asc|desc>"; whitelisted fields are
+	    date and name. Anything else falls back to the default
+	    (date desc, name desc within a day).
 	"""
 	from frappe.utils import cint
 
@@ -244,6 +248,19 @@ def get_issues(
 		params["status"] = status
 	table_where = " AND ".join(table_conditions)
 
+	# Sort: order_by is client input going into raw SQL, so only whitelisted
+	# column/direction pairs are honoured and anything else falls back to the
+	# default. The other sortable column rides along as the tiebreaker.
+	sort_field, sort_dir = "date", "desc"
+	if order_by:
+		_parts = str(order_by).strip().lower().split()
+		if _parts and _parts[0] in ("date", "name"):
+			sort_field = _parts[0]
+		if len(_parts) > 1 and _parts[1] in ("asc", "desc"):
+			sort_dir = _parts[1]
+	secondary_field = "name" if sort_field == "date" else "date"
+	order_clause = f"ORDER BY eg.{sort_field} {sort_dir.upper()}, eg.{secondary_field} DESC"
+
 	# Stats aggregation over base_where (across all statuses for active filters)
 	stats = {"total": 0, "Open": 0, "Investigated": 0, "Resolved": 0, "Invalid": 0}
 	stats_rows = frappe.db.sql(
@@ -288,7 +305,7 @@ def get_issues(
 			FROM `tabEmployee Grievance` eg
 			LEFT JOIN `tabEmployee` e ON eg.raised_by = e.name
 			WHERE {table_where}
-			ORDER BY eg.creation DESC
+			{order_clause}
 			LIMIT %(limit)s OFFSET %(offset)s
 			""",
 			params,
@@ -312,7 +329,7 @@ def get_issues(
 		FROM `tabEmployee Grievance` eg
 		LEFT JOIN `tabEmployee` e ON eg.raised_by = e.name
 		WHERE {table_where}
-		ORDER BY eg.creation DESC
+		{order_clause}
 		""",
 		params,
 		as_dict=True,

@@ -205,18 +205,23 @@
 			:actions="actionsForRecord"
 			:row-key="'name'"
 			:on-row-click="onRowClick"
-			:loading="pager.state.loading"
-			empty-text="No attendance records match these filters."
+			:loading="isAttendanceLoading && !displayRows.length"
+			:empty-text="listEmptyText"
 			:show-pager="true"
-			:total="pager.state.total"
-			:page="pager.state.page"
-			:page-size="pager.state.size"
-			@update:page="pager.state.page = $event"
-			@update:page-size="pager.setPageSize($event)"
+			:total="totalRecords"
+			:page="currentPage"
+			:page-size="pageSize"
+			:sort="{ key: sortBy, dir: sortDir }"
+			@update:page="currentPage = $event"
+			@update:page-size="pageSize = $event; currentPage = 1"
+			@sort="toggleSort"
 		>
 			<template #cell-date="{ row }">
 				{{ formatDate(row.date) }}
 				<span class="block text-xs font-normal text-[#5C6169] dark:text-white/60">{{ formatDay(row.date) }}<span class="sm:hidden"> · {{ row.totalHours }}</span></span>
+			</template>
+			<template #cell-name="{ row }">
+				<span class="block tabular-nums break-words leading-snug sm:truncate">{{ row.name }}</span>
 			</template>
 			<template #cell-employeeName="{ row }">{{ row.employeeName || "—" }}</template>
 			<template #cell-clockIn="{ row }">{{ row.clockIn ? formatTime(row.clockIn) : "—" }}</template>
@@ -261,9 +266,9 @@
 <script setup>
 import { notify, ask } from '@/utils/feedback.js'
 import DataTable from '@/components/DataTable.vue'
-import { useServerPager } from '@/composables/useServerPager'
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { createResource } from "frappe-ui";
+import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import { useEmployeeStore } from "@/stores/employee";
 import { useAttendanceStore } from "@/stores/attendance";
 import AttendancePageView from "../../page_views/AttendancePageView.vue";
@@ -277,6 +282,7 @@ import DateRangePicker from "@/components/DateRangePicker.vue";
 
 const emit = defineEmits(["request-attendance"]);
 
+const queryClient = useQueryClient();
 const filtersOpen = ref(false);
 
 const gridMonthLabel = computed(() =>
@@ -357,8 +363,8 @@ async function handleDelete(record) {
 
 		showCellDetail.value = false;
 
-		await pager.fetchPage();
-		await fetchMonthlyRoster();
+		await queryClient.invalidateQueries({ queryKey: ['attendance-records'] });
+		await queryClient.invalidateQueries({ queryKey: ['attendance-grid'] });
 		if (showGridView.value) {
 			await fetchGridData();
 		}
@@ -368,8 +374,8 @@ async function handleDelete(record) {
 }
 
 async function onSaveSuccess() {
-	await pager.fetchPage();
-	await fetchMonthlyRoster();
+	await queryClient.invalidateQueries({ queryKey: ['attendance-records'] });
+	await queryClient.invalidateQueries({ queryKey: ['attendance-grid'] });
 	if (showGridView.value) {
 		await fetchGridData();
 	}
@@ -379,19 +385,65 @@ const filterFromDate = ref("");
 const filterToDate = ref("");
 const selectedPreset = ref("All Time");
 
-const canMark = ref(false);
-const canEditAttendance = ref(false);
-const canDeleteAttendance = ref(false);
-const canManage = ref(false);
-const canView = ref(false);
+const { data: permissionsData } = useQuery({
+	queryKey: ['attendance-permissions'],
+	queryFn: async () => {
+		const [mark, edit, del, manage, view] = await Promise.all([
+			attendanceStore.checkCanMarkAttendance().catch(() => false),
+			createResource({ url: "arijentek_core.api.attendance.can_user_edit", auto: false }).fetch().catch(() => false),
+			createResource({ url: "arijentek_core.api.attendance.can_user_delete", auto: false }).fetch().catch(() => false),
+			attendanceStore.checkCanManageAttendance().catch(() => false),
+			attendanceStore.checkCanViewAttendance().catch(() => false),
+		]);
+		return { mark: !!mark, edit: !!edit, del: !!del, manage: !!manage, view: !!view };
+	},
+	staleTime: Infinity,
+});
+
+const canMark = computed(() => permissionsData.value?.mark ?? false);
+const canEditAttendance = computed(() => permissionsData.value?.edit ?? false);
+const canDeleteAttendance = computed(() => permissionsData.value?.del ?? false);
+const canManage = computed(() => permissionsData.value?.manage ?? false);
+const canView = computed(() => permissionsData.value?.view ?? false);
 
 const showEmployeeFilter = computed(() => attendanceStore.employeeList.length > 0);
 const selectedEmployee = ref("");
 
 const showGridView = ref(false);
-const gridData = ref([]);
-const gridDayHeaders = ref([]);
-const gridLoading = ref(false);
+
+const _today = new Date();
+const selectedMonth = ref(_today.getMonth() + 1);
+const selectedYear = ref(_today.getFullYear());
+
+// Grid query with TanStack Query
+const { data: gridResult, isLoading: gridLoading, refetch: fetchGridData } = useQuery({
+	queryKey: computed(() => [
+		'attendance-grid',
+		showEmployeeFilter.value ? (selectedEmployee.value || 'all') : (employeeStore.employee?.name || ''),
+		selectedYear.value,
+		selectedMonth.value
+	]),
+	queryFn: async () => {
+		const empId = employeeStore.employee?.name;
+		if (!empId && !showEmployeeFilter.value) return { grid: [] };
+		const id = showEmployeeFilter.value ? selectedEmployee.value : empId;
+		const params = new URLSearchParams({ year: selectedYear.value, month: selectedMonth.value });
+		if (id) params.append('employee_id', id);
+		const res = await fetch(`/api/method/arijentek_core.api.attendance.get_attendance_grid?${params.toString()}`);
+		const json = await res.json();
+		return json.message || { grid: [] };
+	},
+	enabled: computed(() => showGridView.value && Boolean(employeeStore.employee?.name || showEmployeeFilter.value)),
+});
+
+const gridData = computed(() => gridResult.value?.grid || []);
+const gridDayHeaders = computed(() => {
+	const m = selectedMonth.value;
+	const y = selectedYear.value;
+	const daysInMonth = new Date(y, m, 0).getDate();
+	return Array.from({ length: daysInMonth }, (_, i) => String(i + 1));
+});
+
 const showCellDetail = ref(false);
 const detailCell = ref({
 	employeeName: "",
@@ -401,10 +453,6 @@ const detailCell = ref({
 	outTime: "",
 	workingHoursFormatted: "",
 });
-
-const _today = new Date();
-const selectedMonth = ref(_today.getMonth() + 1);
-const selectedYear = ref(_today.getFullYear());
 const filterStatus = ref("");
 
 const monthOptions = computed(() => {
@@ -523,47 +571,6 @@ function closeCellDetail() {
 	showCellDetail.value = false;
 }
 
-async function fetchGridData() {
-	const empId = employeeStore.employee?.name;
-	if (!empId && !showEmployeeFilter.value) return;
-
-	gridLoading.value = true;
-	return new Promise((resolve) => {
-		const gridRes = createResource({
-			url: "arijentek_core.api.attendance.get_attendance_grid",
-			makeParams: () => {
-				const params = { year: selectedYear.value, month: selectedMonth.value };
-				if (showEmployeeFilter.value) {
-					if (selectedEmployee.value) params.employee_id = selectedEmployee.value;
-				} else {
-					params.employee_id = empId;
-				}
-				return params;
-			},
-			auto: false,
-			onSuccess(data) {
-				if (data && data.grid) {
-					gridData.value = data.grid;
-					const m = selectedMonth.value;
-					const y = selectedYear.value;
-					const daysInMonth = new Date(y, m, 0).getDate();
-					gridDayHeaders.value = Array.from({ length: daysInMonth }, (_, i) => String(i + 1));
-				} else {
-					gridData.value = [];
-				}
-				gridLoading.value = false;
-				resolve();
-			},
-			onError() {
-				gridData.value = [];
-				gridLoading.value = false;
-				resolve();
-			},
-		});
-		gridRes.fetch();
-	});
-}
-
 function getStatusClasses(status) {
 	// Returns a tag-* class so the chip matches every other status chip in the app.
 	const s = status?.toLowerCase();
@@ -587,77 +594,114 @@ function formatTime(timeStr) {
 	return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
-async function handleCheckPermission() {
-  try {
-    canMark.value = await attendanceStore.checkCanMarkAttendance();
-  } catch (e) {
-    canMark.value = false;
-  }
-  
-  try {
-    const editRes = createResource({ url: "arijentek_core.api.attendance.can_user_edit", auto: false });
-    const deleteRes = createResource({ url: "arijentek_core.api.attendance.can_user_delete", auto: false });
-    canEditAttendance.value = await editRes.fetch();
-    canDeleteAttendance.value = await deleteRes.fetch();
-  } catch (e) {
-    canEditAttendance.value = false;
-    canDeleteAttendance.value = false;
-  }
+const currentPage = ref(1);
+const pageSize = ref(10);
+
+/* Sort state for the list. Date desc is the natural reading order (newest
+   first); both live in the query key, so a header click refetches from the
+   server rather than reshuffling the current page. */
+const sortBy = ref('date'); // 'date' | 'name'
+const sortDir = ref('desc'); // 'asc' | 'desc'
+
+function toggleSort(col) {
+	if (sortBy.value === col) {
+		sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+	} else {
+		sortBy.value = col;
+		sortDir.value = 'asc';
+	}
+	currentPage.value = 1;
 }
 
-async function fetchMonthlyRoster() {
-  const empId = employeeStore.employee?.name;
-  const targetEmpId = showEmployeeFilter.value ? selectedEmployee.value : empId;
-  if (targetEmpId) {
-    await attendanceStore.fetchMonthlyRoster(targetEmpId, selectedYear.value, selectedMonth.value);
-  }
-}
+const orderParam = computed(() => `${sortBy.value === 'date' ? 'attendance_date' : 'name'} ${sortDir.value}`);
 
-/* Server-side fetch: `page`/`page_size` are passed to the API (LIMIT/OFFSET),
-   and the store's `history`/`historyTotal` hold the current page + total.
-   Returns { rows, total } for useServerPager. */
-async function fetchMonthlyHistory(page, pageSize) {
-  const empId = employeeStore.employee?.name;
-  const targetEmpId = showEmployeeFilter.value ? (selectedEmployee.value || "All") : empId;
-  if (targetEmpId) {
-    const params = {
-      override_employee_id: showEmployeeFilter.value ? (selectedEmployee.value || "") : empId,
-    };
-    const isAllTime = selectedPreset.value === "All Time";
-    if (!isAllTime && filterFromDate.value && filterToDate.value) {
-      params.start_date = filterFromDate.value;
-      params.end_date = filterToDate.value;
-    } else if (!isAllTime) {
-      params.month = selectedMonth.value;
-      params.year = selectedYear.value;
-    }
-    if (filterStatus.value && filterStatus.value !== "All") {
-      params.status = filterStatus.value;
-    }
-    if (page) params.page = page;
-    if (pageSize) params.page_size = pageSize;
-    await attendanceStore.fetchHistory(targetEmpId, params);
-    return { rows: attendanceStore.history, total: attendanceStore.historyTotal };
-  }
-  return { rows: [], total: 0 };
-}
+const canFilterEmployees = computed(() => canView.value || canManage.value || attendanceStore.employeeList.length > 0);
 
-/* Server-side pager: one page at a time (LIMIT/OFFSET). Stale-while-revalidate
-   keeps the previous page visible while the next loads; a stale fetch is dropped. */
-const pager = useServerPager((page, size) => fetchMonthlyHistory(page, size), { size: 10 });
+const targetEmpId = computed(() => {
+	if (canFilterEmployees.value) {
+		return selectedEmployee.value || "All";
+	}
+	return employeeStore.employee?.name || "";
+});
 
-/* The display rows for the current page: transform the raw server records. */
-const displayRows = computed(() =>
-	pager.state.rows
-		.filter((r) => r && !r._summary)
-		.map(transformRecord)
-		.filter(Boolean)
+const attendanceQueryKey = computed(() => [
+	'attendance-records',
+	targetEmpId.value,
+	currentPage.value,
+	pageSize.value,
+	selectedPreset.value,
+	filterFromDate.value,
+	filterToDate.value,
+	selectedMonth.value,
+	selectedYear.value,
+	filterStatus.value,
+	orderParam.value,
+]);
+
+const {
+	data: attendanceData,
+	isLoading: isAttendanceLoading,
+	refetch: refetchAttendance,
+} = useQuery({
+	queryKey: attendanceQueryKey,
+	queryFn: async () => {
+		const empId = employeeStore.employee?.name;
+		const target = targetEmpId.value;
+		if (!target && !empId) return { rows: [], total: 0 };
+
+		const params = {
+			override_employee_id: canFilterEmployees.value ? (selectedEmployee.value || "") : empId,
+		};
+		const isAllTime = selectedPreset.value === "All Time";
+		if (!isAllTime && filterFromDate.value && filterToDate.value) {
+			params.start_date = filterFromDate.value;
+			params.end_date = filterToDate.value;
+		} else if (!isAllTime) {
+			params.month = selectedMonth.value;
+			params.year = selectedYear.value;
+		}
+		if (filterStatus.value && filterStatus.value !== "All") {
+			params.status = filterStatus.value;
+		}
+		if (currentPage.value) params.page = currentPage.value;
+		if (pageSize.value) params.page_size = pageSize.value;
+		params.order_by = orderParam.value;
+
+		await attendanceStore.fetchHistory(target, params);
+		return {
+			rows: [...attendanceStore.history],
+			total: attendanceStore.historyTotal,
+		};
+	},
+	enabled: computed(() => Boolean(employeeStore.employee?.name && permissionsData.value !== undefined)),
+	placeholderData: (previousData) => previousData,
+});
+
+const totalRecords = computed(() => attendanceData.value?.total || 0);
+
+const hasActiveFilters = computed(() =>
+	Boolean(selectedEmployee.value || filterStatus.value || (filterFromDate.value && filterToDate.value))
+);
+const listEmptyText = computed(() =>
+	hasActiveFilters.value ? "No attendance records match these filters." : "No attendance records yet."
 );
 
+/* The display rows for the current page: transform the raw server records. */
+const displayRows = computed(() => {
+	const raw = attendanceData.value?.rows || [];
+	return raw
+		.filter((r) => r && !r._summary)
+		.map(transformRecord)
+		.filter(Boolean);
+});
+
 /* Column declarations for the list view (order = render order; `className`
-   carries the responsive hiding). */
+   carries the responsive hiding). Date leads for scanning; the doctype name
+   is the row's ID anchor (Claim/Application/Reference elsewhere). Date and
+   ID are server-side sortable via the header buttons. */
 const listColumns = [
-	{ key: 'date', label: 'Date', className: 'table-td-strong whitespace-nowrap' },
+	{ key: 'date', label: 'Date', className: 'whitespace-nowrap', sortable: true },
+	{ key: 'name', label: 'ID', className: 'table-td-strong max-w-[180px] sm:max-w-none', sortable: true },
 	{ key: 'employeeName', label: 'Employee', className: 'hidden md:table-cell' },
 	{ key: 'clockIn', label: 'In', className: 'tabular-nums hidden sm:table-cell' },
 	{ key: 'clockOut', label: 'Out', className: 'tabular-nums hidden sm:table-cell' },
@@ -694,14 +738,7 @@ watch(filterFromDate, (val) => {
 });
 
 watch([selectedEmployee, filterStatus, filterFromDate, filterToDate], () => {
-	// Reset to page 1. The pager's own [page, size] watch re-fetches when the
-	// page actually changes; if it is already 1, fetch directly so a filter
-	// change on page 1 still refreshes.
-	if (pager.state.page !== 1) {
-		pager.state.page = 1;
-	} else {
-		pager.fetchPage();
-	}
+	currentPage.value = 1;
 	if (showGridView.value) {
 		fetchGridData();
 	}
@@ -716,25 +753,14 @@ watch(showGridView, (val) => {
 onMounted(async () => {
 	await employeeStore.init();
 	const empId = employeeStore.employee?.name;
-	if (empId) {
-		await attendanceStore.init(empId);
+	if (empId && !attendanceStore.roster) {
+		attendanceStore.fetchRoster(empId).catch(() => {});
 	}
-	await handleCheckPermission();
-	try {
-		canManage.value = await attendanceStore.checkCanManageAttendance();
-	} catch (e) {
-		canManage.value = false;
+	if (attendanceStore.employeeList.length === 0) {
+		attendanceStore.fetchEmployeeList().catch(() => {});
 	}
-	try {
-		canView.value = await attendanceStore.checkCanViewAttendance();
-	} catch (e) {
-		canView.value = false;
-	}
-	await attendanceStore.fetchEmployeeList();
-	await pager.fetchPage();
-	await fetchMonthlyRoster();
 	if (showGridView.value) {
-		await fetchGridData();
+		fetchGridData();
 	}
 });
 

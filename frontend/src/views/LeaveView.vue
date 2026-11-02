@@ -86,25 +86,55 @@
 
 		<!-- Tab Content -->
 		<div class="pb-20 lg:pb-0 tab-fill">
-			<TabLeaveManagement v-if="activeTab === 'leave_management'" />
-			<TabCompensatoryLeave v-if="activeTab === 'compensatory_leave' && (leaveStore.canReadCompLeave || leaveStore.canCreateCompLeave)" />
-			<TabLeavePolicyAssignment v-if="activeTab === 'leave_policy_assignment' && leaveStore.canReadLeavePolicyAssignment" />
-			<TabLeavePolicy v-if="activeTab === 'leave_policy' && leaveStore.canReadLeavePolicy" />
-			<TabLeaveAllocation v-if="activeTab === 'leave_allocation' && leaveStore.canReadLeaveAllocation" />
-			<TabLeaveTypes v-if="activeTab === 'leave_types' && leaveStore.canReadLeaveTypes" />
-			<TabLeavePeriod v-if="activeTab === 'leave_period' && leaveStore.canReadLeavePeriod" />
-			<TabHolidayListAssignment v-if="activeTab === 'holiday_list_assignment' && leaveStore.canReadHolidayListAssignment" />
-			<TabHolidayList v-if="activeTab === 'holiday_list' && leaveStore.canReadHolidayList" />
+			<TabLeaveManagement 
+				v-if="visitedTabs.leave_management" 
+				v-show="activeTab === 'leave_management'" 
+				:is-active="activeTab === 'leave_management'" 
+			/>
+			<TabCompensatoryLeave 
+				v-if="visitedTabs.compensatory_leave && (leaveStore.canReadCompLeave || leaveStore.canCreateCompLeave)" 
+				v-show="activeTab === 'compensatory_leave'" 
+			/>
+			<TabLeavePolicyAssignment 
+				v-if="visitedTabs.leave_policy_assignment && leaveStore.canReadLeavePolicyAssignment" 
+				v-show="activeTab === 'leave_policy_assignment'" 
+			/>
+			<TabLeavePolicy 
+				v-if="visitedTabs.leave_policy && leaveStore.canReadLeavePolicy" 
+				v-show="activeTab === 'leave_policy'" 
+			/>
+			<TabLeaveAllocation 
+				v-if="visitedTabs.leave_allocation && leaveStore.canReadLeaveAllocation" 
+				v-show="activeTab === 'leave_allocation'" 
+			/>
+			<TabLeaveTypes 
+				v-if="visitedTabs.leave_types && leaveStore.canReadLeaveTypes" 
+				v-show="activeTab === 'leave_types'" 
+			/>
+			<TabLeavePeriod 
+				v-if="visitedTabs.leave_period && leaveStore.canReadLeavePeriod" 
+				v-show="activeTab === 'leave_period'" 
+			/>
+			<TabHolidayListAssignment 
+				v-if="visitedTabs.holiday_list_assignment && leaveStore.canReadHolidayListAssignment" 
+				v-show="activeTab === 'holiday_list_assignment'" 
+			/>
+			<TabHolidayList 
+				v-if="visitedTabs.holiday_list && leaveStore.canReadHolidayList" 
+				v-show="activeTab === 'holiday_list'" 
+			/>
 		</div>
 	</div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useLeaveStore } from '@/stores/leave'
 import { useEmployeeStore } from '@/stores/employee'
 import TabBar from '@/components/TabBar.vue'
+
+defineOptions({ name: 'LeaveView' })
 
 import TabLeaveManagement from './tab_settings/leave/tab_leave_management.vue'
 import TabCompensatoryLeave from './tab_settings/leave/tab_compensatory_leave.vue'
@@ -122,6 +152,18 @@ const employeeStore = useEmployeeStore()
 
 const activeTab = ref(route.query.tab || 'leave_management')
 
+const visitedTabs = reactive({
+	leave_management: activeTab.value === 'leave_management',
+	compensatory_leave: activeTab.value === 'compensatory_leave',
+	leave_policy_assignment: activeTab.value === 'leave_policy_assignment',
+	leave_policy: activeTab.value === 'leave_policy',
+	leave_allocation: activeTab.value === 'leave_allocation',
+	leave_types: activeTab.value === 'leave_types',
+	leave_period: activeTab.value === 'leave_period',
+	holiday_list_assignment: activeTab.value === 'holiday_list_assignment',
+	holiday_list: activeTab.value === 'holiday_list',
+})
+
 watch(
 	() => route.query.tab,
 	(newTab) => {
@@ -130,6 +172,12 @@ watch(
 		}
 	}
 )
+
+watch(activeTab, (newTab) => {
+	if (newTab && visitedTabs[newTab] !== undefined) {
+		visitedTabs[newTab] = true
+	}
+})
 
 onMounted(async () => {
 	await employeeStore.init()

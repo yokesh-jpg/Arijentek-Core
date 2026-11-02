@@ -15,12 +15,12 @@
 				<div class="p-4 border-b border-white/10 flex items-center justify-between shrink-0">
 					<div class="flex items-center gap-3">
 						<img
-							:src="asset('images/gemora-gem.png')"
-							alt="Gemora 360"
-							class="h-8 w-auto"
+							:src="asset('images/arijentek-logo.svg')"
+							alt="Arijentek"
+							class="h-9 w-9 rounded-xl object-contain border border-white/10 shadow-sm"
 						/>
 						<div>
-							<h1 class="text-base font-semibold text-white leading-tight">Zevar</h1>
+							<h1 class="text-base font-semibold text-white leading-tight">Arijentek</h1>
 							<p class="text-xs text-white/50">Employee Portal</p>
 						</div>
 					</div>
@@ -108,32 +108,35 @@
 				<router-link
 					v-show="!visuallyCollapsed"
 					to="/"
-					class="flex items-center overflow-hidden outline-none group min-w-0 flex-1"
-					title="Gemora 360 · Staff Hub"
+					class="flex items-center gap-3 overflow-hidden outline-none group min-w-0 flex-1"
+					title="Arijentek · Employee Portal"
 				>
+					<img
+						:src="asset('images/arijentek-logo.svg')"
+						alt="Arijentek"
+						class="h-10 w-10 rounded-xl object-contain shrink-0 border border-white/10 shadow-sm transition-transform duration-200 group-hover:scale-105"
+					/>
 					<span class="flex flex-col items-start min-w-0">
-						<img
-							:src="asset('images/gemora-logo-full.png')"
-							alt="Gemora 360"
-							class="h-[54px] w-auto -ml-1 transition-transform duration-200 group-hover:scale-105"
-						/>
-						<span class="-mt-[3px] ml-[8px] inline-flex items-center gap-1.5 h-4 px-2 rounded-full bg-white/[0.06] border border-white/[0.08] text-[10px] font-medium text-white/70 whitespace-nowrap">
+						<span class="text-[17px] font-bold text-white tracking-wide leading-tight group-hover:text-white/90 truncate">
+							Arijentek
+						</span>
+						<span class="mt-0.5 inline-flex items-center gap-1.5 h-4 px-2 rounded-full bg-white/[0.06] border border-white/[0.08] text-[10px] font-medium text-white/70 whitespace-nowrap">
 							<span class="w-1.5 h-1.5 rounded-full bg-accent-light"></span>Employee Portal
 						</span>
 					</span>
 				</router-link>
 
-				<!-- Collapsed View: Centered Gem Icon Only -->
+				<!-- Collapsed View: Centered Avatar Icon Only -->
 				<div v-show="visuallyCollapsed" class="w-full flex flex-col items-center gap-2 pt-2">
 					<router-link
 						to="/"
 						class="flex items-center justify-center outline-none group"
-						title="Gemora 360 · Staff Hub"
+						title="Arijentek · Employee Portal"
 					>
 						<img
-							:src="asset('images/gemora-gem.png')"
-							alt="Gemora 360"
-							class="h-[32px] w-auto transition-transform duration-200 group-hover:scale-105"
+							:src="asset('images/arijentek-logo.svg')"
+							alt="Arijentek"
+							class="h-10 w-10 rounded-xl object-contain border border-white/10 shadow-sm transition-transform duration-200 group-hover:scale-105"
 						/>
 					</router-link>
 				</div>
@@ -746,6 +749,8 @@ function toggleDarkMode() {
 }
 
 onMounted(async () => {
+	if (!auth.isLoggedIn) return
+
 	await employeeStore.init()
 
 	try {

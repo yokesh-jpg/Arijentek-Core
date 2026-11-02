@@ -4,11 +4,12 @@
 	<div class="login-shell">
 		<div class="w-full max-w-[400px] flex flex-col items-center">
 			<img
-				:src="asset('images/gemora-logo-full.png')"
-				alt="Gemora 360"
-				class="h-[74px] w-auto mb-1"
+				:src="asset('images/arijentek-logo.svg')"
+				alt="Arijentek"
+				class="h-16 w-16 rounded-2xl object-contain border border-white/10 shadow-lg mb-2"
 			/>
-			<p class="text-[13px] text-white/45 mb-6">Staff Hub</p>
+			<h2 class="text-lg font-bold text-white tracking-wide">Arijentek</h2>
+			<p class="text-[13px] text-white/45 mb-6">Employee Portal</p>
 
 			<div
 				class="w-full rounded-[22px] bg-white dark:bg-surface-1 border border-black/[0.07] dark:border-white/10 shadow-[0_28px_70px_-24px_rgba(0,0,0,.55)] p-6 sm:p-7"
@@ -19,7 +20,7 @@
 					Sign in
 				</h1>
 				<p class="text-[13px] text-[#5C6169] dark:text-white/65 mt-1 mb-6">
-					Use your Zevar account to continue.
+					Use your Arijentek account to continue.
 				</p>
 
 				<form @submit.prevent="handleLogin" class="space-y-4">

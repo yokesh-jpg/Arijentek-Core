@@ -38,8 +38,10 @@
 			:total="pager.state.total"
 			:page="pager.state.page"
 			:page-size="pager.state.size"
+			:sort="{ key: sortBy, dir: sortDir }"
 			@update:page="pager.state.page = $event"
 			@update:page-size="pager.setPageSize($event)"
+			@sort="toggleSort"
 		>
 			<template #cell-time="{ row }">
 				<span class="block whitespace-nowrap">{{ formatDateTime(row.time) }}</span>
@@ -109,6 +111,7 @@ async function fetchCheckins(page, size) {
 		params.start_date = filterFromDate.value;
 		params.end_date = filterToDate.value;
 	}
+	params.order_by = orderParam.value;
 	try {
 		await checkinsResource.fetch(params);
 		const res = checkinsResource.data;
@@ -125,10 +128,31 @@ async function fetchCheckins(page, size) {
    keeps the previous page visible while the next loads; a stale fetch is dropped. */
 const pager = useServerPager((page, size) => fetchCheckins(page, size), { size: 10 });
 
+/* Sort state: newest punches first is the reading order this screen promises
+   ("newest first"), so When sorts desc by default. A header click refetches
+   from the server (page reset), never reshuffles the current page. */
+const sortBy = ref('time'); // 'time'
+const sortDir = ref('desc'); // 'asc' | 'desc'
+const orderParam = computed(() => `${sortBy.value} ${sortDir.value}`);
+
+function toggleSort(col) {
+	if (sortBy.value === col) {
+		sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+	} else {
+		sortBy.value = col;
+		sortDir.value = 'asc';
+	}
+	if (pager.state.page !== 1) {
+		pager.state.page = 1;
+	} else {
+		pager.fetchPage();
+	}
+}
+
 /* Column declarations for the list (order = render order; `className`
    carries the responsive hiding). */
 const listColumns = [
-	{ key: "time", label: "When", className: "table-td-strong whitespace-nowrap" },
+	{ key: "time", label: "When", className: "table-td-strong whitespace-nowrap", sortable: true },
 	{ key: "employeeName", label: "Employee", className: "hidden md:table-cell" },
 	{ key: "logType", label: "Type" },
 	{ key: "device_id", label: "Device", className: "hidden lg:table-cell" },
