@@ -74,7 +74,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { call } from 'frappe-ui'
 import { useTeamStore } from '@/stores/team'
 import { notify, ask } from '@/utils/feedback.js'

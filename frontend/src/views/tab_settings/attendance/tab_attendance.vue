@@ -673,7 +673,10 @@ const {
 			total: attendanceStore.historyTotal,
 		};
 	},
-	enabled: computed(() => Boolean(employeeStore.employee?.name && permissionsData.value !== undefined)),
+	/* An admin/HR viewer may have no Employee record of their own — they see
+	   everyone through the employee filter (canFilterEmployees), so the query
+	   must not be gated on a personal employee id. */
+	enabled: computed(() => Boolean((employeeStore.employee?.name || canFilterEmployees.value) && permissionsData.value !== undefined)),
 	placeholderData: (previousData) => previousData,
 });
 
