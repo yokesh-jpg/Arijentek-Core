@@ -2,11 +2,17 @@ import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "./stores/auth";
 
 // Automatically migrate legacy hash URLs (/#/attendance or #login -> /attendance, /login)
-if (typeof window !== "undefined" && window.location.hash) {
-	const raw = window.location.hash.replace(/^#\/?/, "");
+// and strip trailing slashes to avoid server-side 301 redirects
+if (typeof window !== "undefined") {
+	const path = window.location.pathname;
+	const hash = window.location.hash;
+	const raw = hash ? hash.replace(/^#\/?/, "").replace(/^\/+/, "") : "";
+	const cleanPath = path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
+
 	if (raw) {
-		const clean = "/" + raw.replace(/^\/+/, "");
-		window.history.replaceState(null, "", "/employee-portal" + clean);
+		window.history.replaceState(null, "", cleanPath + "/" + raw);
+	} else if (hash || path !== cleanPath) {
+		window.history.replaceState(null, "", cleanPath);
 	}
 }
 

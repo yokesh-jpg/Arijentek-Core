@@ -138,7 +138,7 @@ def send_push_notification(user, title, body, icon=None, url=None, app_type="hrm
 		)
 
 	if not url:
-		url = "/pos/" if app_type == "pos" else "/employee-portal/"
+		url = "/pos" if app_type == "pos" else "/employee-portal"
 
 	payload = json.dumps({"title": title, "body": body, "icon": icon, "url": url})
 

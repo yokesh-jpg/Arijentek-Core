@@ -16,14 +16,21 @@
         window.csrf_token = "{{ frappe.session.csrf_token }}";
         window.frappe_user = "{{ frappe.session.user }}";
 
-        // Seamless migration: automatically convert any legacy # URL to clean / URL
-        if (window.location.hash) {
-            var raw = window.location.hash.replace(/^#\/?/, '');
+        // Seamless URL normalization:
+        // 1. Convert legacy hash routes (e.g. /#/attendance -> /attendance)
+        // 2. Strip trailing slashes and dangling hashes (e.g. /employee-portal/#/ or /employee-portal/ -> /employee-portal)
+        (function () {
+            var path = window.location.pathname;
+            var hash = window.location.hash;
+            var raw = hash ? hash.replace(/^#\/?/, '').replace(/^\/+/, '') : '';
+            var cleanPath = (path.length > 1 && path.endsWith('/')) ? path.slice(0, -1) : path;
+
             if (raw) {
-                var clean = '/' + raw.replace(/^\/+/, '');
-                window.history.replaceState(null, '', '/employee-portal' + clean);
+                window.history.replaceState(null, '', cleanPath + '/' + raw);
+            } else if (hash || path !== cleanPath) {
+                window.history.replaceState(null, '', cleanPath);
             }
-        }
+        })();
     </script>
     {% set employee_portal_js = get_frontend_asset('employee-portal', 'index.js') %}
     {% set employee_portal_css = get_frontend_asset('employee-portal', 'index.css') %}
