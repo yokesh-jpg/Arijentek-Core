@@ -258,9 +258,16 @@ async function fetchMonthlyRoster() {
 
 /* No data yet and no error = the first fetch has not landed (it may not even
    have started — mount awaits employee init first). Skeleton until then; once
-   data exists, refetches keep the old numbers visible instead of flashing 0. */
+   data exists, refetches keep the old numbers visible instead of flashing 0.
+   A user with no linked Employee (e.g. Administrator) never fetches at all, so
+   without this guard the skeleton would spin forever — that case reads as
+   loaded with an empty month instead. */
 const isSummaryLoading = computed(
-	() => !currentUserHistoryResource.data && !currentUserHistoryResource.error
+	() =>
+		!employeeStore.ready ||
+		(Boolean(employeeStore.employee?.name) &&
+			!currentUserHistoryResource.data &&
+			!currentUserHistoryResource.error)
 );
 
 const statusSummary = computed(() => {
