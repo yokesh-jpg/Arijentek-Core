@@ -64,7 +64,7 @@
 								@click="(e) => onNav(e, item, navigate)"
 								class="flex items-center gap-3 h-10 px-3.5 rounded-full transition-colors duration-150"
 								:class="[
-									(item.to === '/' ? isExactActive : isActive)
+									isItemActive(item, isActive, isExactActive)
 										? 'bg-accent text-white font-semibold shadow-md'
 										: 'text-[#C5C5D2] hover:text-white hover:bg-white/[0.06]'
 								]"
@@ -169,7 +169,7 @@
 							@click="(e) => onNav(e, item, navigate)"
 							class="flex items-center h-10 rounded-full transition-colors duration-150 group relative"
 							:class="[
-								(item.to === '/' ? isExactActive : isActive)
+								isItemActive(item, isActive, isExactActive)
 									? 'bg-accent text-white font-semibold shadow-[0_6px_16px_-6px_rgb(var(--accent-rgb)/0.9)]'
 									: 'text-[#C5C5D2] hover:text-white hover:bg-white/[0.06]',
 								visuallyCollapsed ? 'justify-center w-10 mx-auto rounded-[14px]' : 'gap-3 px-3.5',
@@ -178,7 +178,7 @@
 							<NavIcon
 								:name="item.icon"
 								class="w-[18px] h-[18px] shrink-0 pointer-events-none transition-opacity duration-150"
-								:class="(item.to === '/' ? isExactActive : isActive) ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'"
+								:class="isItemActive(item, isActive, isExactActive) ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'"
 							/>
 							<span
 								class="min-w-0 overflow-hidden transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none"
@@ -481,7 +481,7 @@
 							:href="href"
 							@click="navigate"
 							class="phone-nav-item"
-							:class="(item.to === '/' ? isExactActive : isActive) ? 'phone-nav-item-active' : ''"
+							:class="isItemActive(item, isActive, isExactActive) ? 'phone-nav-item-active' : ''"
 						>
 							<span class="phone-nav-pill">
 								<NavIcon :name="item.icon" class="w-[22px] h-[22px]" />
@@ -673,6 +673,13 @@ const baseNavItems = [
 	{ to: '/settings', icon: 'settings', label: 'Settings', group: 'Workspace' },
 ]
 
+const isItemActive = (item, isActive, isExactActive) => {
+	if (item.to === '/dashboard' || item.to === '/') {
+		return route.path === '/dashboard' || route.path === '/'
+	}
+	return isActive
+}
+
 const navItems = computed(() => {
 	const items = baseNavItems.filter((item) => {
 		if (item.to === '/team')
@@ -706,7 +713,7 @@ const phoneNavItems = computed(() =>
 	PHONE_NAV.filter((p) => navItems.value.some((i) => i.to === p.to))
 )
 const isOnMoreRoute = computed(
-	() => !PHONE_NAV.some((p) => (p.to === '/' ? route.path === '/' : route.path.startsWith(p.to)))
+	() => !PHONE_NAV.some((p) => (p.to === '/dashboard' || p.to === '/' ? (route.path === '/' || route.path === '/dashboard') : route.path.startsWith(p.to)))
 )
 
 const navGroups = computed(() =>
@@ -716,7 +723,7 @@ const navGroups = computed(() =>
 )
 
 const currentNavItem = computed(() =>
-	navItems.value.find((i) => (i.to === '/' ? route.path === '/' : route.path.startsWith(i.to)))
+	navItems.value.find((i) => (i.to === '/dashboard' || i.to === '/' ? (route.path === '/' || route.path === '/dashboard') : route.path.startsWith(i.to)))
 )
 
 const pageTitle = computed(() => renderLabel(currentNavItem.value?.label) || 'Staff Hub')
