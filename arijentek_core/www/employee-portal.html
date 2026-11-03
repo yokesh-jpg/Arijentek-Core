@@ -16,19 +16,19 @@
         window.csrf_token = "{{ frappe.session.csrf_token }}";
         window.frappe_user = "{{ frappe.session.user }}";
 
-        // Seamless URL normalization:
-        // 1. Convert legacy hash routes (e.g. /#/attendance -> /attendance)
-        // 2. Strip trailing slashes and dangling hashes (e.g. /employee-portal/#/ or /employee-portal/ -> /employee-portal)
+        // URL Normalization: Immediately strip trailing slashes and migrate legacy hash routes
+        // so browser URL stays cleanly as /employee-portal (just like /pos)
         (function () {
             var path = window.location.pathname;
             var hash = window.location.hash;
             var raw = hash ? hash.replace(/^#\/?/, '').replace(/^\/+/, '') : '';
-            var cleanPath = (path.length > 1 && path.endsWith('/')) ? path.slice(0, -1) : path;
 
-            if (raw) {
-                window.history.replaceState(null, '', cleanPath + '/' + raw);
-            } else if (hash || path !== cleanPath) {
-                window.history.replaceState(null, '', cleanPath);
+            if (raw && raw !== 'dashboard') {
+                window.history.replaceState(null, '', '/employee-portal/' + raw + window.location.search);
+            } else if (path.length > 1 && path.endsWith('/')) {
+                window.history.replaceState(null, '', path.replace(/\/+$/, '') + window.location.search);
+            } else if (hash) {
+                window.history.replaceState(null, '', path + window.location.search);
             }
         })();
     </script>
