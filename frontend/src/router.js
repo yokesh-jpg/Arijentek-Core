@@ -1,18 +1,21 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "./stores/auth";
 
-// Automatically migrate legacy hash URLs (/#/attendance or #login -> /attendance, /login)
-// and strip trailing slashes to avoid server-side 301 redirects
+// URL Normalization before router initialization:
+// 1. Migrate legacy hash routes (e.g. #/attendance -> /attendance)
+// 2. Strip trailing slash so URL stays cleanly as /employee-portal (just like /pos)
+//    without triggering Nginx trailing-slash 301 redirects on reload.
 if (typeof window !== "undefined") {
 	const path = window.location.pathname;
 	const hash = window.location.hash;
 	const raw = hash ? hash.replace(/^#\/?/, "").replace(/^\/+/, "") : "";
-	const cleanPath = path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
 
-	if (raw) {
-		window.history.replaceState(null, "", cleanPath + "/" + raw);
-	} else if (hash || path !== cleanPath) {
-		window.history.replaceState(null, "", cleanPath);
+	if (raw && raw !== "dashboard") {
+		window.history.replaceState(null, "", "/employee-portal/" + raw + window.location.search);
+	} else if (path.length > 1 && path.endsWith("/")) {
+		window.history.replaceState(null, "", path.replace(/\/+$/, "") + window.location.search);
+	} else if (hash) {
+		window.history.replaceState(null, "", path + window.location.search);
 	}
 }
 
@@ -36,6 +39,10 @@ const router = createRouter({
 			name: "dashboard",
 			component: () => import("./views/DashboardView.vue"),
 			meta: { requiresAuth: true },
+		},
+		{
+			path: "/dashboard",
+			redirect: "/",
 		},
 		{
 			path: "/tasks",
