@@ -19,7 +19,12 @@
 			<div class="flex flex-wrap items-end gap-3">
 				<div class="min-w-[200px] flex-1">
 					<label class="field-label">Work period</label>
-					<DateRangePicker @change="fetchReportData" />
+					<DateRangePicker
+						v-model:fromDate="filters.fromDate"
+						v-model:toDate="filters.toDate"
+						v-model:preset="filters.preset"
+						@change="handleDateRangeChange"
+					/>
 				</div>
 				<div class="min-w-[170px] flex-1">
 					<label class="field-label">Employee</label>
@@ -79,12 +84,21 @@ const loading = ref(false);
 const reportData = ref([]);
 
 const filters = reactive({
-	preset: 'This Month',
+	preset: 'All Time',
 	fromDate: '',
 	toDate: '',
 	employee: '',
 	status: '',
 });
+
+const handleDateRangeChange = (range) => {
+	if (range) {
+		filters.fromDate = range.fromDate || '';
+		filters.toDate = range.toDate || '';
+		filters.preset = range.preset || 'All Time';
+	}
+	fetchReportData();
+};
 
 const filterOptions = reactive({
 	employees: [],

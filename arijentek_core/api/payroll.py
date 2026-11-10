@@ -3,6 +3,8 @@ Payroll API - Salary slips and payroll information
 """
 
 import frappe
+from contextlib import contextmanager
+
 from frappe import _
 from frappe.utils import cint
 
@@ -3012,13 +3014,13 @@ def can_read_overtime_slip():
 @frappe.whitelist()
 def can_create_overtime_slip():
 	"""
-	Returns True if the current user has permission to create Overtime Slip.
+	Returns True if the current user has HR Manager, HR User, or System Manager role.
+	Role-only gate (no doctype-permission fallback) so normal employees
+	never see the New button in the portal.
 	"""
 	user = frappe.session.user
 	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
-		return True
-	if frappe.has_permission("Overtime Slip", "create"):
+	if "HR Manager" in roles or "System Manager" in roles or "HR User" in roles:
 		return True
 	return False
 
@@ -3030,7 +3032,7 @@ def can_edit_overtime_slip():
 	"""
 	user = frappe.session.user
 	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if "HR Manager" in roles or "System Manager" in roles or "HR User" in roles:
 		return True
 	if frappe.has_permission("Overtime Slip", "write"):
 		return True
@@ -3044,7 +3046,7 @@ def can_delete_overtime_slip():
 	"""
 	user = frappe.session.user
 	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if "HR Manager" in roles or "System Manager" in roles or "HR User" in roles:
 		return True
 	if frappe.has_permission("Overtime Slip", "delete"):
 		return True
@@ -3141,6 +3143,25 @@ def get_overtime_slip_details(name: str):
 	return doc_dict
 
 
+@contextmanager
+def _suspend_employee_user_permission_scope():
+	"""
+	Temporarily drop the session user's "Employee" User Permission scope during
+	Overtime Slip submission because HRMS' internal make_salary_slip calls
+	frappe.has_permission("Employee", "read", employee, throw=True) which fails
+	if an HR user is linked to their own Employee record.
+	"""
+	cache = frappe.cache
+	user = frappe.session.user
+	saved = cache.hget("user_permissions", user)
+	scoped = {k: v for k, v in (saved or {}).items() if k != "Employee"}
+	cache.hset("user_permissions", user, scoped)
+	try:
+		yield
+	finally:
+		cache.hset("user_permissions", user, saved)
+
+
 @frappe.whitelist()
 def save_overtime_slip(doc):
 	"""
@@ -3208,16 +3229,20 @@ def save_overtime_slip(doc):
 					)
 					break
 
-	if is_new:
-		ot_doc.insert()
-	else:
-		ot_doc.save()
+	# Permissions are enforced by the can_create/can_edit gates at the top of
+	# this function; skip the doctype-level DocPerm re-check on insert/save.
+	ot_doc.flags.ignore_permissions = True
+	with _suspend_employee_user_permission_scope():
+		if is_new:
+			ot_doc.insert(ignore_permissions=True)
+		else:
+			ot_doc.save(ignore_permissions=True)
 
-	frappe.db.set_value("Overtime Slip", ot_doc.name, "total_overtime_duration", total_duration)
-	ot_doc.reload()
+		frappe.db.set_value("Overtime Slip", ot_doc.name, "total_overtime_duration", total_duration)
+		ot_doc.reload()
 
-	if ot_doc.docstatus == 0:
-		ot_doc.submit()
+		if ot_doc.docstatus == 0:
+			ot_doc.submit()
 
 	res_dict = ot_doc.as_dict()
 	res_dict["total_overtime_duration"] = total_duration
@@ -3236,10 +3261,13 @@ def delete_overtime_slip(name: str):
 		frappe.throw(_("You do not have permission to delete Overtime Slip"), frappe.PermissionError)
 
 	doc = frappe.get_doc("Overtime Slip", name)
-	if doc.docstatus == 1:
-		doc.cancel()
+	# Permissions are enforced by the can_delete gate above.
+	doc.flags.ignore_permissions = True
+	with _suspend_employee_user_permission_scope():
+		if doc.docstatus == 1:
+			doc.cancel()
 
-	frappe.delete_doc("Overtime Slip", name)
+		frappe.delete_doc("Overtime Slip", name, ignore_permissions=True)
 	return True
 
 
@@ -3252,7 +3280,7 @@ def can_read_additional_salary():
 	"""
 	user = frappe.session.user
 	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles or "Accounts Manager" in roles:
+	if "HR Manager" in roles or "System Manager" in roles or "Accounts Manager" in roles or "HR User" in roles:
 		return True
 	if frappe.has_permission("Additional Salary", "read"):
 		return True
@@ -3266,7 +3294,7 @@ def can_create_additional_salary():
 	"""
 	user = frappe.session.user
 	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles or "Accounts Manager" in roles:
+	if "HR Manager" in roles or "System Manager" in roles or "Accounts Manager" in roles or "HR User" in roles:
 		return True
 	if frappe.has_permission("Additional Salary", "create"):
 		return True
@@ -3280,7 +3308,7 @@ def can_edit_additional_salary():
 	"""
 	user = frappe.session.user
 	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles or "Accounts Manager" in roles:
+	if "HR Manager" in roles or "System Manager" in roles or "Accounts Manager" in roles or "HR User" in roles:
 		return True
 	if frappe.has_permission("Additional Salary", "write"):
 		return True
@@ -3294,7 +3322,7 @@ def can_delete_additional_salary():
 	"""
 	user = frappe.session.user
 	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles or "Accounts Manager" in roles:
+	if "HR Manager" in roles or "System Manager" in roles or "Accounts Manager" in roles or "HR User" in roles:
 		return True
 	if frappe.has_permission("Additional Salary", "delete"):
 		return True
@@ -3413,10 +3441,11 @@ def save_additional_salary(doc):
 		emp_company = frappe.db.get_value("Employee", doc.get("employee"), "company")
 		sal_doc.company = emp_company or doc.get("company") or frappe.defaults.get_user_default("company")
 
+	sal_doc.flags.ignore_permissions = True
 	if is_new:
-		sal_doc.insert()
+		sal_doc.insert(ignore_permissions=True)
 	else:
-		sal_doc.save()
+		sal_doc.save(ignore_permissions=True)
 
 	if sal_doc.docstatus == 0:
 		sal_doc.submit()
@@ -3436,10 +3465,11 @@ def delete_additional_salary(name: str):
 		frappe.throw(_("You do not have permission to delete Additional Salary"), frappe.PermissionError)
 
 	doc = frappe.get_doc("Additional Salary", name)
+	doc.flags.ignore_permissions = True
 	if doc.docstatus == 1:
 		doc.cancel()
 
-	frappe.delete_doc("Additional Salary", name)
+	frappe.delete_doc("Additional Salary", name, ignore_permissions=True)
 	return True
 
 

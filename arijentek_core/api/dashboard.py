@@ -470,6 +470,7 @@ def get_all_portal_permissions():
 			"can_edit_todo": task_api.can_edit_todo(),
 			"can_delete_todo": task_api.can_delete_todo(),
 			"can_allocate_todo": task_api.can_allocate_todo(),
+			"can_assign_tasks": task_api.can_assign_tasks(),
 		},
 		"payroll": {
 			"can_view_all_payroll": pay_api.can_view_all_payroll(),

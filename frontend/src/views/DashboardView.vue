@@ -117,7 +117,7 @@
 						class="mt-2 h-9 lg:h-8 flex items-center justify-center gap-1.5 rounded-[12px] border border-dashed border-black/15 dark:border-white/20 text-xs font-medium text-[#5C6169] dark:text-white/65 hover:border-accent hover:text-accent dark:hover:text-accent-light transition-colors"
 					>
 						<span class="material-symbols-outlined !text-[18px]">add</span>
-						Add new task
+						{{ canAssignTasks ? 'Assign Task' : 'Add new task' }}
 					</router-link>
 				</section>
 			</div>
@@ -316,6 +316,11 @@
 			v-model="showCreateIssueDialog"
 			@save="handleSaveIssueFromDashboard"
 		/>
+		<!-- Create Salary Slip Dialog Modal -->
+		<CreateSalarySlip
+			v-model="showCreateSalarySlipDialog"
+			@save="handleSaveSalarySlipFromDashboard"
+		/>
 
 	</div>
 </template>
@@ -326,6 +331,7 @@ import CreateLeaveApplication from "@/views/forms/leave/create_leave_application
 import ViewLeaveApplication from "@/views/page_views/leave/view_leave_application.vue"
 import CreateExpenseClaim from "@/views/forms/expense/create_expense_claim.vue"
 import CreateIssue from "@/views/forms/issues/create_issue.vue"
+import CreateSalarySlip from "@/views/forms/payroll/create_salary_slip.vue"
 import { useLeaveStore } from "@/stores/leave"
 import { createResource, initSocket } from "frappe-ui"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
@@ -352,6 +358,7 @@ const showViewLeaveDialog = ref(false)
 const viewLeaveApplicationId = ref('')
 const showCreateExpenseDialog = ref(false)
 const showCreateIssueDialog = ref(false)
+const showCreateSalarySlipDialog = ref(false)
 const showAddTaskDialog = ref(false)
 const showActiveEmployeesDialog = ref(false)
 const canCreateAttendance = computed(() => {
@@ -612,14 +619,77 @@ function go(path) {
 	router.push(path)
 }
 
-const quickActions = [
-	{ label: 'Request leave', icon: 'event_available', run: () => (showRequestLeaveDialog.value = true) },
-	{ label: 'Add task', icon: 'add_task', run: () => (showAddTaskDialog.value = true) },
-	{ label: 'Submit expense', icon: 'receipt_long', run: () => (showCreateExpenseDialog.value = true) },
-	{ label: 'View roster', icon: 'calendar_month', run: () => go('/roster') },
-	{ label: 'My payslips', icon: 'payments', run: () => go('/payroll') },
-	{ label: 'Report an issue', icon: 'report', run: () => (showCreateIssueDialog.value = true) },
-]
+const canAssignTasksResource = createResource({
+	url: "arijentek_core.api.tasks.can_assign_tasks",
+	auto: true,
+})
+
+const canAssignTasks = computed(() => {
+	return (
+		canAssignTasksResource.data === true ||
+		canAssignTasksResource.data === 1 ||
+		tasksStore.permissions?.can_assign_tasks === true ||
+		tasksStore.permissions?.can_allocate === true ||
+		taskMetadata.value?.can_assign_tasks === true
+	)
+})
+
+const quickActions = computed(() => [
+	{
+		label: canAssignTasks.value ? 'Leave Applications' : 'Request leave',
+		icon: 'event_available',
+		run: () => {
+			if (canAssignTasks.value) {
+				go('/leave')
+			} else {
+				showRequestLeaveDialog.value = true
+			}
+		},
+	},
+	{
+		label: canAssignTasks.value ? 'Assign Task' : 'Add Task',
+		icon: 'add_task',
+		run: () => (showAddTaskDialog.value = true),
+	},
+	{
+		label: canAssignTasks.value ? 'Expense Claims' : 'Submit expense',
+		icon: 'receipt_long',
+		run: () => {
+			if (canAssignTasks.value) {
+				go('/expense')
+			} else {
+				showCreateExpenseDialog.value = true
+			}
+		},
+	},
+	{
+		label: 'View roster',
+		icon: 'calendar_month',
+		run: () => go('/roster'),
+	},
+	{
+		label: canAssignTasks.value ? 'Create salary slips' : 'My payslips',
+		icon: 'payments',
+		run: () => {
+			if (canAssignTasks.value) {
+				showCreateSalarySlipDialog.value = true
+			} else {
+				go('/payroll')
+			}
+		},
+	},
+	{
+		label: canAssignTasks.value ? 'Issues' : 'Report an issue',
+		icon: 'report',
+		run: () => {
+			if (canAssignTasks.value) {
+				go('/issues')
+			} else {
+				showCreateIssueDialog.value = true
+			}
+		},
+	},
+])
 
 /* Same trailing-slash trap as the quick actions had: the hand-built URL misses
    the base the dev server expects. */
@@ -643,6 +713,7 @@ onMounted(async () => {
 		await attendance.fetchTodayStatus(id)
 		leaveStore.init(id)
 		tasksStore.init()
+		payrollStore.checkPermissions()
 	}
 
 	// Real-time synchronization: listen for attendance updates
@@ -707,8 +778,14 @@ async function handleSaveIssueFromDashboard() {
 	await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
 }
 
+async function handleSaveSalarySlipFromDashboard() {
+	showCreateSalarySlipDialog.value = false
+	await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+}
+
 const taskMetadata = ref({
 	can_assign_to_others: false,
+	can_assign_tasks: false,
 	priorities: ["Low", "Medium", "High"],
 	statuses: ["Open", "Closed", "Cancelled"],
 	users: [],

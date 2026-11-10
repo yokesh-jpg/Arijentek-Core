@@ -4,17 +4,18 @@ Tasks API - Personal todos management
 
 import frappe
 from frappe import _
-from frappe.utils import getdate, today
+from frappe.utils import cint, getdate, today
 
 
 @frappe.whitelist()
-def get_personal_todos(status: str | None = None, user_filter: str | None = None):
+def get_personal_todos(status: str | None = None, user_filter: str | None = None, limit: int | str | None = None):
 	"""
 	Get personal TODO items for current user, supporting all statuses, assignee/assigner name mapping, and administrative user filtering.
 
 	Args:
 	    status: Filter by status (optional)
 	    user_filter: Filter by target allocated user (optional, only for administrative users)
+	    limit: Maximum number of records to return (defaults to 500, 0 or negative for unlimited)
 
 	Returns:
 	    List of TODO items
@@ -44,13 +45,17 @@ def get_personal_todos(status: str | None = None, user_filter: str | None = None
 	if status:
 		filters.append(["status", "=", status])
 
+	limit_count = cint(limit) if limit is not None else 500
+	if limit_count <= 0:
+		limit_count = None
+
 	todos = frappe.get_all(
 		"ToDo",
 		filters=filters or None,
 		or_filters=or_filters or None,
 		fields=["name", "description", "date", "creation", "priority", "status", "reference_type", "reference_name", "allocated_to", "assigned_by"],
 		order_by="date asc, priority desc",
-		limit=150,
+		limit=limit_count,
 		ignore_permissions=True,
 	)
 
@@ -92,7 +97,7 @@ def get_todo_creation_metadata():
 	todo_roles = frappe.permissions.get_doctype_roles("ToDo")
 	todo_roles = set(todo_roles) - set(AUTOMATIC_ROLES)
 	user_roles = frappe.get_roles(user)
-	can_assign = any(role in todo_roles for role in user_roles)
+	can_assign = any(role in todo_roles for role in user_roles) or can_assign_tasks()
 
 	# Fetch priority and status choices from ToDo metadata
 	meta = frappe.get_meta("ToDo")
@@ -121,6 +126,7 @@ def get_todo_creation_metadata():
 
 	return {
 		"can_assign_to_others": can_assign,
+		"can_assign_tasks": can_assign_tasks(),
 		"priorities": priorities,
 		"statuses": statuses,
 		"users": users,
@@ -488,17 +494,31 @@ def can_delete_todo():
 
 
 @frappe.whitelist()
+def can_assign_tasks():
+	"""
+	Returns True if the current user has permission to assign tasks.
+	Checks for 'HR Manager', 'HR User', or 'System Manager' roles.
+	"""
+	user = frappe.session.user
+	if user == "Administrator":
+		return True
+
+	roles = set(frappe.get_roles(user))
+	allowed_roles = {"HR Manager", "HR User", "System Manager"}
+	return bool(roles & allowed_roles)
+
+
+@frappe.whitelist()
+def can_assign_task():
+	return can_assign_tasks()
+
+
+@frappe.whitelist()
 def can_allocate_todo():
 	"""
 	Returns True if the current user has permission to allocate ToDo.
 	"""
-	user = frappe.session.user
-
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
-		return True
-
-	return False
+	return can_assign_tasks()
 
 
 @frappe.whitelist()

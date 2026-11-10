@@ -40,6 +40,7 @@
             border: 1px solid #d1d5db;
             padding: 6px 8px;
             text-align: left;
+            vertical-align: top;
             word-wrap: break-word;
         }
         th {
@@ -75,9 +76,9 @@
     <table>
         <thead>
             <tr>
-                <th style="width: 30%">Type Name</th>
-                <th style="width: 35%">Default Account</th>
-                <th style="width: 35%">Description</th>
+                <th style="width: 25%">Type Name</th>
+                <th style="width: 25%">Default Account</th>
+                <th style="width: 50%">Description</th>
             </tr>
         </thead>
         <tbody>
@@ -85,7 +86,7 @@
             <tr>
                 <td style="font-weight: bold;">{{ row.expense_type }}</td>
                 <td>{{ row.default_account }}</td>
-                <td>{{ row.description }}</td>
+                <td style="white-space: pre-line;">{{ row.description }}</td>
             </tr>
             {% else %}
             <tr>

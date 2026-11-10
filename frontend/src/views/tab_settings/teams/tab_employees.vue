@@ -94,7 +94,7 @@ import DataTable from '@/components/DataTable.vue'
 import SearchableDropdown from '@/components/SearchableDropdown.vue'
 import { useServerPager } from '@/composables/useServerPager.js'
 import CreateEmployeeForm from '@/views/forms/create_employee.vue'
-import ViewEmployeeModal from '@/views/page_views/view_employee.vue'
+import ViewEmployeeModal from '@/views/page_views/teams/view_employee.vue'
 
 const teamStore = useTeamStore()
 const employeeStore = useEmployeeStore()
