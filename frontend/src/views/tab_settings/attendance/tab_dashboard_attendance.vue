@@ -128,9 +128,18 @@
 						<!-- The status as a word, not a bare dot — the old cell needed
 						     the legend to be readable at all. -->
 						<span v-if="day.entries.length" class="cal-entries min-w-0 w-full overflow-hidden">
-							<span v-for="(e, i) in day.entries" :key="i" class="cal-entry min-w-0 w-full overflow-hidden" :title="e.label">
-								<span class="cal-tick shrink-0" :class="day.isToday ? 'bg-white/70' : e.tick"></span>
-								<span class="cal-entry-label flex-1 min-w-0 truncate" :class="day.isToday ? '!text-white/85' : ''">{{ e.label }}</span>
+							<span
+								v-for="(e, i) in day.entries"
+								:key="i"
+								class="cal-entry min-w-0 w-full overflow-hidden sm:px-1.5 sm:py-0.5 sm:rounded-[6px]"
+								:class="day.isToday ? 'sm:bg-white/15' : (e.badge || '')"
+								:title="e.label"
+							>
+								<span class="cal-tick shrink-0" :class="day.isToday ? 'bg-white/80' : e.tick"></span>
+								<span
+									class="cal-entry-label flex-1 min-w-0 truncate"
+									:class="day.isToday ? '!text-white font-medium' : (e.color || '')"
+								>{{ e.label }}</span>
 							</span>
 						</span>
 					</button>
@@ -401,7 +410,7 @@ const legend = [
 	{ label: 'Absent', dot: 'bg-red-500' },
 	{ label: 'Half day', dot: 'bg-amber-500' },
 	{ label: 'Leave', dot: 'bg-violet-400' },
-	{ label: 'Holiday', dot: 'bg-sky-400' },
+	{ label: 'Holiday', dot: 'bg-amber-500' },
 ];
 
 /* One place that decides what a date means, so the cell, the legend and the
@@ -411,14 +420,47 @@ const legend = [
 function dayMarkers(day) {
 	const out = [];
 	const S = {
-		Present: { label: 'Present', tick: 'bg-green-500' },
-		Absent: { label: 'Absent', tick: 'bg-red-500' },
-		'Half Day': { label: 'Half day', tick: 'bg-amber-500' },
-		'On Leave': { label: 'On leave', tick: 'bg-violet-400' },
+		Present: {
+			label: 'Present',
+			tick: 'bg-green-500',
+			color: '!text-green-700 dark:!text-green-300 font-semibold',
+			badge: 'sm:bg-green-500/[0.10] dark:sm:bg-green-500/20',
+		},
+		Absent: {
+			label: 'Absent',
+			tick: 'bg-red-500',
+			color: '!text-red-700 dark:!text-red-300 font-semibold',
+			badge: 'sm:bg-red-500/[0.10] dark:sm:bg-red-500/20',
+		},
+		'Half Day': {
+			label: 'Half day',
+			tick: 'bg-amber-500',
+			color: '!text-amber-800 dark:!text-amber-300 font-semibold',
+			badge: 'sm:bg-amber-500/[0.12] dark:sm:bg-amber-500/20',
+		},
+		'On Leave': {
+			label: 'On leave',
+			tick: 'bg-violet-400',
+			color: '!text-violet-700 dark:!text-violet-300 font-semibold',
+			badge: 'sm:bg-violet-500/[0.10] dark:sm:bg-violet-500/20',
+		},
 	};
 	if (S[day.attendanceStatus]) out.push(S[day.attendanceStatus]);
-	if (day.isHoliday) out.push({ label: day.holidayName || 'Holiday', tick: 'bg-sky-400' });
-	else if (day.isOnLeave && !out.length) out.push({ label: day.holidayName || 'Leave', tick: 'bg-violet-400' });
+	if (day.isHoliday) {
+		out.push({
+			label: day.holidayName || 'Holiday',
+			tick: 'bg-amber-500',
+			color: '!text-amber-800 dark:!text-amber-300 font-semibold',
+			badge: 'sm:bg-amber-500/[0.12] dark:sm:bg-amber-500/20',
+		});
+	} else if (day.isOnLeave && !out.length) {
+		out.push({
+			label: day.holidayName || 'Leave',
+			tick: 'bg-violet-400',
+			color: '!text-violet-700 dark:!text-violet-300 font-semibold',
+			badge: 'sm:bg-violet-500/[0.10] dark:sm:bg-violet-500/20',
+		});
+	}
 	return out;
 }
 
@@ -442,7 +484,7 @@ const selectedDay = computed(() => {
 	const entries = [];
 
 	if (day?.isHoliday) {
-		entries.push({ title: day.holidayName || 'Holiday', detail: 'Company holiday', bar: 'bg-sky-400' });
+		entries.push({ title: day.holidayName || 'Holiday', detail: 'Company holiday', bar: 'bg-amber-500' });
 	}
 	if (day?.isOnLeave) {
 		entries.push({ title: day.holidayName || 'Leave', detail: 'Approved leave', bar: 'bg-violet-400' });
@@ -478,7 +520,7 @@ const selectedDay = computed(() => {
 		'On Leave': { label: 'On leave', tone: 'tag-neutral' },
 	};
 
-	return { date, entries, statusTag: rec ? TAGS[rec.status] : day?.isHoliday ? { label: 'Holiday', tone: 'tag-accent' } : null };
+	return { date, entries, statusTag: rec ? TAGS[rec.status] : day?.isHoliday ? { label: day.holidayName || 'Holiday', tone: 'tag-amber' } : null };
 });
 
 const selectedDayHeading = computed(() => {

@@ -2863,7 +2863,7 @@ def report_compensatory_leave_list(from_date=None, to_date=None, employee=None, 
 	)
 
 	if int(export):
-		from frappe.utils.xlsxutils import build_xlsx_response
+		from arijentek_core.api.reports import report_xlsx_response
 
 		xlsx_data = [["Reference", "Employee", "Work From Date", "Work End Date", "Half Day", "Status", "Reason"]]
 		for d in data:
@@ -2880,7 +2880,11 @@ def report_compensatory_leave_list(from_date=None, to_date=None, employee=None, 
 				d.reason
 			])
 
-		build_xlsx_response(xlsx_data, "Compensatory_Leave_Report")
+		report_xlsx_response(
+			xlsx_data,
+			"Compensatory_Leave_Report",
+			text_col_idxs=[xlsx_data[0].index("Reason")],
+		)
 		return
 
 	if int(pdf):

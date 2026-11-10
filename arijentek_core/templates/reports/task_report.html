@@ -81,6 +81,7 @@
 		th, td {
 			padding: 6px 8px;
 			text-align: left;
+			vertical-align: top;
 			border-bottom: 1px solid #e2e8f0;
 		}
 
@@ -132,12 +133,12 @@
 	<table>
 		<thead>
 			<tr>
-				<th style="width: 15%">Task ID</th>
-				<th style="width: 20%">Assigned To</th>
-				<th style="width: 10%">Priority</th>
-				<th style="width: 10%">Status</th>
-				<th style="width: 15%">Due Date</th>
-				<th style="width: 30%">Description</th>
+				<th style="width: 10%">Task ID</th>
+				<th style="width: 16%">Assigned To</th>
+				<th style="width: 9%">Priority</th>
+				<th style="width: 9%">Status</th>
+				<th style="width: 11%">Due Date</th>
+				<th style="width: 45%">Description</th>
 			</tr>
 		</thead>
 		<tbody>
@@ -148,7 +149,7 @@
 				<td>{{ row.priority }}</td>
 				<td>{{ row.status }}</td>
 				<td>{{ row.due_date or '-' }}</td>
-				<td>{{ row.description }}</td>
+				<td style="white-space: pre-line; word-wrap: break-word;">{{ row.description }}</td>
 			</tr>
 			{% else %}
 			<tr>

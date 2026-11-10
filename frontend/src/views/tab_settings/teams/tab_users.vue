@@ -82,7 +82,7 @@ import { getErrorMessage } from '@/utils.js'
 import DataTable from '@/components/DataTable.vue'
 import { useServerPager } from '@/composables/useServerPager.js'
 import CreateUsersForm from '@/views/forms/create_users.vue'
-import ViewUserModal from '@/views/page_views/view_users.vue'
+import ViewUserModal from '@/views/page_views/teams/view_users.vue'
 
 const teamStore = useTeamStore()
 

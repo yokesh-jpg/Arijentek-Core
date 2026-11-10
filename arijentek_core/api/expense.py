@@ -1356,7 +1356,6 @@ def report_expense_type_list(account=None, export=0, pdf=0):
 	import frappe
 	from frappe.utils import now_datetime
 	from frappe.utils.pdf import get_pdf
-	from frappe.utils.xlsxutils import build_xlsx_response
 
 	conditions = []
 	params = {}
@@ -1400,7 +1399,13 @@ def report_expense_type_list(account=None, export=0, pdf=0):
 				r["description"]
 			])
 
-		build_xlsx_response(xlsx_data, "Expense_Type_Report")
+		from arijentek_core.api.reports import report_xlsx_response
+
+		report_xlsx_response(
+			xlsx_data,
+			"Expense_Type_Report",
+			text_col_idxs=[xlsx_data[0].index("Description")],
+		)
 		return
 
 	if int(pdf):

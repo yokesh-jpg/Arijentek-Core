@@ -148,12 +148,35 @@
 								<span v-else class="block w-6 h-6 mx-auto grid place-items-center text-[#D8DADE] dark:text-white/15 text-xs">·</span>
 							</td>
 						</tr>
+						<!-- Sentinel element for IntersectionObserver -->
+						<tr ref="gridSentinelRef" class="h-1">
+							<td :colspan="gridDayHeaders.length + 1" class="p-0 border-0"></td>
+						</tr>
 					</tbody>
 				</table>
 			</div>
+
+			<!-- Safe Load More Controls & Status Indicator -->
+			<div v-if="gridPager.state.hasMore" class="flex flex-col items-center justify-center p-3 border-t border-black/[0.06] dark:border-white/[0.07] gap-1.5">
+				<button
+					@click="gridPager.loadMore"
+					:disabled="gridPager.state.loadingMore"
+					class="btn-secondary !text-xs !py-1.5 !px-4 inline-flex items-center gap-1.5"
+				>
+					<span v-if="gridPager.state.loadingMore" class="material-symbols-outlined !text-[16px] animate-spin">progress_activity</span>
+					<span v-else class="material-symbols-outlined !text-[16px]">expand_more</span>
+					{{ gridPager.state.loadingMore ? 'Loading more employees…' : `Load more (${remainingEmployeesCount} remaining)` }}
+				</button>
+				<p class="text-[11px] text-[#5C6169] dark:text-white/50">
+					Showing {{ gridPager.state.items.length }} of {{ gridPager.state.total }} employees
+				</p>
+			</div>
+			<div v-else-if="gridPager.state.total > 50" class="py-2.5 px-4 text-center border-t border-black/[0.06] dark:border-white/[0.07] text-[11px] text-[#5C6169] dark:text-white/50">
+				All {{ gridPager.state.total }} employees loaded.
+			</div>
 		</div>
 
-		<!-- Day detail -->
+		<!-- Unrecorded day summary (recorded cells open the shared ViewAttendance modal) -->
 		<Teleport to="body">
 			<div v-if="showCellDetail" @click.self="showCellDetail = false" class="modal-scrim">
 				<div class="modal-panel !max-w-sm">
@@ -184,14 +207,8 @@
 							<span class="text-[13px] font-medium text-[#17181B] dark:text-white tabular-nums">{{ detailCell.workingHoursFormatted }}</span>
 						</div>
 					</div>
-					<div v-if="detailCell.name || canEditAttendance || canDeleteAttendance || showEmployeeFilter" class="modal-footer">
-						<button v-if="detailCell.name && canDeleteAttendance" @click="handleDelete(detailCell)" class="btn-secondary !text-red-600 dark:text-red-400 dark:!text-red-400 mr-auto">
-							<span class="material-symbols-outlined !text-[18px]">delete</span>Delete
-						</button>
-						<button v-if="detailCell.name" @click="viewAttendance(detailCell.name)" class="btn-secondary">View</button>
-						<button v-if="detailCell.name ? canEditAttendance : (canEditAttendance || showEmployeeFilter)" @click="openEditDialog(detailCell)" class="btn-primary">
-							{{ detailCell.name ? 'Edit' : 'Mark' }}
-						</button>
+					<div v-if="canEditAttendance || showEmployeeFilter" class="modal-footer">
+						<button @click="openEditDialog(detailCell)" class="btn-primary">Mark</button>
 					</div>
 				</div>
 			</div>
@@ -233,9 +250,9 @@
 		<Teleport to="body">
 			<div v-if="showAttendanceViewModal" class="fixed inset-0 z-[100] flex items-center justify-center bg-[#0B0B0E]/70 backdrop-blur-sm p-4 md:p-6">
 				<div class="w-full max-w-md">
-					<AttendancePageView 
-						:id="selectedAttendanceViewId" 
-						:isModal="true" 
+					<ViewAttendance
+						:id="selectedAttendanceViewId"
+						:isModal="true"
 						@close="showAttendanceViewModal = false"
 						@edit="(record) => { showAttendanceViewModal = false; openEditDialog(record); }"
 						@delete="(record) => { showAttendanceViewModal = false; handleDelete(record); }"
@@ -271,7 +288,7 @@ import { createResource } from "frappe-ui";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import { useEmployeeStore } from "@/stores/employee";
 import { useAttendanceStore } from "@/stores/attendance";
-import AttendancePageView from "../../page_views/AttendancePageView.vue";
+import ViewAttendance from "../../page_views/attendance/view_attendance.vue";
 
 import CreateAttendance from "../../forms/attendance/create_attendance.vue";
 import CreateBulkAttendance from "../../forms/attendance/create_bulk_attendance.vue";
@@ -279,6 +296,7 @@ import ActiveEmployeesList from "../../forms/attendance/active_employees_list.vu
 
 import SearchableDropdown from "@/components/SearchableDropdown.vue";
 import DateRangePicker from "@/components/DateRangePicker.vue";
+import { useInfiniteServerPager } from "@/composables/useInfiniteServerPager.js";
 
 const emit = defineEmits(["request-attendance"]);
 
@@ -364,7 +382,6 @@ async function handleDelete(record) {
 		showCellDetail.value = false;
 
 		await queryClient.invalidateQueries({ queryKey: ['attendance-records'] });
-		await queryClient.invalidateQueries({ queryKey: ['attendance-grid'] });
 		if (showGridView.value) {
 			await fetchGridData();
 		}
@@ -375,7 +392,6 @@ async function handleDelete(record) {
 
 async function onSaveSuccess() {
 	await queryClient.invalidateQueries({ queryKey: ['attendance-records'] });
-	await queryClient.invalidateQueries({ queryKey: ['attendance-grid'] });
 	if (showGridView.value) {
 		await fetchGridData();
 	}
@@ -415,28 +431,52 @@ const _today = new Date();
 const selectedMonth = ref(_today.getMonth() + 1);
 const selectedYear = ref(_today.getFullYear());
 
-// Grid query with TanStack Query
-const { data: gridResult, isLoading: gridLoading, refetch: fetchGridData } = useQuery({
-	queryKey: computed(() => [
-		'attendance-grid',
-		showEmployeeFilter.value ? (selectedEmployee.value || 'all') : (employeeStore.employee?.name || ''),
-		selectedYear.value,
-		selectedMonth.value
-	]),
-	queryFn: async () => {
+// Grid infinite scroll pager
+const gridSentinelRef = ref(null);
+
+const gridPager = useInfiniteServerPager(
+	async (page, pageSize) => {
 		const empId = employeeStore.employee?.name;
-		if (!empId && !showEmployeeFilter.value) return { grid: [] };
+		if (!empId && !showEmployeeFilter.value) return { items: [], total: 0, hasMore: false };
 		const id = showEmployeeFilter.value ? selectedEmployee.value : empId;
-		const params = new URLSearchParams({ year: selectedYear.value, month: selectedMonth.value });
+		const params = new URLSearchParams({
+			year: selectedYear.value,
+			month: selectedMonth.value,
+			page,
+			page_size: pageSize,
+		});
 		if (id) params.append('employee_id', id);
 		const res = await fetch(`/api/method/arijentek_core.api.attendance.get_attendance_grid?${params.toString()}`);
 		const json = await res.json();
-		return json.message || { grid: [] };
+		const msg = json.message || {};
+		return {
+			items: msg.grid || [],
+			total: msg.total !== undefined ? msg.total : (msg.grid || []).length,
+			hasMore: msg.has_more ?? false,
+		};
 	},
-	enabled: computed(() => showGridView.value && Boolean(employeeStore.employee?.name || showEmployeeFilter.value)),
-});
+	{ pageSize: 50, itemKey: 'employee' }
+);
 
-const gridData = computed(() => gridResult.value?.grid || []);
+const gridLoading = computed(() => gridPager.state.loadingInitial);
+const gridData = computed(() => gridPager.state.items);
+const remainingEmployeesCount = computed(() => Math.max(0, gridPager.state.total - gridPager.state.items.length));
+
+function fetchGridData() {
+	return gridPager.resetAndFetch();
+}
+
+watch(
+	[() => showGridView.value, gridSentinelRef, () => gridPager.state.hasMore],
+	([isOpen, sentinel, hasMore]) => {
+		if (isOpen && sentinel && hasMore) {
+			gridPager.attachObserver(gridSentinelRef);
+		} else if (!hasMore) {
+			gridPager.cleanupObserver();
+		}
+	},
+	{ flush: 'post' }
+);
 const gridDayHeaders = computed(() => {
 	const m = selectedMonth.value;
 	const y = selectedYear.value;
@@ -446,6 +486,7 @@ const gridDayHeaders = computed(() => {
 
 const showCellDetail = ref(false);
 const detailCell = ref({
+	employee: "",
 	employeeName: "",
 	date: "",
 	status: "",
@@ -554,8 +595,15 @@ function formatGridHours(hours) {
 }
 
 function openCellDetail(day, employeeId, employeeName) {
+	/* Recorded days open the same ViewAttendance modal the list rows use; only
+	   unrecorded days (e.g. leave days with no attendance doc) fall back to the
+	   summary popup, which exists for its Mark action. The grid API sends the
+	   record id as `attendance_name`. */
+	if (day.attendance_name) {
+		viewAttendance(day.attendance_name);
+		return;
+	}
 	detailCell.value = {
-		name: day.name || "",
 		employee: employeeId || "",
 		employeeName,
 		date: day.date,

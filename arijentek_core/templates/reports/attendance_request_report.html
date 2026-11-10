@@ -51,6 +51,7 @@
 			border: 1px solid #e2e8f0;
 			padding: 6px 8px;
 			text-align: left;
+			vertical-align: top;
 		}
 		th {
 			background-color: #f7fafc;
@@ -133,6 +134,8 @@
 								{% else %}
 									<td class="status-draft">{{ val }}</td>
 								{% endif %}
+							{% elif col.fieldname in ('reason', 'explanation') %}
+								<td style="white-space: pre-line; word-wrap: break-word; width: 24%;">{{ val }}</td>
 							{% else %}
 								<td>{{ val }}</td>
 							{% endif %}

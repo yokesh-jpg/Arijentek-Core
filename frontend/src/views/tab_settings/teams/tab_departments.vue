@@ -60,7 +60,7 @@
 		<Dialog v-model="showViewDepartmentModal" :options="{ size: '2xl' }">
 			<template #body>
 				<div class="modal-panel">
-					<DepartmentPageView
+					<ViewDepartment
 						:id="viewDepartmentId"
 						:is-modal="true"
 						@close="showViewDepartmentModal = false"
@@ -82,7 +82,7 @@ import { getErrorMessage } from '@/utils.js'
 import DataTable from '@/components/DataTable.vue'
 import { useServerPager } from '@/composables/useServerPager.js'
 import CreateDepartmentForm from '@/views/forms/create_department.vue'
-import DepartmentPageView from '@/views/page_views/DepartmentPageView.vue'
+import ViewDepartment from '@/views/page_views/teams/view_department.vue'
 
 const teamStore = useTeamStore()
 

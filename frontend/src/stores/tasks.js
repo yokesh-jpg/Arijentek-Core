@@ -51,7 +51,8 @@ export const useTasksStore = defineStore("tasks", () => {
 		can_create: false,
 		can_edit: false,
 		can_delete: false,
-		can_allocate: false
+		can_allocate: false,
+		can_assign_tasks: false
 	});
 
 	const canReadTodoRes = createResource({ url: "arijentek_core.api.tasks.can_read_todo", auto: false, onSuccess(d) { permissions.value.can_read = d; } });
@@ -59,6 +60,7 @@ export const useTasksStore = defineStore("tasks", () => {
 	const canEditTodoRes = createResource({ url: "arijentek_core.api.tasks.can_edit_todo", auto: false, onSuccess(d) { permissions.value.can_edit = d; } });
 	const canDeleteTodoRes = createResource({ url: "arijentek_core.api.tasks.can_delete_todo", auto: false, onSuccess(d) { permissions.value.can_delete = d; } });
 	const canAllocateTodoRes = createResource({ url: "arijentek_core.api.tasks.can_allocate_todo", auto: false, onSuccess(d) { permissions.value.can_allocate = d; } });
+	const canAssignTasksRes = createResource({ url: "arijentek_core.api.tasks.can_assign_tasks", auto: false, onSuccess(d) { permissions.value.can_assign_tasks = d; } });
 
 	// Global lists
 	const taskStatusList = createResource({
@@ -172,6 +174,7 @@ export const useTasksStore = defineStore("tasks", () => {
 			permissions.value.can_edit = !!perms.can_edit_todo;
 			permissions.value.can_delete = !!perms.can_delete_todo;
 			permissions.value.can_allocate = !!perms.can_allocate_todo;
+			permissions.value.can_assign_tasks = !!(perms.can_assign_tasks ?? perms.can_allocate_todo);
 		}
 	}
 

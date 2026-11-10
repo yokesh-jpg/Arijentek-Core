@@ -1,5 +1,6 @@
 import json
 import unittest
+from unittest.mock import patch
 
 import frappe
 from frappe.utils import add_to_date, get_datetime, getdate
@@ -10,6 +11,9 @@ from arijentek_core.api.attendance import (
 	_process_employee_date,
 	calculate_completed_shift_hours,
 	calculate_late_early,
+	clock_in,
+	clock_out,
+	delete_employee_checkin,
 	get_active_sessions_for_reconciliation,
 	get_today_checkin_status,
 	is_auto_attendance_disabled,
@@ -153,7 +157,10 @@ class TestAttendanceScenarios(unittest.TestCase):
 		if emp_id:
 			frappe.db.delete("Employee Checkin", {"employee": emp_id})
 			frappe.db.delete("Attendance", {"employee": emp_id})
+			frappe.db.delete("Timesheet", {"employee": emp_id})
 			frappe.db.delete("Leave Application", {"employee": emp_id})
+			frappe.db.set_single_value("HR Settings", "timesheet_with_clockin", 0)
+			frappe.db.set_single_value("HR Settings", "disable_auto_attendance", 0)
 			frappe.db.commit()
 
 	def test_01_naruto_regular_day_shift(self):
@@ -707,3 +714,299 @@ class TestAttendanceScenarios(unittest.TestCase):
 
 		att_created = frappe.db.exists("Attendance", {"employee": emp_id, "attendance_date": test_date_enabled, "status": "Present"})
 		self.assertTrue(att_created, "Attendance Present record MUST be created when disable_auto_attendance is 0")
+
+	def test_15_regular_shift_proper_clock_in_out_next_day(self):
+		"""
+		Scenario 1: Check the normal day shift properly clock in and clock out, what happens to him in next day.
+		"""
+		user = self.employees["naruto"]
+		self.cleanup_user_records(user)
+		emp_id = frappe.db.get_value("Employee", {"user_id": user}, "name")
+		frappe.set_user(user)
+
+		d1_in = get_datetime("2026-11-03 09:00:00")
+		d1_out = get_datetime("2026-11-03 18:00:00")
+		d2_next = get_datetime("2026-11-04 09:00:00")
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d1_in):
+			res_in = clock_in()
+			self.assertTrue(res_in.get("success"))
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d1_out):
+			res_out = clock_out()
+			self.assertTrue(res_out.get("success"))
+			self.assertEqual(res_out.get("hours_this_session"), 9.0)
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d2_next):
+			status_next = get_today_checkin_status(employee_id=emp_id)
+			self.assertFalse(status_next["checked_in"], "Next day must be ready to clock in")
+
+		att = frappe.db.get_value("Attendance", {"employee": emp_id, "attendance_date": "2026-11-03", "docstatus": ("!=", 2)},
+								  ["status", "working_hours"], as_dict=True)
+		self.assertEqual(att.status, "Present")
+		self.assertEqual(att.working_hours, 9.0)
+
+	def test_16_regular_shift_forgot_clock_out(self):
+		"""
+		Scenario 2: Check he forgets to clock out on a normal day shift.
+		"""
+		user = self.employees["gaara"]
+		self.cleanup_user_records(user)
+		emp_id = frappe.db.get_value("Employee", {"user_id": user}, "name")
+		frappe.set_user(user)
+
+		d1_in = get_datetime("2026-11-03 09:00:00")
+		d1_evening = get_datetime("2026-11-03 18:00:00")
+		d2_next = get_datetime("2026-11-04 09:00:00")
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d1_in):
+			clock_in()
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d1_evening):
+			status_evening = get_today_checkin_status(employee_id=emp_id)
+			self.assertTrue(status_evening["checked_in"], "Within 16h, session is active with Clock Out available")
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d2_next):
+			status_next = get_today_checkin_status(employee_id=emp_id)
+			self.assertFalse(status_next["checked_in"], "Past 16h, expired session resets and opens Clock In")
+
+		att = frappe.db.get_value("Attendance", {"employee": emp_id, "attendance_date": "2026-11-03", "docstatus": ("!=", 2)},
+								  ["status", "out_time", "working_hours"], as_dict=True)
+		self.assertIsNone(att.out_time, "Forgot clock out leaves out_time as NULL")
+		self.assertEqual(att.working_hours, 0.0)
+
+	def test_17_regular_shift_forgot_clock_out_timesheet_enabled(self):
+		"""
+		Scenario 3: Check he forgets to clock out and Timesheet automation is enabled.
+		"""
+		user = self.employees["sasuke"]
+		self.cleanup_user_records(user)
+		emp_id = frappe.db.get_value("Employee", {"user_id": user}, "name")
+		frappe.db.set_single_value("HR Settings", "timesheet_with_clockin", 1)
+		frappe.db.commit()
+		frappe.set_user(user)
+
+		d1_in = get_datetime("2026-11-03 09:00:00")
+		d2_next = get_datetime("2026-11-04 09:00:00")
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d1_in):
+			clock_in()
+
+		ts = frappe.db.get_value("Timesheet", {"employee": emp_id, "start_date": "2026-11-03"}, ["name", "docstatus"], as_dict=True)
+		self.assertIsNotNone(ts, "Draft timesheet must be created on clock in")
+		self.assertEqual(ts.docstatus, 0, "Timesheet must remain in Draft (docstatus=0)")
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d2_next):
+			status_next = get_today_checkin_status(employee_id=emp_id)
+			self.assertFalse(status_next["checked_in"], "Session expired past 16h")
+
+	def test_18_regular_shift_forgot_clock_out_disable_auto_attendance(self):
+		"""
+		Scenario 4: Check he forgets to clock out and Disable auto attendance is enabled.
+		"""
+		user = self.employees["hinata"]
+		self.cleanup_user_records(user)
+		emp_id = frappe.db.get_value("Employee", {"user_id": user}, "name")
+		frappe.db.set_single_value("HR Settings", "disable_auto_attendance", 1)
+		frappe.db.commit()
+		frappe.set_user(user)
+
+		d1_in = get_datetime("2026-11-03 09:00:00")
+		d2_next = get_datetime("2026-11-04 09:00:00")
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d1_in):
+			clock_in()
+
+		skip_val = frappe.db.get_value("Employee Checkin", {"employee": emp_id, "time": d1_in}, "skip_auto_attendance")
+		self.assertEqual(skip_val, 1)
+
+		att_count = frappe.db.count("Attendance", {"employee": emp_id, "attendance_date": "2026-11-03"})
+		self.assertEqual(att_count, 0, "No attendance doc created when auto attendance is disabled")
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d2_next):
+			status_next = get_today_checkin_status(employee_id=emp_id)
+			self.assertFalse(status_next["checked_in"])
+
+	def test_19_overnight_shift_proper_clock_in_out(self):
+		"""
+		Scenario 5: Apply Scenario 1 in midnight day-changing movement (Overnight Shift 22:00 -> 06:00).
+		"""
+		user = self.employees["shikamaru"]
+		self.cleanup_user_records(user)
+		emp_id = frappe.db.get_value("Employee", {"user_id": user}, "name")
+		frappe.set_user(user)
+
+		d1_night_in = get_datetime("2026-11-03 22:00:00")
+		d2_midnight = get_datetime("2026-11-04 02:00:00")
+		d2_morning_out = get_datetime("2026-11-04 06:00:00")
+		d3_next_evening = get_datetime("2026-11-04 20:00:00")
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d1_night_in):
+			clock_in()
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d2_midnight):
+			status_midnight = get_today_checkin_status(employee_id=emp_id)
+			self.assertTrue(status_midnight["checked_in"], "Overnight shift must remain active across midnight")
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d2_morning_out):
+			res_out = clock_out()
+			self.assertTrue(res_out.get("success"))
+			self.assertEqual(res_out.get("hours_this_session"), 8.0)
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d3_next_evening):
+			status_next = get_today_checkin_status(employee_id=emp_id)
+			self.assertFalse(status_next["checked_in"], "Ready for new night shift")
+
+		att = frappe.db.get_value("Attendance", {"employee": emp_id, "attendance_date": "2026-11-03", "docstatus": ("!=", 2)},
+								  ["status", "working_hours"], as_dict=True)
+		self.assertEqual(att.status, "Present")
+		self.assertEqual(att.working_hours, 8.0)
+
+	def test_20_overnight_shift_forgot_clock_out(self):
+		"""
+		Scenario 6: Apply Scenario 2 in midnight day-changing movement (Overnight Shift forgot clock out).
+		"""
+		user = self.employees["kiba"]
+		self.cleanup_user_records(user)
+		emp_id = frappe.db.get_value("Employee", {"user_id": user}, "name")
+		frappe.set_user(user)
+
+		d1_night_in = get_datetime("2026-11-03 22:00:00")
+		d2_midnight = get_datetime("2026-11-04 02:00:00")
+		d2_morning = get_datetime("2026-11-04 08:00:00")
+		d2_afternoon = get_datetime("2026-11-04 16:00:00")
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d1_night_in):
+			clock_in()
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d2_midnight):
+			status_mid = get_today_checkin_status(employee_id=emp_id)
+			self.assertTrue(status_mid["checked_in"])
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d2_morning):
+			status_morn = get_today_checkin_status(employee_id=emp_id)
+			self.assertTrue(status_morn["checked_in"], "Morning within 16h still has Clock Out button active")
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d2_afternoon):
+			status_aft = get_today_checkin_status(employee_id=emp_id)
+			self.assertFalse(status_aft["checked_in"], "Afternoon past 16h session expires, Clock In available")
+
+		att = frappe.db.get_value("Attendance", {"employee": emp_id, "attendance_date": "2026-11-03", "docstatus": ("!=", 2)},
+								  ["out_time", "working_hours"], as_dict=True)
+		self.assertIsNone(att.out_time)
+		self.assertEqual(att.working_hours, 0.0)
+
+	def test_21_overnight_shift_forgot_clock_out_timesheet_enabled(self):
+		"""
+		Scenario 7: Apply Scenario 3 in midnight day-changing movement (Overnight Shift + Timesheet enabled).
+		"""
+		user = self.employees["neji"]
+		self.cleanup_user_records(user)
+		emp_id = frappe.db.get_value("Employee", {"user_id": user}, "name")
+		frappe.db.set_single_value("HR Settings", "timesheet_with_clockin", 1)
+		frappe.db.commit()
+		frappe.set_user(user)
+
+		d1_night_in = get_datetime("2026-11-03 22:00:00")
+		d2_afternoon = get_datetime("2026-11-04 16:00:00")
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d1_night_in):
+			clock_in()
+
+		ts = frappe.db.get_value("Timesheet", {"employee": emp_id, "start_date": "2026-11-03"}, ["name", "docstatus"], as_dict=True)
+		self.assertIsNotNone(ts)
+		self.assertEqual(ts.docstatus, 0)
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d2_afternoon):
+			status_aft = get_today_checkin_status(employee_id=emp_id)
+			self.assertFalse(status_aft["checked_in"])
+
+	def test_22_overnight_shift_forgot_clock_out_disable_auto_attendance(self):
+		"""
+		Scenario 8: Apply Scenario 4 in midnight day-changing movement (Overnight Shift + Auto Attendance disabled).
+		"""
+		user = self.employees["rocklee"]
+		self.cleanup_user_records(user)
+		emp_id = frappe.db.get_value("Employee", {"user_id": user}, "name")
+		frappe.db.set_single_value("HR Settings", "disable_auto_attendance", 1)
+		frappe.db.commit()
+		frappe.set_user(user)
+
+		d1_night_in = get_datetime("2026-11-03 22:00:00")
+		d2_afternoon = get_datetime("2026-11-04 16:00:00")
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d1_night_in):
+			clock_in()
+
+		checkin_skip = frappe.db.get_value("Employee Checkin", {"employee": emp_id, "time": d1_night_in}, "skip_auto_attendance")
+		self.assertEqual(checkin_skip, 1)
+
+		att_count = frappe.db.count("Attendance", {"employee": emp_id, "attendance_date": "2026-11-03"})
+		self.assertEqual(att_count, 0)
+
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d2_afternoon):
+			status_aft = get_today_checkin_status(employee_id=emp_id)
+			self.assertFalse(status_aft["checked_in"])
+
+	def test_23_prevent_re_clock_in_after_completed_shift(self):
+		"""
+		Verify that after an employee completes their normal shift and clocks out:
+		1. is_day_completed is True throughout that day.
+		2. Calling clock_in() again on that same day is rejected.
+		3. Next day is reset cleanly (is_day_completed = False, ready for Clock In).
+		4. If the Clock Out check-in is deleted, is_day_completed resets to False and session resumes.
+		"""
+		user = self.employees["sakura"]
+		self.cleanup_user_records(user)
+		emp_id = frappe.db.get_value("Employee", {"user_id": user}, "name")
+		frappe.set_user(user)
+
+		d1_in = get_datetime("2026-11-03 09:00:00")
+		d1_out = get_datetime("2026-11-03 18:00:00")
+		d1_later = get_datetime("2026-11-03 18:10:00")
+		d1_night = get_datetime("2026-11-03 23:00:00")
+		d2_next = get_datetime("2026-11-04 09:00:00")
+
+		# Clock In
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d1_in):
+			res_in = clock_in()
+			self.assertTrue(res_in.get("success"))
+
+		# Clock Out
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d1_out):
+			res_out = clock_out()
+			self.assertTrue(res_out.get("success"))
+			out_checkin_name = res_out.get("checkout_id")
+
+		# Check status immediately after clock out
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d1_out):
+			status_out = get_today_checkin_status(employee_id=emp_id)
+			self.assertFalse(status_out["checked_in"])
+			self.assertTrue(status_out["is_day_completed"], "Day must be marked completed after clocking out")
+
+		# Attempt re-clock-in 10 minutes later on the same day -> Must be rejected!
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d1_later):
+			res_reclock = clock_in()
+			self.assertFalse(res_reclock.get("success"), "Re-clock in on same day must be rejected")
+			self.assertIn("Attendance for today is already completed", res_reclock.get("message"))
+
+		# Attempt re-clock-in 5 hours later on the same day -> Must still be rejected!
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d1_night):
+			status_night = get_today_checkin_status(employee_id=emp_id)
+			self.assertTrue(status_night["is_day_completed"], "Day completed status must persist throughout the rest of the day")
+			res_reclock_night = clock_in()
+			self.assertFalse(res_reclock_night.get("success"), "Must reject clock-in at night of same completed day")
+
+		# Next Day -> Day completes resets, Clock In is available
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d2_next):
+			status_next = get_today_checkin_status(employee_id=emp_id)
+			self.assertFalse(status_next["is_day_completed"], "Next day must NOT be day-completed")
+			self.assertFalse(status_next["checked_in"])
+
+		# Delete Clock Out log -> session resumes!
+		with patch("arijentek_core.api.attendance.get_employee_now_datetime", return_value=d1_out):
+			del_res = delete_employee_checkin(out_checkin_name)
+			self.assertTrue(del_res.get("success"))
+			status_resumed = get_today_checkin_status(employee_id=emp_id)
+			self.assertTrue(status_resumed["checked_in"], "Session must resume when checkout log is deleted")
+			self.assertFalse(status_resumed["is_day_completed"])

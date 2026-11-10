@@ -136,7 +136,7 @@ import { useEmployeeStore } from '../../../stores/employee';
 import SearchableDropdown from '../../../components/SearchableDropdown.vue';
 import CreateSalaryStructureAssignment from '../../forms/payroll/create_salary_structure_assignment.vue';
 import CreateBulkSalaryStrutureAssignment from '../../forms/payroll/create_bulk_salary_struture_assignment.vue';
-import ViewSalaryStructureAssignment from '../../page_views/view_salary_structure_assignment.vue';
+import ViewSalaryStructureAssignment from '../../page_views/payroll/view_salary_structure_assignment.vue';
 import { getErrorMessage } from '@/utils';
 
 const payrollStore = usePayrollStore();

@@ -87,7 +87,7 @@ import { call } from 'frappe-ui';
 import { storeToRefs } from 'pinia';
 import { usePayrollStore } from '../../../stores/payroll';
 import CreateSalaryStructure from '../../forms/payroll/create_salary_structure.vue';
-import ViewSalaryStructure from '../../page_views/view_salary_structure.vue';
+import ViewSalaryStructure from '../../page_views/payroll/view_salary_structure.vue';
 import { getErrorMessage } from '@/utils';
 
 const payrollStore = usePayrollStore();

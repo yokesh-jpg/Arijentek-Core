@@ -1,3 +1,5 @@
+import { createSafeError } from "../utils/errorSanitizer";
+
 // Caching helper — TTL: 1 hour
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
@@ -15,29 +17,34 @@ async function request(endpoint, options = {}) {
     headers["X-Frappe-CSRF-Token"] = token;
   }
 
-  const res = await fetch(`/api/method/${endpoint}`, {
-    ...options,
-    headers,
-    credentials: "include",
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    let msg = "Request failed";
-    if (err._server_messages) {
-      try {
-        const msgs = JSON.parse(err._server_messages);
-        msg = JSON.parse(msgs[0]).message || msg;
-      } catch {
-        /* ignore */
-      }
-    } else if (err.exception) {
-      msg = err.exception;
-    }
-    throw new Error(msg);
+  let res;
+  try {
+    res = await fetch(`/api/method/${endpoint}`, {
+      ...options,
+      headers,
+      credentials: "include",
+    });
+  } catch (networkErr) {
+    throw createSafeError(networkErr);
   }
 
-  const data = await res.json();
+  if (!res.ok) {
+    let err = {};
+    try {
+      err = await res.json();
+    } catch {
+      err = { status: res.status, message: res.statusText || "Server response error" };
+    }
+    err.status = res.status;
+    throw createSafeError(err);
+  }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    return null;
+  }
   return data.message !== undefined ? data.message : data;
 }
 

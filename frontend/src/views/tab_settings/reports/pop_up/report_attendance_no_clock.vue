@@ -19,7 +19,12 @@
 			<div class="flex flex-wrap items-end gap-3">
 				<div class="min-w-[200px] flex-1">
 					<label class="field-label">Date range</label>
-					<DateRangePicker @change="fetchReportData" />
+					<DateRangePicker
+						v-model:fromDate="filters.fromDate"
+						v-model:toDate="filters.toDate"
+						v-model:preset="filters.preset"
+						@change="handleDateRangeChange"
+					/>
 				</div>
 				<div class="min-w-[170px] flex-1">
 					<label class="field-label">Employee</label>
@@ -48,7 +53,7 @@
 import { ref, reactive, watch } from 'vue';
 import SearchableDropdown from '../../../../components/SearchableDropdown.vue';
 import DateRangePicker from '../../../../components/DateRangePicker.vue';
-import AttendancePageView from '../../../page_views/AttendancePageView.vue';
+import ViewAttendance from '../../../page_views/attendance/view_attendance.vue';
 import CreateAttendance from '../../../../views/forms/attendance/create_attendance.vue';
 import ReportDialog from '@/components/ReportDialog.vue';
 import ReportTable from '@/components/ReportTable.vue';
@@ -107,6 +112,15 @@ const filters = reactive({
 	employee: '',
 	forgotClockOut: true,
 });
+
+const handleDateRangeChange = (range) => {
+	if (range) {
+		filters.fromDate = range.fromDate || '';
+		filters.toDate = range.toDate || '';
+		filters.preset = range.preset || 'All Time';
+	}
+	fetchReportData();
+};
 
 const columns = ref([]);
 const reportData = ref([]);

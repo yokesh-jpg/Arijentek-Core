@@ -92,12 +92,14 @@ after_install = [
 	"arijentek_core.install.after_install",
 	"arijentek_core.api.overtime_type.create_standard_overtime_type",
 	"arijentek_core.api.expense_type.update_standard_expense_types",
+	"arijentek_core.api.overtime_slip_perm.setup_overtime_slip_permission",
 ]
 after_migrate = [
 	"arijentek_core.custom_fields.setup_custom_fields",
 	"arijentek_core.install.after_migrate",
 	"arijentek_core.api.overtime_type.create_standard_overtime_type",
 	"arijentek_core.api.expense_type.update_standard_expense_types",
+	"arijentek_core.api.overtime_slip_perm.setup_overtime_slip_permission",
 ]
 
 # Uninstallation

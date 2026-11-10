@@ -114,6 +114,7 @@
 <script setup>
 import { ref } from 'vue'
 import { createResource } from 'frappe-ui'
+import { getSafeErrorMessage } from '../utils/errorSanitizer.js'
 
 const usernameOrEmail = ref('')
 const password = ref('')
@@ -130,11 +131,24 @@ const loginResource = createResource({
 		return { usr: (usernameOrEmail.value || '').trim(), pwd: password.value }
 	},
 	onSuccess() {
+		try {
+			const usr = (usernameOrEmail.value || '').trim()
+			const syncPayload = { action: 'new_login', user: usr, timestamp: Date.now() }
+			localStorage.setItem('portal_session_sync', JSON.stringify(syncPayload))
+			if (usr) {
+				localStorage.setItem('portal_active_user', usr)
+			}
+			if (typeof BroadcastChannel !== 'undefined') {
+				const ch = new BroadcastChannel('portal_session_sync_channel')
+				ch.postMessage(syncPayload)
+				ch.close()
+			}
+		} catch (e) {}
 		window.location.reload()
 	},
 	onError(err) {
 		loading.value = false
-		errorMsg.value = err?.messages?.[0] || 'Invalid credentials'
+		errorMsg.value = getSafeErrorMessage(err, 'Invalid login credentials')
 	},
 })
 

@@ -95,14 +95,14 @@
 		<!-- ===== DESKTOP SIDEBAR (RAIL) ===== -->
 		<aside
 			class="hidden lg:flex portal-rail flex-col shrink-0 overflow-hidden select-none z-30 transition-[width,min-width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
-			:class="visuallyCollapsed ? 'w-[80px] min-w-[80px] items-center' : 'w-[256px] min-w-[256px]'"
+			:class="visuallyCollapsed ? 'w-[80px] min-w-[80px]' : 'w-[256px] min-w-[256px]'"
 			@mouseenter="onHoverEnter"
 			@mouseleave="onHoverLeave"
 		>
-			<!-- Top Header: Brand Lockup (matching zevar_ui - no top toggle; collapse via hover) -->
+			<!-- Top Header: Brand Lockup (matching zevar_ui) -->
 			<div
-				class="flex items-center h-16 shrink-0 transition-all duration-300 w-full"
-				:class="visuallyCollapsed ? 'px-0 justify-center mb-2' : 'px-4 justify-start gap-3 mb-2'"
+				class="flex items-center h-[88px] shrink-0 transition-all duration-300 w-full"
+				:class="visuallyCollapsed ? 'px-0 justify-center' : 'px-5 justify-start'"
 			>
 				<!-- Brand lockup (shown when expanded) -->
 				<router-link
@@ -127,7 +127,7 @@
 				</router-link>
 
 				<!-- Collapsed View: Centered Avatar Icon Only -->
-				<div v-show="visuallyCollapsed" class="w-full flex flex-col items-center gap-2 pt-2">
+				<div v-show="visuallyCollapsed" class="w-full flex justify-center">
 					<router-link
 						to="/"
 						class="flex items-center justify-center outline-none group"
@@ -145,6 +145,7 @@
 			<!-- Grouped nav -->
 			<nav
 				class="flex-1 pb-3 space-y-5 overflow-y-auto overflow-x-hidden no-scrollbar w-full"
+				:class="visuallyCollapsed ? 'px-5' : 'px-4'"
 			>
 				<div v-for="group in navGroups" :key="group.label" class="space-y-2.5">
 					<div
@@ -152,7 +153,7 @@
 						:class="visuallyCollapsed ? 'opacity-0 h-0' : 'opacity-100 h-6 delay-100'"
 					>
 						<span
-							class="text-xs font-semibold tracking-[0.14em] text-[#8A8A9E] whitespace-nowrap uppercase"
+							class="text-xs font-semibold tracking-[0.14em] text-[#6E6E80] whitespace-nowrap"
 							>{{ group.label }}</span
 						>
 					</div>

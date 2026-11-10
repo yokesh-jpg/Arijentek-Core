@@ -158,18 +158,27 @@ export const useAttendanceStore = defineStore("attendance", () => {
 		const data = todayStatus.value;
 		if (!data) return false;
 
-		// If there are shifts defined
-		if (data.shifts && data.shifts.length > 0) {
-			return data.shifts.every((s) => s.is_completed);
+		// Authoritative flag from backend
+		if (typeof data.is_day_completed === "boolean") {
+			return data.is_day_completed;
 		}
 
-		// Fallback for single/standard shift
-		return (
+		// Fallback for single/standard shift: clocked out and not on break
+		const isOut = (
 			data.last_log_type === "OUT" &&
 			!isOnBreak.value &&
 			(data.logs || []).length >= 2 &&
 			totalSecondsToday.value > 0
 		);
+
+		if (!isOut) return false;
+
+		// If there are shifts defined
+		if (data.shifts && data.shifts.length > 0) {
+			return data.shifts.every((s) => s.is_completed);
+		}
+
+		return true;
 	});
 
 	const canManageBreak = computed(() => {

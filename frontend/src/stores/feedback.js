@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { sanitizeError, isProhibitedMessage } from '../utils/errorSanitizer.js'
 
 /* The POS's feedback store (zevar_ui_design_bundle/src/stores/feedback.js),
    trimmed to what the Staff Hub uses: an in-app confirm dialog in place of the
@@ -29,7 +30,19 @@ export const useFeedbackStore = defineStore('feedback', () => {
 
 	function show(type, message, title = '') {
 		const id = ++nextId
-		toasts.value.unshift({ id, type, title, message: typeof message === 'string' ? message : message?.message || JSON.stringify(message) })
+		let finalTitle = title
+		let finalMessage = message
+
+		const rawStr = typeof message === 'string' ? message : (message?.message || '')
+		if (type === 'error' || isProhibitedMessage(rawStr) || message instanceof Error) {
+			const sanitized = sanitizeError(message, title)
+			finalTitle = sanitized.title || title || 'Action restricted'
+			finalMessage = sanitized.message
+		} else {
+			finalMessage = typeof message === 'string' ? message : message?.message || JSON.stringify(message)
+		}
+
+		toasts.value.unshift({ id, type, title: finalTitle, message: finalMessage })
 		if (toasts.value.length > 3) toasts.value.pop()
 		setTimeout(() => dismiss(id), DURATION[type] || 5000)
 		return id

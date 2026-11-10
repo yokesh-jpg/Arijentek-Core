@@ -3682,6 +3682,41 @@ def get_attendance_report_filter_options():
 	}
 
 
+def report_xlsx_response(xlsx_data, filename, text_col_idxs=None, text_col_width=80):
+	"""
+	Send a report as an xlsx download: bold header row, and wrap-text plus a
+	wide column (default 80 chars) on free-text fields (Description / Reason /
+	Explanation) so multi-line values read the way they do in the on-screen
+	preview and the PDF.
+
+	Calls make_xlsx()/provide_binary_file() directly because
+	build_xlsx_response() cannot set column widths.
+	"""
+	from frappe.desk.utils import provide_binary_file
+	from frappe.utils.xlsxutils import make_xlsx
+
+	text_cols = set(text_col_idxs or ())
+	n_cols = len(xlsx_data[0]) if xlsx_data else 0
+
+	cell_styles = {}
+	for col_idx in range(n_cols):
+		cell_styles[(0, col_idx)] = [0]
+	for row_idx in range(1, len(xlsx_data)):
+		for col_idx in text_cols:
+			cell_styles[(row_idx, col_idx)] = [1]
+
+	styles = {
+		"styles": [{"bold": True}, {"text_wrap": True, "valign": "top"}],
+		"column_styles": {},
+		"row_styles": {},
+		"cell_styles": cell_styles,
+	}
+	column_widths = [text_col_width if col_idx in text_cols else None for col_idx in range(n_cols)]
+
+	xlsx_file = make_xlsx(xlsx_data, filename, column_widths=column_widths, styles=styles)
+	provide_binary_file(filename, "xlsx", xlsx_file.getvalue())
+
+
 @frappe.whitelist()
 def get_daily_timesheet_summary_report(from_date=None, to_date=None, employee=None, department=None, designation=None, export=False):
 	"""
@@ -3690,12 +3725,8 @@ def get_daily_timesheet_summary_report(from_date=None, to_date=None, employee=No
 	"""
 	import frappe
 	from frappe.utils import cint, getdate, nowdate
-	from frappe.utils.xlsxutils import build_xlsx_response
 
-	if not from_date and not to_date:
-		from_date = nowdate()
-		to_date = nowdate()
-	elif from_date and not to_date:
+	if from_date and not to_date:
 		to_date = from_date
 	elif to_date and not from_date:
 		from_date = to_date
@@ -3770,7 +3801,11 @@ def get_daily_timesheet_summary_report(from_date=None, to_date=None, employee=No
 		xlsx_data = [[c["label"] for c in columns]]
 		for row in data:
 			xlsx_data.append([row.get(c["fieldname"], "") for c in columns])
-		return build_xlsx_response(xlsx_data, "Daily_Timesheet_Summary")
+		return report_xlsx_response(
+			xlsx_data,
+			"Daily_Timesheet_Summary",
+			text_col_idxs=[i for i, c in enumerate(columns) if c.get("fieldname") == "description"],
+		)
 
 	return {
 		"columns": columns,

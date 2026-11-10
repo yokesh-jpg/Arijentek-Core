@@ -1,6 +1,7 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import { setConfig, frappeRequest, resourcesPlugin } from "frappe-ui";
+import { safeFrappeRequest } from "./utils/safeFrappeRequest";
 import { VueQueryPlugin } from "@tanstack/vue-query";
 import App from "./App.vue";
 import router from "./router";
@@ -26,7 +27,19 @@ window.addEventListener(
 const pinia = createPinia();
 const app = createApp(App);
 
-setConfig("resourceFetcher", frappeRequest);
+// Register safe resource fetcher to guard createResource calls against raw HTML/TypeError crashes
+setConfig("resourceFetcher", safeFrappeRequest);
+
+// Global Vue Runtime Error Boundary
+app.config.errorHandler = (err, instance, info) => {
+	console.error("[Global Vue Error Boundary Intercepted]:", err, info);
+};
+
+// Global Unhandled Async Promise Rejection Shield
+window.addEventListener("unhandledrejection", (event) => {
+	console.warn("[Global Unhandled Rejection Shielded]:", event.reason);
+	event.preventDefault();
+});
 
 app.use(pinia);
 app.use(router);

@@ -135,7 +135,7 @@
 			border: 1px solid #cbd5e1;
 			padding: 5px 4px;
 			text-align: left;
-			vertical-align: middle;
+			vertical-align: top;
 			word-wrap: break-word;
 		}
 		table.report-table th {
@@ -224,16 +224,16 @@
 	<table class="report-table">
 		<thead>
 			<tr>
-				<th style="width: 75px;">Timesheet ID</th>
+				<th style="width: 65px;">Timesheet ID</th>
 				<th style="width: 65px;">Emp ID</th>
-				<th style="width: 110px;">Employee Name</th>
-				<th style="width: 85px;">Department</th>
-				<th style="width: 85px;">Designation</th>
+				<th style="width: 95px;">Employee Name</th>
+				<th style="width: 70px;">Department</th>
+				<th style="width: 70px;">Designation</th>
 				<th style="width: 65px;" class="text-center">Date</th>
 				<th style="width: 85px;" class="text-center">Time Span</th>
 				<th style="width: 45px;" class="text-right">Hours</th>
 				<th style="width: 75px;">Activity</th>
-				<th style="width: 90px;">Project</th>
+				<th style="width: 70px;">Project</th>
 				<th>Description</th>
 				<th style="width: 55px;" class="text-center">Status</th>
 			</tr>
@@ -253,7 +253,7 @@
 				<td class="text-right text-hours">{{ row.hours }} hrs</td>
 				<td><span class="badge-activity">{{ row.activity_type }}</span></td>
 				<td>{{ row.project or '-' }}</td>
-				<td style="color: #475569; font-size: 8px;">{{ row.description or '-' }}</td>
+				<td style="color: #475569; font-size: 8px; white-space: pre-line;">{{ row.description or '-' }}</td>
 				<td class="text-center">
 					{% set st = row.status|string|lower %}
 					{% if st == 'submitted' %}

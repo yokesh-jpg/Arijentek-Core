@@ -388,10 +388,10 @@ export const usePayrollStore = defineStore("payroll", () => {
 			canEditOvertimeSlip.value = !!perms.can_edit_overtime_slip;
 			canDeleteOvertimeSlip.value = !!perms.can_delete_overtime_slip;
 
-			canReadAdditionalSalary.value = !!perms.can_read_additional_salary || !!perms.can_read_employee_advance || true;
-			canCreateAdditionalSalary.value = !!perms.can_create_additional_salary || !!perms.can_create_employee_advance || true;
-			canEditAdditionalSalary.value = !!perms.can_edit_additional_salary || !!perms.can_edit_employee_advance || true;
-			canDeleteAdditionalSalary.value = !!perms.can_delete_additional_salary || !!perms.can_delete_employee_advance || true;
+			canReadAdditionalSalary.value = !!perms.can_read_additional_salary;
+			canCreateAdditionalSalary.value = !!perms.can_create_additional_salary;
+			canEditAdditionalSalary.value = !!perms.can_edit_additional_salary;
+			canDeleteAdditionalSalary.value = !!perms.can_delete_additional_salary;
 
 			canViewAllResource.data = perms.can_view_all_payroll;
 		}

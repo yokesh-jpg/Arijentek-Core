@@ -9,6 +9,7 @@ import frappe
 from frappe import _
 from frappe.utils import (
 	add_days,
+	cint,
 	flt,
 	get_first_day,
 	get_last_day,
@@ -354,7 +355,7 @@ def _link_missing_out_shifts(employee_id, for_date):
 		"Employee Checkin",
 		filters={
 			"employee": employee_id,
-			"time": ["Between", [f"{for_date} 00:00:00", f"{for_date} 23:59:59"]],
+			"time": ["Between", [f"{add_days(for_date, -1)} 00:00:00", f"{for_date} 23:59:59"]],
 		},
 		fields=["name", "log_type", "shift"],
 		order_by="time asc",
@@ -405,11 +406,21 @@ def get_today_checkin_status(employee_id: str | None = None, skip_roster: bool =
 
 	start_date = today
 	if last_db_log and last_db_log.log_type == "IN" and last_db_log.time:
-		# If they clocked in yesterday (up to 24h ago) and haven't clocked out, start query from the check-in date
+		# If they clocked in within the active window (up to 16h = 57600s) and haven't clocked out, start query from check-in date
 		last_checkin_date = last_db_log.time.date()
-		if last_checkin_date < today and (get_employee_now_datetime(employee_id) - last_db_log.time).total_seconds() < 86400:
-			# But only if attendance has not already been submitted for that date
-			if not frappe.db.exists("Attendance", {"employee": employee_id, "attendance_date": last_checkin_date, "docstatus": ("!=", 2)}):
+		elapsed_seconds = (get_employee_now_datetime(employee_id) - last_db_log.time).total_seconds()
+		if last_checkin_date < today and elapsed_seconds < 57600:
+			# Only consider it closed if attendance record already has out_time completed
+			completed_att = frappe.db.exists(
+				"Attendance",
+				{
+					"employee": employee_id,
+					"attendance_date": last_checkin_date,
+					"out_time": ["is", "set"],
+					"docstatus": ("!=", 2),
+				}
+			)
+			if not completed_att:
 				start_date = last_checkin_date
 
 	# Get check-in logs starting from start_date
@@ -450,11 +461,31 @@ def get_today_checkin_status(employee_id: str | None = None, skip_roster: bool =
 	if is_on_break and last_log:
 		current_break_seconds = max(0, int((get_employee_now_datetime(employee_id) - last_log.time).total_seconds()))
 
+	# Check if today's attendance / shift has already been completed
+	is_day_completed = False
+	if not checked_in and not is_on_break:
+		has_completed_att = bool(
+			frappe.db.exists(
+				"Attendance",
+				{
+					"employee": employee_id,
+					"attendance_date": [">=", start_date],
+					"out_time": ["is", "set"],
+					"docstatus": ("!=", 2),
+				}
+			)
+		)
+		if has_completed_att:
+			is_day_completed = True
+		elif last_log and last_log.log_type == "OUT" and len(logs) >= 2 and total_seconds > 0:
+			is_day_completed = True
+
 	return {
 		"checked_in": checked_in,
 		"is_on_break": is_on_break,
 		"is_still_checked_in": checked_in,
 		"is_overnight_shift": False,
+		"is_day_completed": is_day_completed,
 		"last_log_type": last_log.log_type if last_log else None,
 		"last_log_time": str(last_log.time) if last_log else None,
 		"last_log_note": _extract_log_note(last_log),
@@ -527,6 +558,12 @@ def create_timesheet(employee_id: str, start_time) -> str:
 		)
 
 	company = frappe.db.get_value("Employee", employee_id, "company")
+	if not frappe.db.exists("Activity Type", "Attendance"):
+		try:
+			frappe.get_doc({"doctype": "Activity Type", "activity_type": "Attendance"}).insert(ignore_permissions=True)
+		except Exception:
+			pass
+
 	ts = frappe.get_doc(
 		{
 			"doctype": "Timesheet",
@@ -639,6 +676,16 @@ def clock_in(latitude: float | None = None, longitude: float | None = None, note
 	if not employee_id:
 		return {"success": False, "message": _("No employee record found for current user")}
 
+	# Guard against clocking in after shift/attendance has already been completed for the day
+	is_break = notes and "Break" in notes
+	if not is_break:
+		status_today = get_today_checkin_status(employee_id)
+		if status_today.get("is_day_completed"):
+			return {
+				"success": False,
+				"message": _("Attendance for today is already completed. You have already clocked out for the day."),
+			}
+
 	# Check last log status
 	last_log = frappe.db.get_value(
 		"Employee Checkin",
@@ -649,19 +696,31 @@ def clock_in(latitude: float | None = None, longitude: float | None = None, note
 	)
 
 	if last_log and last_log.log_type == "IN":
-		# Check if it's from today
-		today = get_employee_now_datetime(employee_id).date()
-		if getdate(last_log.time) == today:
-			if _is_recent_duplicate(last_log.time, employee_id):
-				status = get_today_checkin_status(employee_id)
-				return {
-					"success": True,
-					"checkin_id": last_log.name,
-					"time": str(last_log.time),
-					"message": _("Already checked in."),
-					"status": status,
+		now_dt = get_employee_now_datetime(employee_id)
+		elapsed_seconds = (now_dt - last_log.time).total_seconds()
+		today = now_dt.date()
+		# If from today or actively working within 16 hours without completed out_time
+		if getdate(last_log.time) == today or elapsed_seconds < 57600:
+			completed_att = frappe.db.exists(
+				"Attendance",
+				{
+					"employee": employee_id,
+					"attendance_date": last_log.time.date(),
+					"out_time": ["is", "set"],
+					"docstatus": ("!=", 2),
 				}
-			return {"success": False, "message": _("Already checked in today. Please check out first.")}
+			)
+			if not completed_att:
+				if _is_recent_duplicate(last_log.time, employee_id):
+					status = get_today_checkin_status(employee_id)
+					return {
+						"success": True,
+						"checkin_id": last_log.name,
+						"time": str(last_log.time),
+						"message": _("Already checked in."),
+						"status": status,
+					}
+				return {"success": False, "message": _("Already checked in. Please check out first.")}
 
 	if not shift:
 		roster = get_employee_roster(employee_id)
@@ -790,6 +849,10 @@ def clock_out(latitude: float | None = None, longitude: float | None = None, not
 			}
 		return {"success": False, "message": _("No active check-in found. Please check in first.")}
 
+	now_dt = get_employee_now_datetime(employee_id)
+	if (now_dt - last_log.time).total_seconds() >= 57600:
+		return {"success": False, "message": _("Previous check-in session has expired (over 16 hours). Please contact HR.")}
+
 	is_break = notes and "Break" in notes
 	try:
 		checkout = frappe.get_doc(
@@ -818,7 +881,8 @@ def clock_out(latitude: float | None = None, longitude: float | None = None, not
 
 		if timesheet_enabled:
 			is_break_start = notes == "Break Start"
-			timesheet_name = _get_active_timesheet(employee_id, checkout.time.date())
+			timesheet_date = last_log.time.date() if last_log and last_log.time else checkout.time.date()
+			timesheet_name = _get_active_timesheet(employee_id, timesheet_date)
 			if timesheet_name:
 				if is_break_start:
 					end_timesheet_log(timesheet_name, checkout.time, submit=False)
@@ -1056,6 +1120,7 @@ def _process_auto_attendance(employee_id, for_date=None):
 					update_values["early_exit"] = early_exit
 				else:
 					update_values["out_time"] = None
+					update_values["working_hours"] = 0.0
 				if shift_type:
 					update_values["shift"] = shift_type
 
@@ -1515,25 +1580,26 @@ def get_leave_applications(month=None, year=None):
 # ---------------------------------------------------------------------------
 
 @frappe.whitelist()
-def get_attendance_grid(year: int | str | None = None, month: int | str | None = None, employee_id: str | None = None):
+def get_attendance_grid(
+	year: int | str | None = None,
+	month: int | str | None = None,
+	employee_id: str | None = None,
+	page: int | str | None = 1,
+	page_size: int | str | None = 50,
+):
 	"""
 	Get attendance grid data for all (or a specific) employee(s) for a given month.
+	Supports pagination via page and page_size (defaults to 50 employees per batch).
 
 	Returns a nested structure:
 	{
 	    "employees": [{"name": "EMP-001", "employee_name": "John Doe"}, ...],
 	    "days_in_month": 30,
-	    "grid": [
-	        {
-	            "employee": "EMP-001",
-	            "employee_name": "John Doe",
-	            "days": [
-	                {"date": "2026-05-01", "status": "Present", "in_time": "...", "out_time": "...", "working_hours": 8.5, "is_working_day": true},
-	                ...
-	            ]
-	        },
-	        ...
-	    ]
+	    "grid": [...],
+	    "page": 1,
+	    "page_size": 50,
+	    "total": 120,
+	    "has_more": true
 	}
 	"""
 	from erpnext.setup.doctype.employee.employee import get_holiday_list_for_employee
@@ -1581,13 +1647,37 @@ def get_attendance_grid(year: int | str | None = None, month: int | str | None =
 			)
 			employee_ids = [e.name for e in active_permitted]
 
+	total = len(employee_ids)
+	page_num = cint(page) if page is not None else 1
+	if page_num < 1:
+		page_num = 1
+	size = cint(page_size) if page_size is not None else 50
+
+	if size > 0:
+		start = (page_num - 1) * size
+		end = start + size
+		target_employee_ids = employee_ids[start:end]
+		has_more = end < total
+	else:
+		target_employee_ids = employee_ids
+		has_more = False
+
+	# Pre-fetch employee names in a single batch
+	emp_name_map = {}
+	if target_employee_ids:
+		emp_rows = frappe.get_all(
+			"Employee",
+			filters={"name": ["in", target_employee_ids]},
+			fields=["name", "employee_name"],
+		)
+		emp_name_map = {e.name: (e.employee_name or e.name) for e in emp_rows}
+
 	# Fetch all holidays for employees (use a common holiday list approach)
-	# We'll resolve per-employee since holiday lists vary
 	holiday_cache = {}
 
-	# Fetch all attendance records for the month for these employees
+	# Fetch all attendance records for the month for targeted employees
 	attendance_records = []
-	if employee_ids:
+	if target_employee_ids:
 		attendance_records = frappe.db.sql(
 			"""
 			SELECT name, attendance_date, status, working_hours, in_time, out_time, employee
@@ -1596,8 +1686,8 @@ def get_attendance_grid(year: int | str | None = None, month: int | str | None =
 			AND employee IN ({placeholders})
 			AND attendance_date BETWEEN %s AND %s
 			ORDER BY employee, attendance_date
-			""".format(placeholders=", ".join(["%s"] * len(employee_ids))),
-			(*employee_ids, first_day, last_day),
+			""".format(placeholders=", ".join(["%s"] * len(target_employee_ids))),
+			(*target_employee_ids, first_day, last_day),
 			as_dict=True,
 		)
 
@@ -1613,9 +1703,9 @@ def get_attendance_grid(year: int | str | None = None, month: int | str | None =
 			"out_time": str(r.out_time) if r.out_time else None,
 		}
 
-	# Fetch approved leave applications for the month for these employees
+	# Fetch approved leave applications for the month for targeted employees
 	leave_records = []
-	if employee_ids:
+	if target_employee_ids:
 		leave_records = frappe.db.sql(
 			"""
 			SELECT employee, from_date, to_date, leave_type, status
@@ -1625,8 +1715,8 @@ def get_attendance_grid(year: int | str | None = None, month: int | str | None =
 			AND from_date <= %s
 			AND to_date >= %s
 			ORDER BY employee, from_date
-			""".format(placeholders=", ".join(["%s"] * len(employee_ids))),
-			(*employee_ids, last_day, first_day),
+			""".format(placeholders=", ".join(["%s"] * len(target_employee_ids))),
+			(*target_employee_ids, last_day, first_day),
 			as_dict=True,
 		)
 
@@ -1644,7 +1734,7 @@ def get_attendance_grid(year: int | str | None = None, month: int | str | None =
 
 	# Build grid data
 	grid = []
-	for emp_id in employee_ids:
+	for emp_id in target_employee_ids:
 		# Get employee's holiday list
 		holiday_list_name = frappe.db.get_value("Employee", emp_id, "holiday_list")
 		holiday_dates = set()
@@ -1659,15 +1749,7 @@ def get_attendance_grid(year: int | str | None = None, month: int | str | None =
 			holiday_dates = holiday_cache.get(holiday_list_name, set())
 
 		leave_dates = leave_date_sets.get(emp_id, set())
-
-		# Get employee name
-		emp_name = ""
-		for r in attendance_records:
-			if r.employee == emp_id:
-				emp_name = frappe.db.get_value("Employee", emp_id, "employee_name")
-				break
-		if not emp_name:
-			emp_name = frappe.db.get_value("Employee", emp_id, "employee_name")
+		emp_name = emp_name_map.get(emp_id) or emp_id
 
 		days_data = []
 		for day in range(1, days_in_month + 1):
@@ -1705,15 +1787,16 @@ def get_attendance_grid(year: int | str | None = None, month: int | str | None =
 			"days": days_data,
 		})
 
-	# Filter by status if provided (for the frontend filter — applied on the grid)
-	# We return all data; filtering is done client-side for grid UX
-
 	return {
 		"employees": [{"name": emp_id, "employee_name": g["employee_name"]} for g in grid],
 		"days_in_month": days_in_month,
 		"first_day": str(first_day),
 		"last_day": str(last_day),
 		"grid": grid,
+		"page": page_num,
+		"page_size": size,
+		"total": total,
+		"has_more": has_more,
 	}
 
 
@@ -2349,13 +2432,20 @@ def can_delete_checkin():
 @frappe.whitelist()
 def delete_employee_checkin(checkin_name: str):
 	"""
-	Delete employee checkin record.
+	Delete employee checkin record and recalculate auto-attendance.
 	"""
 	if not can_delete_checkin():
 		return {"success": False, "message": _("You do not have permission to delete employee checkins")}
 
+	checkin_info = frappe.db.get_value("Employee Checkin", checkin_name, ["employee", "time"], as_dict=True)
 	frappe.delete_doc("Employee Checkin", checkin_name, ignore_permissions=True)
 	frappe.db.commit()
+
+	if checkin_info and checkin_info.employee and checkin_info.time:
+		try:
+			_process_auto_attendance(checkin_info.employee, for_date=checkin_info.time.date())
+		except Exception:
+			pass
 
 	return {"success": True}
 
@@ -4184,7 +4274,6 @@ def report_attendance_request_list(from_date=None, to_date=None, employee=None, 
 	from frappe import _
 	from frappe.utils import cint, now_datetime
 	from frappe.utils.pdf import get_pdf
-	from frappe.utils.xlsxutils import build_xlsx_response
 
 	# Verify permissions (basic check)
 	if not frappe.has_permission("Attendance Request", "read"):
@@ -4254,10 +4343,16 @@ def report_attendance_request_list(from_date=None, to_date=None, employee=None, 
 	is_pdf = cint(pdf) if isinstance(pdf, (int, str)) and str(pdf).isdigit() else frappe.parse_json(pdf)
 
 	if is_export:
+		from arijentek_core.api.reports import report_xlsx_response
+
 		xlsx_data = [[c["label"] for c in columns]]
 		for row in data:
 			xlsx_data.append([row.get(c["fieldname"], "") for c in columns])
-		return build_xlsx_response(xlsx_data, "Attendance_Request_Report")
+		return report_xlsx_response(
+			xlsx_data,
+			"Attendance_Request_Report",
+			text_col_idxs=[i for i, c in enumerate(columns) if c.get("fieldname") in ("reason", "explanation")],
+		)
 
 	if is_pdf:
 		company_name = frappe.db.get_single_value("Global Defaults", "default_company") or "Company"
