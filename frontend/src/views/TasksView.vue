@@ -262,7 +262,7 @@
 						class="flex-1 min-h-0 overflow-y-auto column-scroll px-2.5 pb-2.5 space-y-2.5"
 					>
 						<article
-							v-for="todo in getTodosByStatus(status)"
+							v-for="todo in getVisibleTodosByStatus(status)"
 							:key="todo.id"
 							:draggable="true"
 							@dragstart="onDragStart($event, todo, 'todo')"
@@ -347,6 +347,37 @@
 							<p class="text-xs text-[#656A72] dark:text-white/55 mt-1.5">
 								Drop a task here
 							</p>
+						</div>
+
+						<!-- Sentinel element for IntersectionObserver -->
+						<div
+							v-if="hasMoreForStatus(status)"
+							:ref="el => setColumnSentinel(status, el)"
+							class="h-1"
+						></div>
+
+						<!-- Safe Load More Controls & Status Indicator -->
+						<div
+							v-if="hasMoreForStatus(status)"
+							class="pt-1.5 pb-1 flex flex-col items-center justify-center gap-1"
+						>
+							<button
+								type="button"
+								@click="loadMoreForStatus(status)"
+								class="w-full py-2 px-3 rounded-[12px] border border-black/10 dark:border-white/10 bg-white dark:bg-surface-2 text-xs font-medium text-[#17181B] dark:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.06] flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+							>
+								<span class="material-symbols-outlined !text-[16px]">expand_more</span>
+								Load more ({{ getRemainingCountForStatus(status) }} remaining)
+							</button>
+							<p class="text-[10px] text-[#5C6169] dark:text-white/50">
+								Showing {{ getVisibleTodosByStatus(status).length }} of {{ getTodosByStatus(status).length }} tasks
+							</p>
+						</div>
+						<div
+							v-else-if="getTodosByStatus(status).length > KANBAN_PAGE_SIZE"
+							class="py-1 text-center text-[10px] text-[#5C6169] dark:text-white/50"
+						>
+							All {{ getTodosByStatus(status).length }} tasks loaded.
 						</div>
 					</div>
 				</section>
@@ -535,7 +566,7 @@
 import TablePager from '@/components/TablePager.vue'
 import { usePager } from '@/composables/usePager.js'
 import { notify, ask } from '@/utils/feedback.js'
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from "vue";
 import { createResource } from "frappe-ui";
 import { useTasksStore } from "@/stores/tasks";
 import SearchableDropdown from "@/components/SearchableDropdown.vue";
@@ -898,6 +929,81 @@ function getTodosByStatus(status) {
 		.sort((a, b) => (priorityOrder[a.priority] || 99) - (priorityOrder[b.priority] || 99));
 }
 
+// Kanban progressive batching & infinite scroll
+const KANBAN_PAGE_SIZE = 50;
+const visibleLimits = reactive({});
+
+function getVisibleLimit(status) {
+	return visibleLimits[status] || KANBAN_PAGE_SIZE;
+}
+
+function getVisibleTodosByStatus(status) {
+	const all = getTodosByStatus(status);
+	return all.slice(0, getVisibleLimit(status));
+}
+
+function hasMoreForStatus(status) {
+	return getTodosByStatus(status).length > getVisibleLimit(status);
+}
+
+function getRemainingCountForStatus(status) {
+	return Math.max(0, getTodosByStatus(status).length - getVisibleLimit(status));
+}
+
+function loadMoreForStatus(status) {
+	if (hasMoreForStatus(status)) {
+		visibleLimits[status] = getVisibleLimit(status) + KANBAN_PAGE_SIZE;
+	}
+}
+
+// Reset column visible limits whenever filtered todos or viewMode change
+watch(
+	[filteredTodos, viewMode],
+	() => {
+		for (const st of Object.keys(visibleLimits)) {
+			visibleLimits[st] = KANBAN_PAGE_SIZE;
+		}
+	}
+);
+
+// Map of sentinels & observers per status column
+const columnSentinels = new Map();
+const columnObservers = new Map();
+
+function setColumnSentinel(status, el) {
+	if (!el) {
+		const existingObs = columnObservers.get(status);
+		if (existingObs) {
+			existingObs.disconnect();
+			columnObservers.delete(status);
+		}
+		columnSentinels.delete(status);
+		return;
+	}
+
+	columnSentinels.set(status, el);
+	if (typeof window === 'undefined' || !window.IntersectionObserver) return;
+
+	if (columnObservers.has(status)) {
+		columnObservers.get(status).disconnect();
+	}
+
+	const obs = new IntersectionObserver(
+		(entries) => {
+			const entry = entries[0];
+			if (entry && entry.isIntersecting && hasMoreForStatus(status)) {
+				loadMoreForStatus(status);
+			}
+		},
+		{
+			rootMargin: '150px',
+			threshold: 0.05,
+		}
+	);
+	obs.observe(el);
+	columnObservers.set(status, obs);
+}
+
 /* Column dot. Open is the accent because it is the working state, not a
    success; green is reserved for something that finished well. */
 function getStatusBulletColor(status) {
@@ -1043,6 +1149,11 @@ onMounted(() => {
 onUnmounted(() => {
 	window.removeEventListener("click", closeTodoMenu);
 	mq?.removeEventListener("change", onMediaChange);
+	for (const obs of columnObservers.values()) {
+		obs.disconnect();
+	}
+	columnObservers.clear();
+	columnSentinels.clear();
 });
 
 /* Client-side paging for the list(s) above (TablePager). */

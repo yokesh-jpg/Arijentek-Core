@@ -157,14 +157,17 @@ function exportExcel() {
 	for (const row of reportData.value) {
 		const rowData = columns.map(col => {
 			let val = row[col.fieldname] || '';
-			// Escape quotes
+			// Escape quotes (embedded newlines stay inside the quoted field,
+			// so multi-line descriptions remain one cell in Excel)
 			val = String(val).replace(/"/g, '""');
 			return `"${val}"`;
 		});
 		csvContent.push(rowData.join(','));
 	}
-	
-	const blob = new Blob([csvContent.join('\n')], { type: 'text/csv;charset=utf-8;' });
+
+	// CRLF row separator (RFC 4180) — never collides with the embedded
+	// line breaks inside quoted description cells.
+	const blob = new Blob([csvContent.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
 	const url = URL.createObjectURL(blob);
 	const link = document.createElement('a');
 	link.setAttribute('href', url);

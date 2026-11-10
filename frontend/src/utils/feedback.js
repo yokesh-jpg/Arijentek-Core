@@ -1,4 +1,5 @@
 import { useFeedbackStore } from '@/stores/feedback.js'
+import { sanitizeError, isProhibitedMessage } from './errorSanitizer.js'
 
 /* Drop-in replacements for the browser's alert() and confirm(), which drew the
    OS's own grey box over the app. */
@@ -16,6 +17,7 @@ function store() {
    warnings, failures are errors, completions are successes. */
 function classify(text) {
 	const t = String(text).toLowerCase()
+	if (isProhibitedMessage(t)) return 'error'
 	if (/\b(fail|failed|error|could not|couldn't|cannot|can't|unable|denied|not allowed|invalid)\b/.test(t)) return 'error'
 	if (/\b(success|successfully|saved|created|updated|deleted|removed|submitted|approved|rejected|cancelled|canceled|added|uploaded|assigned|completed|sent|done)\b/.test(t)) return 'success'
 	if (/\b(please|required|select|enter|must|missing|choose|at least)\b/.test(t)) return 'warning'
@@ -26,13 +28,22 @@ export function notify(message, type) {
 	const text = message instanceof Error ? message.message : message
 	const kind = type || classify(text)
 	const s = store()
+	if (kind === 'error' || isProhibitedMessage(text)) {
+		const safe = sanitizeError(message)
+		if (s) return s.show('error', safe.message, safe.title)
+		console.error(safe.message)
+		return
+	}
 	if (s) return s.show(kind, text)
 	console[kind === 'error' ? 'error' : 'log'](text)
 }
 
 export const toast = {
 	success: (m, title) => store()?.show('success', m, title),
-	error: (m, title) => store()?.show('error', m, title),
+	error: (m, title) => {
+		const safe = sanitizeError(m, title)
+		return store()?.show('error', safe.message, safe.title)
+	},
 	warning: (m, title) => store()?.show('warning', m, title),
 	info: (m, title) => store()?.show('info', m, title),
 }

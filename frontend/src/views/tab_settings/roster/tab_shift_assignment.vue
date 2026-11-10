@@ -286,7 +286,7 @@
     <Teleport to="body">
       <div v-if="showShiftAssignmentModal" @click.self="showShiftAssignmentModal = false" class="fixed inset-0 z-[100] flex items-center justify-center bg-[#0B0B0E]/70 backdrop-blur-sm p-4 md:p-6">
         <div class="w-full max-w-2xl" @click.stop>
-          <ShiftAssignmentPageView
+          <ViewShiftAssignment
             :id="selectedShiftAssignmentId"
             :selectedDate="selectedShiftAssignmentDate"
             :isModal="true"
@@ -306,7 +306,7 @@ import DataTable from '@/components/DataTable.vue'
 import { ref, computed, onMounted, watch } from 'vue';
 import { call } from 'frappe-ui';
 import { useRosterStore } from '@/stores/roster';
-import ShiftAssignmentPageView from '@/views/page_views/ShiftAssignmentPageView.vue';
+import ViewShiftAssignment from '@/views/page_views/roster/view_shift_assignment.vue';
 import CreateShiftAssignment from '@/views/forms/roster/create_shift_assignment.vue';
 import CreateBulkShiftAssignment from '@/views/forms/roster/create_bulk_shift_assignment.vue';
 import SearchableDropdown from '@/components/SearchableDropdown.vue';

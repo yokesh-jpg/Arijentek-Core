@@ -296,12 +296,33 @@ def login(usr, pwd, remember_me=False):
 	if frappe.db.exists("Employee", {"name": usr}):
 		user_id = frappe.db.get_value("Employee", {"name": usr}, "user_id")
 		if not user_id:
-			frappe.throw("No user account is linked to this Employee ID.", frappe.AuthenticationError)
+			frappe.clear_messages()
+			frappe.local.response["http_status_code"] = 401
+			return {
+				"success": False,
+				"message": "No user account is linked to this Employee ID.",
+			}
 		usr = user_id
 		frappe.form_dict["usr"] = usr
 
-	frappe.local.login_manager = LoginManager()
-	frappe.local.login_manager.login()
+	try:
+		frappe.local.login_manager = LoginManager()
+		frappe.local.login_manager.login()
+	except frappe.AuthenticationError:
+		frappe.clear_messages()
+		frappe.local.response["http_status_code"] = 401
+		return {
+			"success": False,
+			"message": "Invalid login credentials",
+		}
+	except Exception as e:
+		frappe.clear_messages()
+		frappe.log_error(title="Login Exception", message=frappe.get_traceback())
+		frappe.local.response["http_status_code"] = 401
+		return {
+			"success": False,
+			"message": "Invalid login credentials. Please verify your username and password.",
+		}
 
 	# ponytail: extend session expiry when "Remember Me" is checked.
 	if remember_me and frappe.session.user != "Guest":
@@ -333,4 +354,16 @@ def login(usr, pwd, remember_me=False):
 		"user": usr,
 		"landing_route": landing_route,
 	}
+
+
+@frappe.whitelist(allow_guest=True)
+def logout():
+	"""Logout the current user, clear session from DB/cache, and expire cookies."""
+	if hasattr(frappe.local, "login_manager") and frappe.local.login_manager:
+		frappe.local.login_manager.logout()
+	else:
+		LoginManager().logout()
+	frappe.db.commit()
+	return {"success": True}
+
 

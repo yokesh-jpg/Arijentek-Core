@@ -200,6 +200,10 @@ async function handleDeleteCheckin(log) {
 			checkin_name: logName,
 		});
 		await pager.fetchPage();
+		const currentEmpId = employeeStore.employee?.name;
+		if (currentEmpId) {
+			await attendanceStore.fetchTodayStatus(currentEmpId);
+		}
 	} catch (err) {
 		notify(err.message || "Failed to delete check-in record.");
 	}

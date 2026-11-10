@@ -65,13 +65,13 @@ const router = createRouter({
 		{
 			path: "/shift-assignment/:id",
 			name: "shiftAssignmentView",
-			component: () => import("./views/page_views/ShiftAssignmentPageView.vue"),
+			component: () => import("./views/page_views/roster/view_shift_assignment.vue"),
 			meta: { requiresAuth: true },
 		},
 		{
 			path: "/attendance-record/:id",
 			name: "attendancePageView",
-			component: () => import("./views/page_views/AttendancePageView.vue"),
+			component: () => import("./views/page_views/attendance/view_attendance.vue"),
 			meta: { requiresAuth: true },
 		},
 		{

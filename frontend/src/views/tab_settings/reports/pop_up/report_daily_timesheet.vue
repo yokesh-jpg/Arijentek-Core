@@ -19,7 +19,12 @@
 			<div class="flex flex-wrap items-end gap-3">
 				<div class="min-w-[200px] flex-1">
 					<label class="field-label">Date range</label>
-					<DateRangePicker @change="fetchReportData" />
+					<DateRangePicker
+						v-model:fromDate="filters.fromDate"
+						v-model:toDate="filters.toDate"
+						v-model:preset="filters.preset"
+						@change="handleDateRangeChange"
+					/>
 				</div>
 				<div class="min-w-[170px] flex-1">
 					<label class="field-label">Department</label>
@@ -85,18 +90,23 @@ const filterOptions = reactive({
 	employees: [],
 });
 
-const getTodayDate = () => {
-	return new Date().toISOString().split('T')[0];
-};
-
 const filters = reactive({
-	fromDate: getTodayDate(),
-	toDate: getTodayDate(),
-	preset: 'Today',
+	fromDate: '',
+	toDate: '',
+	preset: 'All Time',
 	department: '',
 	designation: '',
 	employee: '',
 });
+
+const handleDateRangeChange = (range) => {
+	if (range) {
+		filters.fromDate = range.fromDate || '';
+		filters.toDate = range.toDate || '';
+		filters.preset = range.preset || 'All Time';
+	}
+	fetchReportData();
+};
 
 const columns = ref([]);
 const reportData = ref([]);
@@ -167,10 +177,9 @@ async function fetchReportData() {
 };
 
 const resetFilters = () => {
-	const today = getTodayDate();
-	filters.fromDate = today;
-	filters.toDate = today;
-	filters.preset = 'Today';
+	filters.fromDate = '';
+	filters.toDate = '';
+	filters.preset = 'All Time';
 	filters.department = '';
 	filters.designation = '';
 	filters.employee = '';

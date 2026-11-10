@@ -50,7 +50,7 @@
 		<Dialog v-model="showViewDesignationModal" :options="{ size: '2xl' }">
 			<template #body>
 				<div class="modal-panel">
-					<DesignationPageView
+					<ViewDesignation
 						:id="viewDesignationId"
 						:is-modal="true"
 						@close="showViewDesignationModal = false"
@@ -72,7 +72,7 @@ import { getErrorMessage } from '@/utils.js'
 import DataTable from '@/components/DataTable.vue'
 import { useServerPager } from '@/composables/useServerPager.js'
 import CreateDesignationForm from '@/views/forms/create_designation.vue'
-import DesignationPageView from '@/views/page_views/DesignationPageView.vue'
+import ViewDesignation from '@/views/page_views/teams/view_designation.vue'
 
 const teamStore = useTeamStore()
 
