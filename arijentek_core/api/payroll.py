@@ -167,7 +167,13 @@ def get_salary_slips(year: int | None = None, month: int | None = None, employee
 
 	user = frappe.session.user
 	roles = frappe.get_roles(user)
-	has_global = "System Manager" in roles or "HR Manager" in roles or frappe.has_permission("Salary Slip", "submit")
+	has_global = (
+		user == "Administrator"
+		or "System Manager" in roles
+		or "HR Manager" in roles
+		or "HR User" in roles
+		or frappe.has_permission("Salary Slip", "submit")
+	)
 
 	if not has_global:
 		employee_id = _get_current_employee_id()
@@ -186,27 +192,29 @@ def get_salary_slips(year: int | None = None, month: int | None = None, employee
 			filters["start_date"] = [">=", f"{year}-01-01"]
 			filters["end_date"] = ["<=", f"{year}-12-31"]
 
-	# Using get_list is the only way to match Core behavior 1:1 for Sam
-	salary_slips = frappe.get_list(
-		"Salary Slip",
-		filters=filters,
-		fields=[
-			"name",
-			"employee",
-			"employee_name",
-			"start_date",
-			"end_date",
-			"posting_date",
-			"gross_pay",
-			"net_pay",
-			"total_deduction",
-			"currency",
-			"docstatus",
-		],
-		order_by="start_date desc",
-		limit=limit,
-		ignore_permissions=False
-	)
+	try:
+		salary_slips = frappe.get_list(
+			"Salary Slip",
+			filters=filters,
+			fields=[
+				"name",
+				"employee",
+				"employee_name",
+				"start_date",
+				"end_date",
+				"posting_date",
+				"gross_pay",
+				"net_pay",
+				"total_deduction",
+				"currency",
+				"docstatus",
+			],
+			order_by="start_date desc",
+			limit=limit,
+			ignore_permissions=False
+		)
+	except Exception:
+		salary_slips = []
 
 	result = []
 	for slip in salary_slips:
@@ -305,7 +313,13 @@ def get_payroll_summary(year: int | None = None, month: int | None = None, emplo
 
 	user = frappe.session.user
 	roles = frappe.get_roles(user)
-	has_global = "System Manager" in roles or "HR Manager" in roles or frappe.has_permission("Salary Slip", "submit")
+	has_global = (
+		user == "Administrator"
+		or "System Manager" in roles
+		or "HR Manager" in roles
+		or "HR User" in roles
+		or frappe.has_permission("Salary Slip", "submit")
+	)
 
 	if not has_global:
 		employee_id = _get_current_employee_id()
@@ -327,13 +341,15 @@ def get_payroll_summary(year: int | None = None, month: int | None = None, emplo
 		year = getdate().year
 		filters["start_date"] = [">=", f"{year}-01-01"]
 
-	# Sam's User Permissions will automatically filter the list returned by get_list
-	slips = frappe.get_list(
-		"Salary Slip",
-		filters=filters,
-		fields=["gross_pay", "total_deduction", "net_pay"],
-		ignore_permissions=False
-	)
+	try:
+		slips = frappe.get_list(
+			"Salary Slip",
+			filters=filters,
+			fields=["gross_pay", "total_deduction", "net_pay"],
+			ignore_permissions=False
+		)
+	except Exception:
+		slips = []
 
 	summary = {
 		"total_earnings": sum(flt(s.gross_pay) for s in slips),
@@ -373,76 +389,52 @@ def get_leave_details(slip):
 	return leave_details
 
 
+def _is_payroll_admin():
+	user = frappe.session.user
+	if user == "Administrator":
+		return True
+	roles = frappe.get_roles(user)
+	return bool(set(roles) & {"System Manager", "HR Manager", "HR User", "Accounts Manager"})
+
+
 @frappe.whitelist()
 def can_read_salary_componants():
 	"""
 	Returns True if the current user has permission to read a Salary Component.
-	This is true for 'HR Manager', 'System Manager', or users with explicit read permissions on the 'Salary Component' Doctype.
 	"""
-	user = frappe.session.user
-
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-
-	if frappe.has_permission("Salary Component", "read"):
-		return True
-
-	return False
+	return bool(frappe.has_permission("Salary Component", "read"))
 
 
 @frappe.whitelist()
 def can_create_salary_componants():
 	"""
 	Returns True if the current user has permission to create a Salary Component.
-	This is true for 'HR Manager', 'System Manager', or users with explicit create permissions on the 'Salary Component' Doctype.
 	"""
-	user = frappe.session.user
-
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-
-	if frappe.has_permission("Salary Component", "create"):
-		return True
-
-	return False
+	return bool(frappe.has_permission("Salary Component", "create"))
 
 
 @frappe.whitelist()
 def can_edit_salary_componants():
 	"""
 	Returns True if the current user has permission to edit a Salary Component.
-	This is true for 'HR Manager', 'System Manager', or users with explicit write permissions on the 'Salary Component' Doctype.
 	"""
-	user = frappe.session.user
-
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-
-	if frappe.has_permission("Salary Component", "write"):
-		return True
-
-	return False
+	return bool(frappe.has_permission("Salary Component", "write"))
 
 
 @frappe.whitelist()
 def can_delete_salary_componants():
 	"""
 	Returns True if the current user has permission to delete a Salary Component.
-	This is true for 'HR Manager', 'System Manager', or users with explicit delete permissions on the 'Salary Component' Doctype.
 	"""
-	user = frappe.session.user
-
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-
-	if frappe.has_permission("Salary Component", "delete"):
-		return True
-
-	return False
+	return bool(frappe.has_permission("Salary Component", "delete"))
 
 
 # --- Salary Structure ---
@@ -451,52 +443,39 @@ def can_read_salary_structure():
 	"""
 	Returns True if the current user has permission to read a Salary Structure.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Salary Structure", "read"):
-		return True
-	return False
+	return bool(frappe.has_permission("Salary Structure", "read"))
+
 
 @frappe.whitelist()
 def can_create_salary_structure():
 	"""
 	Returns True if the current user has permission to create a Salary Structure.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Salary Structure", "create"):
-		return True
-	return False
+	return bool(frappe.has_permission("Salary Structure", "create"))
+
 
 @frappe.whitelist()
 def can_edit_salary_structure():
 	"""
 	Returns True if the current user has permission to edit a Salary Structure.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Salary Structure", "write"):
-		return True
-	return False
+	return bool(frappe.has_permission("Salary Structure", "write"))
+
 
 @frappe.whitelist()
 def can_delete_salary_structure():
 	"""
 	Returns True if the current user has permission to delete a Salary Structure.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Salary Structure", "delete"):
-		return True
-	return False
+	return bool(frappe.has_permission("Salary Structure", "delete"))
 
 
 # --- Salary Structure Assignment ---
@@ -505,52 +484,40 @@ def can_read_salary_structure_assignment():
 	"""
 	Returns True if the current user has permission to read a Salary Structure Assignment.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Salary Structure Assignment", "read"):
-		return True
-	return False
+	return bool(frappe.has_permission("Salary Structure Assignment", "read"))
+
 
 @frappe.whitelist()
 def can_create_salary_structure_assignment():
 	"""
 	Returns True if the current user has permission to create a Salary Structure Assignment.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Salary Structure Assignment", "create"):
-		return True
-	return False
+	return bool(frappe.has_permission("Salary Structure Assignment", "create"))
+
 
 @frappe.whitelist()
 def can_edit_salary_structure_assignment():
 	"""
 	Returns True if the current user has permission to edit a Salary Structure Assignment.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Salary Structure Assignment", "write"):
-		return True
-	return False
+	return bool(frappe.has_permission("Salary Structure Assignment", "write"))
+
 
 @frappe.whitelist()
 def can_delete_salary_structure_assignment():
 	"""
 	Returns True if the current user has permission to delete a Salary Structure Assignment.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Salary Structure Assignment", "delete"):
-		return True
-	return False
+	return bool(frappe.has_permission("Salary Structure Assignment", "delete"))
+
 
 # --- Payroll Entry ---
 @frappe.whitelist()
@@ -558,52 +525,39 @@ def can_read_payroll_entry():
 	"""
 	Returns True if the current user has permission to read a Payroll Entry.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Payroll Entry", "read"):
-		return True
-	return False
+	return bool(frappe.has_permission("Payroll Entry", "read"))
+
 
 @frappe.whitelist()
 def can_create_payroll_entry():
 	"""
 	Returns True if the current user has permission to create a Payroll Entry.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Payroll Entry", "create"):
-		return True
-	return False
+	return bool(frappe.has_permission("Payroll Entry", "create"))
+
 
 @frappe.whitelist()
 def can_edit_payroll_entry():
 	"""
 	Returns True if the current user has permission to edit a Payroll Entry.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Payroll Entry", "write"):
-		return True
-	return False
+	return bool(frappe.has_permission("Payroll Entry", "write"))
+
 
 @frappe.whitelist()
 def can_delete_payroll_entry():
 	"""
 	Returns True if the current user has permission to delete a Payroll Entry.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Payroll Entry", "delete"):
-		return True
-	return False
+	return bool(frappe.has_permission("Payroll Entry", "delete"))
 
 
 # --- Salary Slip ---
@@ -612,52 +566,39 @@ def can_read_salary_slip():
 	"""
 	Returns True if the current user has permission to read a Salary Slip.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Salary Slip", "read"):
-		return True
-	return False
+	return bool(frappe.has_permission("Salary Slip", "read"))
+
 
 @frappe.whitelist()
 def can_create_salary_slip():
 	"""
 	Returns True if the current user has permission to create a Salary Slip.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Salary Slip", "create"):
-		return True
-	return False
+	return bool(frappe.has_permission("Salary Slip", "create"))
+
 
 @frappe.whitelist()
 def can_edit_salary_slip():
 	"""
 	Returns True if the current user has permission to edit a Salary Slip.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Salary Slip", "write"):
-		return True
-	return False
+	return bool(frappe.has_permission("Salary Slip", "write"))
+
 
 @frappe.whitelist()
 def can_delete_salary_slip():
 	"""
 	Returns True if the current user has permission to delete a Salary Slip.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Salary Slip", "delete"):
-		return True
-	return False
+	return bool(frappe.has_permission("Salary Slip", "delete"))
 
 
 @frappe.whitelist()
@@ -1710,34 +1651,58 @@ def get_payroll_entries(
 		if len(_parts) > 1 and _parts[1] in ("asc", "desc"):
 			sort_dir = _parts[1]
 	secondary_field = "name" if sort_field != "name" else "start_date"
-	order_clause = f"{sort_field} {sort_dir}, {secondary_field} desc"
+	order_clause = f"`tabPayroll Entry`.`{sort_field}` {sort_dir}, `tabPayroll Entry`.`{secondary_field}` desc"
 
-	if page_size > 0:
-		total = frappe.db.count("Payroll Entry", filters=filters)
-		offset = (page - 1) * page_size
+	fields = [
+		"name",
+		"posting_date",
+		"start_date",
+		"end_date",
+		"company",
+		"currency",
+		"status",
+		"salary_slip_based_on_timesheet",
+		"payroll_frequency",
+		"branch",
+		"department",
+		"designation",
+		"number_of_employees",
+		"salary_slips_created",
+		"salary_slips_submitted",
+		"docstatus",
+	]
+
+	try:
+		if page_size > 0:
+			total = frappe.db.count("Payroll Entry", filters=filters)
+			offset = (page - 1) * page_size
+			entries = frappe.get_all(
+				"Payroll Entry",
+				filters=filters,
+				fields=fields,
+				order_by=order_clause,
+				limit_start=offset,
+				limit_page_length=page_size
+			)
+			return {
+				"data": entries,
+				"total": total,
+				"page": page,
+				"page_size": page_size
+			}
+
 		entries = frappe.get_all(
 			"Payroll Entry",
 			filters=filters,
-			fields=["*"],
-			order_by=order_clause,
-			limit_start=offset,
-			limit_page_length=page_size
+			fields=fields,
+			order_by=order_clause
 		)
-		return {
-			"data": entries,
-			"total": total,
-			"page": page,
-			"page_size": page_size
-		}
-
-	entries = frappe.get_all(
-		"Payroll Entry",
-		filters=filters,
-		fields=["*"],
-		order_by=order_clause
-	)
-
-	return entries
+		return entries
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Failed to fetch payroll entries")
+		if page_size > 0:
+			return {"data": [], "total": 0, "page": page, "page_size": page_size}
+		return []
 
 
 @frappe.whitelist()
@@ -1910,8 +1875,13 @@ def get_payroll_entry_options():
 
 	payroll_frequencies = ["Monthly", "Fortnightly", "Weekly", "Daily"]
 
+	default_company = frappe.db.get_single_value("Global Defaults", "default_company")
+	if not default_company and companies:
+		default_company = companies[0].name
+
 	return {
 		"companies": companies,
+		"default_company": default_company,
 		"payroll_frequencies": payroll_frequencies,
 		"branches": get_branches(),
 		"designations": get_designations(),
@@ -1995,6 +1965,26 @@ def get_payroll_eligible_employees(
 		return []
 
 	eligible_employees = [emp for emp in employees if emp.name in assigned_employees]
+
+	if start_date and end_date and eligible_employees:
+		existing_slips = frappe.get_all(
+			"Salary Slip",
+			filters={
+				"docstatus": ["!=", 2],
+				"company": company,
+				"start_date": start_date,
+				"end_date": end_date,
+				"employee": ["in", [e.name for e in eligible_employees]]
+			},
+			fields=["employee", "name"]
+		)
+		existing_map = {s.employee: s.name for s in existing_slips}
+		for emp in eligible_employees:
+			emp["existing_salary_slip"] = existing_map.get(emp.name)
+	else:
+		for emp in eligible_employees:
+			emp["existing_salary_slip"] = None
+
 	return eligible_employees
 
 
@@ -2039,8 +2029,9 @@ def save_payroll_entry(doc):
 		pe.payroll_payable_account = frappe.db.get_value("Company", pe.company, "default_payroll_payable_account")
 
 	if pe.payroll_payable_account and frappe.db.exists("Account", pe.payroll_payable_account):
-		if frappe.db.get_value("Account", pe.payroll_payable_account, "account_type") != "Payable":
-			frappe.db.set_value("Account", pe.payroll_payable_account, "account_type", "Payable")
+		acc_type = frappe.db.get_value("Account", pe.payroll_payable_account, "account_type")
+		if acc_type != "Payable":
+			frappe.db.set_value("Account", pe.payroll_payable_account, "account_type", "Payable", update_modified=False)
 
 	pe.set("employees", [])
 	selected_employees = doc.get("employees") or []
@@ -2068,12 +2059,21 @@ def save_payroll_entry(doc):
 		# Commit transaction
 		frappe.db.commit()
 
+		return {"success": True, "name": pe.name}
+
 	except Exception as e:
 		# Rollback transaction on failure
 		frappe.db.rollback()
-		raise e
-
-	return pe.name
+		msg = str(e)
+		if frappe.message_log:
+			try:
+				import json
+				log_entry = json.loads(frappe.message_log[-1])
+				msg = log_entry.get("message", msg)
+			except Exception:
+				pass
+		msg = frappe.utils.strip_html_tags(msg)
+		return {"success": False, "error": msg}
 
 
 @frappe.whitelist()
@@ -2784,6 +2784,43 @@ def report_salary_structure_assignment_list(employee=None, department=None, desi
 	return result
 
 
+# --- Sales Commission Report (Unified with sales_history API) ---
+
+@frappe.whitelist()
+def get_sales_commission_report_filter_options():
+	"""
+	Returns dropdown options for Employee, Department, and Designation for Sales Commission Report.
+	Delegates to get_salesperson_filter_meta.
+	"""
+	from arijentek_core.api.sales_history import get_salesperson_filter_meta
+	return get_salesperson_filter_meta()
+
+
+@frappe.whitelist()
+def report_sales_commission_list(
+	from_date=None,
+	to_date=None,
+	employee=None,
+	department=None,
+	designation=None,
+	export=0,
+	pdf=0
+):
+	"""
+	Returns Sales Commission Report listing ALL active employees (even those without sales),
+	their contributed transaction count, total invoice value, contributed amount, and calculated commission.
+	Delegates to get_employee_sales_commission_summary.
+	"""
+	from arijentek_core.api.sales_history import get_employee_sales_commission_summary
+	return get_employee_sales_commission_summary(
+		employee=employee,
+		department=department,
+		designation=designation,
+		from_date=from_date,
+		to_date=to_date,
+		export=export,
+	)
+
 
 # --- Overtime Type ---
 
@@ -2792,13 +2829,9 @@ def can_read_overtime_type():
 	"""
 	Returns True if the current user has permission to read Overtime Type.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Overtime Type", "read"):
-		return True
-	return False
+	return bool(frappe.has_permission("Overtime Type", "read"))
 
 
 @frappe.whitelist()
@@ -2806,13 +2839,9 @@ def can_create_overtime_type():
 	"""
 	Returns True if the current user has permission to create Overtime Type.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Overtime Type", "create"):
-		return True
-	return False
+	return bool(frappe.has_permission("Overtime Type", "create"))
 
 
 @frappe.whitelist()
@@ -2820,13 +2849,9 @@ def can_edit_overtime_type():
 	"""
 	Returns True if the current user has permission to edit Overtime Type.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Overtime Type", "write"):
-		return True
-	return False
+	return bool(frappe.has_permission("Overtime Type", "write"))
 
 
 @frappe.whitelist()
@@ -2834,13 +2859,9 @@ def can_delete_overtime_type():
 	"""
 	Returns True if the current user has permission to delete Overtime Type.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Overtime Type", "delete"):
-		return True
-	return False
+	return bool(frappe.has_permission("Overtime Type", "delete"))
 
 
 @frappe.whitelist()
@@ -3002,27 +3023,19 @@ def can_read_overtime_slip():
 	"""
 	Returns True if the current user has permission to read Overtime Slip.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Overtime Slip", "read"):
-		return True
-	return False
+	return bool(frappe.has_permission("Overtime Slip", "read"))
 
 
 @frappe.whitelist()
 def can_create_overtime_slip():
 	"""
-	Returns True if the current user has HR Manager, HR User, or System Manager role.
-	Role-only gate (no doctype-permission fallback) so normal employees
-	never see the New button in the portal.
+	Returns True if the current user has permission to create Overtime Slip.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles or "HR User" in roles:
+	if _is_payroll_admin():
 		return True
-	return False
+	return bool(frappe.has_permission("Overtime Slip", "create"))
 
 
 @frappe.whitelist()
@@ -3030,13 +3043,9 @@ def can_edit_overtime_slip():
 	"""
 	Returns True if the current user has permission to edit Overtime Slip.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles or "HR User" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Overtime Slip", "write"):
-		return True
-	return False
+	return bool(frappe.has_permission("Overtime Slip", "write"))
 
 
 @frappe.whitelist()
@@ -3044,12 +3053,9 @@ def can_delete_overtime_slip():
 	"""
 	Returns True if the current user has permission to delete Overtime Slip.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles or "HR User" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Overtime Slip", "delete"):
-		return True
+	return bool(frappe.has_permission("Overtime Slip", "delete"))
 	return False
 
 
@@ -3278,13 +3284,9 @@ def can_read_additional_salary():
 	"""
 	Returns True if the current user has permission to read Additional Salary.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles or "Accounts Manager" in roles or "HR User" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Additional Salary", "read"):
-		return True
-	return False
+	return bool(frappe.has_permission("Additional Salary", "read"))
 
 
 @frappe.whitelist()
@@ -3292,13 +3294,9 @@ def can_create_additional_salary():
 	"""
 	Returns True if the current user has permission to create Additional Salary.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles or "Accounts Manager" in roles or "HR User" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Additional Salary", "create"):
-		return True
-	return False
+	return bool(frappe.has_permission("Additional Salary", "create"))
 
 
 @frappe.whitelist()
@@ -3306,13 +3304,9 @@ def can_edit_additional_salary():
 	"""
 	Returns True if the current user has permission to edit Additional Salary.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles or "Accounts Manager" in roles or "HR User" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Additional Salary", "write"):
-		return True
-	return False
+	return bool(frappe.has_permission("Additional Salary", "write"))
 
 
 @frappe.whitelist()
@@ -3320,12 +3314,9 @@ def can_delete_additional_salary():
 	"""
 	Returns True if the current user has permission to delete Additional Salary.
 	"""
-	user = frappe.session.user
-	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles or "Accounts Manager" in roles or "HR User" in roles:
+	if _is_payroll_admin():
 		return True
-	if frappe.has_permission("Additional Salary", "delete"):
-		return True
+	return bool(frappe.has_permission("Additional Salary", "delete"))
 	return False
 
 

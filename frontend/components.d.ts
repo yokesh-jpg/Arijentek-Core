@@ -17,6 +17,7 @@ declare module 'vue' {
     DateTimeField: typeof import('./src/components/DateTimeField.vue')['default']
     ModernCalendar: typeof import('./src/components/ModernCalendar.vue')['default']
     NavIcon: typeof import('./src/components/NavIcon.vue')['default']
+    PdfViewerModal: typeof import('./src/components/PdfViewerModal.vue')['default']
     PortalLayout: typeof import('./src/components/PortalLayout.vue')['default']
     RefListTab: typeof import('./src/components/RefListTab.vue')['default']
     ReportDialog: typeof import('./src/components/ReportDialog.vue')['default']

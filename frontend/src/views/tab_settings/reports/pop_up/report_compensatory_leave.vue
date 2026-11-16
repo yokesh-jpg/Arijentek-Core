@@ -58,6 +58,7 @@ import SearchableDropdown from '../../../../components/SearchableDropdown.vue';
 import DateRangePicker from '../../../../components/DateRangePicker.vue';
 import ReportDialog from '@/components/ReportDialog.vue';
 import ReportTable from '@/components/ReportTable.vue';
+import { exportReportPdf } from '@/utils/reportExport.js';
 
 const props = defineProps({
 	show: {
@@ -173,7 +174,8 @@ const exportPDF = () => {
 	if (filters.status) params.append('status', filters.status);
 	params.append('pdf', '1');
 
-	window.open(`/api/method/arijentek_core.api.leave.report_compensatory_leave_list?${params.toString()}`, '_blank');
+	const url = `/api/method/arijentek_core.api.leave.report_compensatory_leave_list?${params.toString()}`;
+	exportReportPdf({ title: 'Compensatory Leave Report', url });
 };
 
 const emitClose = () => {

@@ -58,6 +58,7 @@ import { createResource } from 'frappe-ui';
 import SearchableDropdown from '../../../../components/SearchableDropdown.vue';
 import ReportDialog from '@/components/ReportDialog.vue';
 import ReportTable from '@/components/ReportTable.vue';
+import { exportReportPdf } from '@/utils/reportExport.js';
 
 const props = defineProps({
 	show: {
@@ -110,13 +111,15 @@ const metadataResource = createResource({
 	onSuccess(data) {
 		if (data) {
 			if (data.users && data.users.length > 0) {
-				filterOptions.users = data.users.map(u => ({ id: u.name, name: u.full_name || u.name }));
+				filterOptions.users = data.users.map(u => ({ label: u.full_name || u.name, value: u.name, id: u.name, name: u.full_name || u.name }));
+			} else {
+				filterOptions.users = [];
 			}
 			if (data.priorities) {
-				filterOptions.priorities = data.priorities.map(p => ({ id: p, name: p }));
+				filterOptions.priorities = data.priorities.map(p => ({ label: p, value: p, id: p, name: p }));
 			}
 			if (data.statuses) {
-				filterOptions.statuses = data.statuses.map(s => ({ id: s, name: s }));
+				filterOptions.statuses = data.statuses.map(s => ({ label: s, value: s, id: s, name: s }));
 			}
 		}
 	}
@@ -129,20 +132,28 @@ const dataResource = createResource({
 		reportData.value = data || [];
 		loading.value = false;
 	},
-	onError() {
+	onError(err) {
+		console.warn("Task report data failed to load:", err);
+		reportData.value = [];
 		loading.value = false;
 	}
 });
 
 function fetchReportData() {
 	loading.value = true;
-	dataResource.fetch({
-		filters: {
-			user: filters.user,
-			priority: filters.priority,
-			status: filters.status
-		}
-	});
+	try {
+		dataResource.fetch({
+			filters: {
+				user: filters.user || undefined,
+				priority: filters.priority || undefined,
+				status: filters.status || undefined
+			}
+		});
+	} catch (e) {
+		console.warn("Task report fetch error:", e);
+		reportData.value = [];
+		loading.value = false;
+	}
 }
 
 function exportExcel() {
@@ -189,7 +200,7 @@ function exportPDF() {
 	}));
 	
 	const url = `/api/method/arijentek_core.api.tasks.download_task_report_pdf?${params.toString()}`;
-	window.open(url, '_blank');
+	exportReportPdf({ title: 'Tasks Report', url });
 }
 
 watch(() => props.show, (newVal) => {

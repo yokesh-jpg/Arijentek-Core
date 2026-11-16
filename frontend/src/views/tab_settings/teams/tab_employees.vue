@@ -294,6 +294,5 @@ watch(
 
 onMounted(() => {
 	pager.fetchPage()
-	teamStore.fetchLists()
 })
 </script>

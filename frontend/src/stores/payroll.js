@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { createResource } from "frappe-ui";
 import { ref, computed } from "vue";
+import { fetchPortalPermissionsCached, getCachedPortalPermissionsSync } from "./auth";
 
 export const usePayrollStore = defineStore("payroll", () => {
 	const salarySlips = ref([]);
@@ -9,6 +10,7 @@ export const usePayrollStore = defineStore("payroll", () => {
 	const loading = ref(false);
 	const selectedEmployeeId = ref(null);
 	const employeeList = ref([]);
+	const permissionsLoaded = ref(false);
 
 	// Permission flags for Salary Component
 	const canReadSalaryComponent = ref(false);
@@ -65,6 +67,10 @@ export const usePayrollStore = defineStore("payroll", () => {
 		onSuccess(data) {
 			salarySlips.value = data || [];
 		},
+		onError(err) {
+			console.warn("Could not load salary slips:", err);
+			salarySlips.value = [];
+		},
 	});
 
 	// Get payroll summary
@@ -74,6 +80,10 @@ export const usePayrollStore = defineStore("payroll", () => {
 		onSuccess(data) {
 			payrollSummary.value = data;
 		},
+		onError(err) {
+			console.warn("Could not load payroll summary:", err);
+			payrollSummary.value = null;
+		},
 	});
 
 	// Get my payroll summary
@@ -82,6 +92,10 @@ export const usePayrollStore = defineStore("payroll", () => {
 		auto: false,
 		onSuccess(data) {
 			myPayrollSummary.value = data;
+		},
+		onError(err) {
+			console.warn("Could not load my payroll summary:", err);
+			myPayrollSummary.value = null;
 		},
 	});
 
@@ -278,6 +292,10 @@ export const usePayrollStore = defineStore("payroll", () => {
 		onSuccess(data) {
 			employeeList.value = data || [];
 		},
+		onError(err) {
+			console.warn("Could not load employee list:", err);
+			employeeList.value = [];
+		},
 	});
 
 	// Computed
@@ -316,21 +334,37 @@ export const usePayrollStore = defineStore("payroll", () => {
 
 	// Actions
 	async function fetchSalarySlips(params = {}) {
-		if (selectedEmployeeId.value) params.employee_id = selectedEmployeeId.value;
-		await salarySlipsResource.fetch(params);
+		try {
+			if (selectedEmployeeId.value) params.employee_id = selectedEmployeeId.value;
+			await salarySlipsResource.fetch(params);
+		} catch (e) {
+			// Handled in onError
+		}
 	}
 
 	async function fetchPayrollSummary(params = {}) {
-		if (selectedEmployeeId.value) params.employee_id = selectedEmployeeId.value;
-		await payrollSummaryResource.fetch(params);
+		try {
+			if (selectedEmployeeId.value) params.employee_id = selectedEmployeeId.value;
+			await payrollSummaryResource.fetch(params);
+		} catch (e) {
+			// Handled in onError
+		}
 	}
 
 	async function fetchMyPayrollSummary(params = {}) {
-		await myPayrollSummaryResource.fetch(params);
+		try {
+			await myPayrollSummaryResource.fetch(params);
+		} catch (e) {
+			// Handled in onError
+		}
 	}
 
 	async function fetchEmployeeList() {
-		await employeeListResource.fetch();
+		try {
+			await employeeListResource.fetch();
+		} catch (e) {
+			employeeList.value = [];
+		}
 	}
 
 	async function getSlipDetails(slipName) {
@@ -341,59 +375,70 @@ export const usePayrollStore = defineStore("payroll", () => {
 		return await generateMyPayslipResource.fetch({ month, year });
 	}
 
+	function applyPayrollPermissions(perms) {
+		if (!perms) return;
+		canReadSalaryComponent.value = !!perms.can_read_salary_componants;
+		canCreateSalaryComponent.value = !!perms.can_create_salary_componants;
+		canEditSalaryComponent.value = !!perms.can_edit_salary_componants;
+		canDeleteSalaryComponent.value = !!perms.can_delete_salary_componants;
+
+		canReadSalaryStructure.value = !!perms.can_read_salary_structure;
+		canCreateSalaryStructure.value = !!perms.can_create_salary_structure;
+		canEditSalaryStructure.value = !!perms.can_edit_salary_structure;
+		canDeleteSalaryStructure.value = !!perms.can_delete_salary_structure;
+
+		canReadSalaryStructureAssignment.value = !!perms.can_read_salary_structure_assignment;
+		canCreateSalaryStructureAssignment.value = !!perms.can_create_salary_structure_assignment;
+		canEditSalaryStructureAssignment.value = !!perms.can_edit_salary_structure_assignment;
+		canDeleteSalaryStructureAssignment.value = !!perms.can_delete_salary_structure_assignment;
+
+		canReadPayrollEntry.value = !!perms.can_read_payroll_entry;
+		canCreatePayrollEntry.value = !!perms.can_create_payroll_entry;
+		canEditPayrollEntry.value = !!perms.can_edit_payroll_entry;
+		canDeletePayrollEntry.value = !!perms.can_delete_payroll_entry;
+
+		canReadSalarySlip.value = !!perms.can_read_salary_slip;
+		canCreateSalarySlip.value = !!perms.can_create_salary_slip;
+		canEditSalarySlip.value = !!perms.can_edit_salary_slip;
+		canDeleteSalarySlip.value = !!perms.can_delete_salary_slip;
+
+		canReadOvertimeType.value = !!perms.can_read_overtime_type;
+		canCreateOvertimeType.value = !!perms.can_create_overtime_type;
+		canEditOvertimeType.value = !!perms.can_edit_overtime_type;
+		canDeleteOvertimeType.value = !!perms.can_delete_overtime_type;
+
+		canReadOvertimeSlip.value = !!perms.can_read_overtime_slip;
+		canCreateOvertimeSlip.value = !!perms.can_create_overtime_slip;
+		canEditOvertimeSlip.value = !!perms.can_edit_overtime_slip;
+		canDeleteOvertimeSlip.value = !!perms.can_delete_overtime_slip;
+
+		canReadAdditionalSalary.value = !!perms.can_read_additional_salary;
+		canCreateAdditionalSalary.value = !!perms.can_create_additional_salary;
+		canEditAdditionalSalary.value = !!perms.can_edit_additional_salary;
+		canDeleteAdditionalSalary.value = !!perms.can_delete_additional_salary;
+
+		canViewAllResource.data = perms.can_view_all_payroll;
+		permissionsLoaded.value = true;
+	}
+
+	// Synchronously pre-hydrate permissions from session storage cache on store initialization
+	try {
+		const cachedSync = getCachedPortalPermissionsSync();
+		if (cachedSync?.payroll) {
+			applyPayrollPermissions(cachedSync.payroll);
+		}
+	} catch (_) {}
+
 	async function loadPermissions(consolidatedPerms = null) {
 		let perms = consolidatedPerms;
 		if (!perms) {
-			try {
-				const res = await fetch("/api/method/arijentek_core.api.dashboard.get_all_portal_permissions");
-				const json = await res.json();
-				perms = json.message?.payroll;
-			} catch (err) {
-				console.error("Failed to load payroll permissions:", err);
-			}
+			const json = await fetchPortalPermissionsCached("arijentek_core");
+			perms = json?.payroll;
 		}
 		if (perms) {
-			canReadSalaryComponent.value = !!perms.can_read_salary_componants;
-			canCreateSalaryComponent.value = !!perms.can_create_salary_componants;
-			canEditSalaryComponent.value = !!perms.can_edit_salary_componants;
-			canDeleteSalaryComponent.value = !!perms.can_delete_salary_componants;
-
-			canReadSalaryStructure.value = !!perms.can_read_salary_structure;
-			canCreateSalaryStructure.value = !!perms.can_create_salary_structure;
-			canEditSalaryStructure.value = !!perms.can_edit_salary_structure;
-			canDeleteSalaryStructure.value = !!perms.can_delete_salary_structure;
-
-			canReadSalaryStructureAssignment.value = !!perms.can_read_salary_structure_assignment;
-			canCreateSalaryStructureAssignment.value = !!perms.can_create_salary_structure_assignment;
-			canEditSalaryStructureAssignment.value = !!perms.can_edit_salary_structure_assignment;
-			canDeleteSalaryStructureAssignment.value = !!perms.can_delete_salary_structure_assignment;
-
-			canReadPayrollEntry.value = !!perms.can_read_payroll_entry;
-			canCreatePayrollEntry.value = !!perms.can_create_payroll_entry;
-			canEditPayrollEntry.value = !!perms.can_edit_payroll_entry;
-			canDeletePayrollEntry.value = !!perms.can_delete_payroll_entry;
-
-			canReadSalarySlip.value = !!perms.can_read_salary_slip;
-			canCreateSalarySlip.value = !!perms.can_create_salary_slip;
-			canEditSalarySlip.value = !!perms.can_edit_salary_slip;
-			canDeleteSalarySlip.value = !!perms.can_delete_salary_slip;
-
-			canReadOvertimeType.value = !!perms.can_read_overtime_type;
-			canCreateOvertimeType.value = !!perms.can_create_overtime_type;
-			canEditOvertimeType.value = !!perms.can_edit_overtime_type;
-			canDeleteOvertimeType.value = !!perms.can_delete_overtime_type;
-
-			canReadOvertimeSlip.value = !!perms.can_read_overtime_slip;
-			canCreateOvertimeSlip.value = !!perms.can_create_overtime_slip;
-			canEditOvertimeSlip.value = !!perms.can_edit_overtime_slip;
-			canDeleteOvertimeSlip.value = !!perms.can_delete_overtime_slip;
-
-			canReadAdditionalSalary.value = !!perms.can_read_additional_salary;
-			canCreateAdditionalSalary.value = !!perms.can_create_additional_salary;
-			canEditAdditionalSalary.value = !!perms.can_edit_additional_salary;
-			canDeleteAdditionalSalary.value = !!perms.can_delete_additional_salary;
-
-			canViewAllResource.data = perms.can_view_all_payroll;
+			applyPayrollPermissions(perms);
+		} else {
+			permissionsLoaded.value = true;
 		}
 	}
 
@@ -408,6 +453,7 @@ export const usePayrollStore = defineStore("payroll", () => {
 	}
 
 	return {
+		permissionsLoaded,
 		salarySlips,
 		payrollSummary,
 		myPayrollSummary,

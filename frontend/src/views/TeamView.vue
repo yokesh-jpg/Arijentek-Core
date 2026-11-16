@@ -99,7 +99,7 @@
 			</button>
 		</TabBar>
 
-		<div class="pb-20 lg:pb-0 tab-fill">
+		<div v-if="hasAnyTeamPermission" class="pb-20 lg:pb-0 tab-fill">
 			<TabEmployees v-if="activeTab === 'employees' && teamStore.readEmployeePermissionResource.data" />
 			<TabUsers v-if="activeTab === 'users' && teamStore.readUsersPermissionResource.data" />
 			<TabRoles v-if="activeTab === 'roles' && teamStore.readRolePermissionResource?.data" />
@@ -113,11 +113,20 @@
 			<TabHolidayList v-if="activeTab === 'holiday_list' && leaveStore.canReadHolidayList" />
 			<TabHolidayListAssignment v-if="activeTab === 'holiday_list_assignment' && leaveStore.canReadHolidayListAssignment" />
 		</div>
+
+		<!-- Fallback when user has no permissions to any team tab -->
+		<div v-else class="glass-card p-12 text-center my-6 max-w-lg mx-auto">
+			<span class="material-symbols-outlined !text-[48px] text-[#9AA0A8] dark:text-white/30 mb-3">group_off</span>
+			<h3 class="text-base font-semibold text-[#17181B] dark:text-white">Team Directory Restricted</h3>
+			<p class="text-xs text-[#5C6169] dark:text-white/60 mt-1.5 leading-relaxed">
+				You do not have permission to view employee records or organization management structures. Please contact HR if you need access.
+			</p>
+		</div>
 	</div>
 </template>
 
 <script setup>
-import { ref, watch, watchEffect, onMounted } from 'vue'
+import { ref, computed, watch, watchEffect, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useTeamStore } from '@/stores/team'
 import { useLeaveStore } from '@/stores/leave'
@@ -139,6 +148,23 @@ import TabHolidayListAssignment from './tab_settings/holiday_list/tab_holiday_li
 const route = useRoute()
 const teamStore = useTeamStore()
 const leaveStore = useLeaveStore()
+
+const hasAnyTeamPermission = computed(() => {
+	return !!(
+		teamStore.readEmployeePermissionResource?.data ||
+		teamStore.readUsersPermissionResource?.data ||
+		teamStore.readRolePermissionResource?.data ||
+		teamStore.readDepartmentPermissionResource?.data ||
+		teamStore.readDesignationPermissionResource?.data ||
+		teamStore.readBranchPermissionResource?.data ||
+		teamStore.readEmployeeGradePermissionResource?.data ||
+		teamStore.readSalutationPermissionResource?.data ||
+		teamStore.readGenderPermissionResource?.data ||
+		teamStore.readEmployeeTypePermissionResource?.data ||
+		leaveStore.canReadHolidayList ||
+		leaveStore.canReadHolidayListAssignment
+	)
+})
 
 const activeTab = ref(route.query.tab || '')
 

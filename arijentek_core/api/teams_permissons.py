@@ -126,6 +126,8 @@ def can_read_users():
 	Returns True if the current user has permission to read the User doctype.
 	"""
 	user = frappe.session.user
+	if user == "Administrator":
+		return True
 	roles = frappe.get_roles(user)
 	if "HR Manager" in roles or "System Manager" in roles:
 		return True
@@ -519,15 +521,24 @@ def get_employee_list(employee_id="", search_term="", department="", designation
 
 @frappe.whitelist()
 def get_departments():
-	return [d.name for d in frappe.get_all("Department", order_by="name asc")]
+	try:
+		return [d.name for d in frappe.get_all("Department", order_by="name asc", ignore_permissions=True)]
+	except Exception:
+		return []
 
 @frappe.whitelist()
 def get_designations():
-	return [d.name for d in frappe.get_all("Designation", order_by="name asc")]
+	try:
+		return [d.name for d in frappe.get_all("Designation", order_by="name asc", ignore_permissions=True)]
+	except Exception:
+		return []
 
 @frappe.whitelist()
 def get_employment_types():
-	return [d.name for d in frappe.get_all("Employment Type", order_by="name asc")]
+	try:
+		return [d.name for d in frappe.get_all("Employment Type", order_by="name asc", ignore_permissions=True)]
+	except Exception:
+		return []
 
 @frappe.whitelist()
 def get_genders():
@@ -622,15 +633,24 @@ def get_users_details(user_id="", search_term="", page=1, page_size=0, order_by:
 
 @frappe.whitelist()
 def get_salutations():
-	return [d.name for d in frappe.get_all("Salutation", order_by="name asc")]
+	try:
+		return [d.name for d in frappe.get_all("Salutation", order_by="name asc", ignore_permissions=True)]
+	except Exception:
+		return []
 
 @frappe.whitelist()
 def get_branches():
-	return [d.name for d in frappe.get_all("Branch", order_by="name asc")]
+	try:
+		return [d.name for d in frappe.get_all("Branch", order_by="name asc", ignore_permissions=True)]
+	except Exception:
+		return []
 
 @frappe.whitelist()
 def get_employee_grades():
-	return [d.name for d in frappe.get_all("Employee Grade", order_by="name asc")]
+	try:
+		return [d.name for d in frappe.get_all("Employee Grade", order_by="name asc", ignore_permissions=True)]
+	except Exception:
+		return []
 
 @frappe.whitelist()
 def get_users_list(no_employees=False):
@@ -753,6 +773,47 @@ def get_roles(search_term="", page=1, page_size=0):
 
 	return roles
 
+def _resolve_employee_company(employee_data):
+	"""Resolve the Company for an Employee create/save (R8-1).
+
+	Order: explicit payload company -> user default -> Global Defaults default
+	company -> the only Company on a single-company site.
+	"""
+	company = (
+		employee_data.get("company")
+		or frappe.defaults.get_user_default("Company")
+		or frappe.db.get_single_value("Global Defaults", "default_company")
+	)
+	if not company:
+		companies = frappe.get_all("Company", pluck="name", order_by="name asc", limit_page_length=2)
+		if len(companies) == 1:
+			company = companies[0]
+	return company
+
+
+@frappe.whitelist()
+def get_employee_company_options():
+	"""Company choices + resolved default for the Add/Edit Employee dialog."""
+	companies = [c.name for c in frappe.get_all("Company", order_by="name asc", ignore_permissions=True)]
+
+	# Users scoped to specific companies (User Permission) only pick among those
+	user_companies = [p.get("doc") for p in (frappe.permissions.get_user_permissions(frappe.session.user).get("Company") or [])]
+	if user_companies:
+		companies = [c for c in companies if c in user_companies] or user_companies
+
+	default_company = (
+		frappe.defaults.get_user_default("Company")
+		or frappe.db.get_single_value("Global Defaults", "default_company")
+		or ""
+	)
+	if default_company and companies and default_company not in companies:
+		default_company = ""
+	if not default_company and len(companies) == 1:
+		default_company = companies[0]
+
+	return {"options": companies, "default": default_company}
+
+
 @frappe.whitelist()
 def create_employee(employee_data):
 	if isinstance(employee_data, str):
@@ -779,7 +840,9 @@ def create_employee(employee_data):
 			else:
 				frappe.throw(f"Employee {reports_to_emp} does not exist.")
 
-	company = employee_data.get("company") or frappe.defaults.get_user_default("Company") or frappe.db.get_single_value("Global Defaults", "default_company")
+	company = _resolve_employee_company(employee_data)
+	if not company:
+		frappe.throw("Company is required to create an Employee", frappe.MandatoryError)
 
 	# Prepare doc fields
 	doc_fields = {

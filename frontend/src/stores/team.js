@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { createResource } from "frappe-ui";
+import { fetchPortalPermissionsCached } from "./auth";
 
 export const useTeamStore = defineStore("team", () => {
 	const permissionResource = createResource({
@@ -273,13 +274,8 @@ export const useTeamStore = defineStore("team", () => {
 	async function loadPermissions(consolidatedPerms = null) {
 		let perms = consolidatedPerms;
 		if (!perms) {
-			try {
-				const res = await fetch("/api/method/arijentek_core.api.dashboard.get_all_portal_permissions");
-				const json = await res.json();
-				perms = json.message?.team;
-			} catch (err) {
-				console.error("Failed to load team permissions:", err);
-			}
+			const json = await fetchPortalPermissionsCached("arijentek_core");
+			perms = json?.team;
 		}
 		if (perms) {
 			permissionResource.data = perms.can_create_employee;
@@ -324,21 +320,36 @@ export const useTeamStore = defineStore("team", () => {
 		}
 	}
 
-	function fetchLists() {
-		departmentsResource.fetch();
-		designationsResource.fetch();
-		employmentTypesResource.fetch();
-		gendersResource.fetch();
-		usersListResource.fetch();
-		employeeListResource.fetch();
-		salutationsResource.fetch();
-		branchesResource.fetch();
-		employeeGradesResource.fetch();
-		shiftTypesResource.fetch();
-		rolesResource.fetch();
-		unlinkedUsersResource.fetch();
-		unlinkedEmployeesResource.fetch();
-		timezonesResource.fetch();
+	let fetchListsPromise = null;
+	let lastFetchTime = 0;
+	function fetchLists(force = false) {
+		const now = Date.now();
+		if (!force && lastFetchTime && (now - lastFetchTime < 30000)) {
+			return fetchListsPromise || Promise.resolve();
+		}
+		if (fetchListsPromise && !force) {
+			return fetchListsPromise;
+		}
+		lastFetchTime = now;
+		fetchListsPromise = Promise.allSettled([
+			departmentsResource.fetch().catch(() => {}),
+			designationsResource.fetch().catch(() => {}),
+			employmentTypesResource.fetch().catch(() => {}),
+			gendersResource.fetch().catch(() => {}),
+			usersListResource.fetch().catch(() => {}),
+			employeeListResource.fetch().catch(() => {}),
+			salutationsResource.fetch().catch(() => {}),
+			branchesResource.fetch().catch(() => {}),
+			employeeGradesResource.fetch().catch(() => {}),
+			shiftTypesResource.fetch().catch(() => {}),
+			rolesResource.fetch().catch(() => {}),
+			unlinkedUsersResource.fetch().catch(() => {}),
+			unlinkedEmployeesResource.fetch().catch(() => {}),
+			timezonesResource.fetch().catch(() => {}),
+		]).finally(() => {
+			fetchListsPromise = null;
+		});
+		return fetchListsPromise;
 	}
 
 	return {

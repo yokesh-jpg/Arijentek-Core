@@ -8,8 +8,10 @@ def can_create_employee_grievance():
 	Returns True if the current user has permission to create an Employee Grievance.
 	"""
 	user = frappe.session.user
+	if user == "Administrator":
+		return True
 	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if "HR Manager" in roles or "System Manager" in roles or "HR User" in roles or "Employee" in roles:
 		return True
 	if frappe.has_permission("Employee Grievance", "create"):
 		return True
@@ -21,8 +23,10 @@ def can_read_employee_grievance():
 	Returns True if the current user has permission to read an Employee Grievance.
 	"""
 	user = frappe.session.user
+	if user == "Administrator":
+		return True
 	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if "HR Manager" in roles or "System Manager" in roles or "HR User" in roles or "Employee" in roles:
 		return True
 	if frappe.has_permission("Employee Grievance", "read"):
 		return True
@@ -34,8 +38,10 @@ def can_edit_employee_grievance():
 	Returns True if the current user has permission to edit an Employee Grievance.
 	"""
 	user = frappe.session.user
+	if user == "Administrator":
+		return True
 	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if "HR Manager" in roles or "System Manager" in roles or "HR User" in roles:
 		return True
 	if frappe.has_permission("Employee Grievance", "write"):
 		return True
@@ -47,6 +53,8 @@ def can_delete_employee_grievance():
 	Returns True if the current user has permission to delete an Employee Grievance.
 	"""
 	user = frappe.session.user
+	if user == "Administrator":
+		return True
 	roles = frappe.get_roles(user)
 	if "HR Manager" in roles or "System Manager" in roles:
 		return True
@@ -60,6 +68,8 @@ def can_submit_employee_grievance():
 	Returns True if the current user has permission to submit an Employee Grievance.
 	"""
 	user = frappe.session.user
+	if user == "Administrator":
+		return True
 	roles = frappe.get_roles(user)
 	if "HR Manager" in roles or "System Manager" in roles:
 		return True
@@ -73,8 +83,10 @@ def can_create_grievance_type():
 	Returns True if the current user has permission to create a Grievance Type.
 	"""
 	user = frappe.session.user
+	if user == "Administrator":
+		return True
 	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if "HR Manager" in roles or "System Manager" in roles or "HR User" in roles:
 		return True
 	if frappe.has_permission("Grievance Type", "create"):
 		return True
@@ -86,8 +98,10 @@ def can_read_grievance_type():
 	Returns True if the current user has permission to read a Grievance Type.
 	"""
 	user = frappe.session.user
+	if user == "Administrator":
+		return True
 	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if "HR Manager" in roles or "System Manager" in roles or "HR User" in roles or "Employee" in roles:
 		return True
 	if frappe.has_permission("Grievance Type", "read"):
 		return True
@@ -99,8 +113,10 @@ def can_edit_grievance_type():
 	Returns True if the current user has permission to edit a Grievance Type.
 	"""
 	user = frappe.session.user
+	if user == "Administrator":
+		return True
 	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if "HR Manager" in roles or "System Manager" in roles or "HR User" in roles:
 		return True
 	if frappe.has_permission("Grievance Type", "write"):
 		return True
@@ -112,6 +128,8 @@ def can_delete_grievance_type():
 	Returns True if the current user has permission to delete a Grievance Type.
 	"""
 	user = frappe.session.user
+	if user == "Administrator":
+		return True
 	roles = frappe.get_roles(user)
 	if "HR Manager" in roles or "System Manager" in roles:
 		return True
@@ -125,8 +143,11 @@ def get_issues_types(id=None):
 	Fetch Grievance Types. If id is provided, fetch specific record.
 	Returns all fields.
 	"""
+	if not frappe.db.exists("DocType", "Grievance Type"):
+		return []
+
 	if not can_read_grievance_type():
-		frappe.throw(frappe._("Not permitted to read Grievance Type"), frappe.PermissionError)
+		return []
 
 	filters = {}
 	if id:
@@ -139,6 +160,14 @@ def save_issue_type(doc):
 	import json
 	if isinstance(doc, str):
 		doc = json.loads(doc)
+
+	if not frappe.db.exists("DocType", "Grievance Type"):
+		frappe.throw(frappe._("DocType Grievance Type does not exist on this site"))
+
+	current_mod = frappe.db.get_value("DocType", "Grievance Type", "module")
+	if current_mod != "HR":
+		frappe.db.set_value("DocType", "Grievance Type", "module", "HR", update_modified=False)
+		frappe.clear_cache(doctype="Grievance Type")
 
 	original_name = doc.get("original_name")
 	new_name = doc.get("name")
@@ -206,10 +235,14 @@ def get_issues(
 
 	can_submit = can_submit_employee_grievance()
 
+	user = frappe.session.user
+	roles = frappe.get_roles(user)
+	is_hr_or_admin = user == "Administrator" or "HR Manager" in roles or "System Manager" in roles or "HR User" in roles
+
 	conditions = ["eg.docstatus < 2"]
 	params = {}
 
-	if not can_submit:
+	if not can_submit and not is_hr_or_admin:
 		user_emp = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
 		if user_emp:
 			conditions.append("eg.raised_by = %(user_emp)s")
@@ -451,7 +484,10 @@ def get_issue_report_filter_options():
 		{"id": "Resolved", "name": "Resolved"},
 		{"id": "Invalid", "name": "Invalid"}
 	]
-	issue_types = frappe.get_all("Grievance Type", fields=["name as id", "name as name"], order_by="name asc")
+	if not frappe.db.exists("DocType", "Grievance Type"):
+		issue_types = []
+	else:
+		issue_types = frappe.get_all("Grievance Type", fields=["name as id", "name as name"], order_by="name asc", ignore_permissions=True)
 
 	return {
 		"employees": [{"id": e.id, "name": f"{e.name} ({e.id})"} for e in employees],

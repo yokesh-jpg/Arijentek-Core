@@ -38,6 +38,14 @@ def get_department_approvers(department: str, parentfield: str) -> list:
 	return department_approvers
 
 
+def _get_hr_setting_safe(fieldname, default=None):
+	try:
+		return frappe.db.get_single_value("HR Settings", fieldname)
+	except Exception:
+		val = frappe.db.get_value("Singles", {"doctype": "HR Settings", "field": fieldname}, "value")
+		return val if val is not None else default
+
+
 @frappe.whitelist()
 def get_leave_approval_details(employee: str) -> dict:
 	"""Return leave approval details for a given employee.
@@ -73,8 +81,8 @@ def get_leave_approval_details(employee: str) -> dict:
 		leave_approver=leave_approver,
 		leave_approver_name=leave_approver_name,
 		department_approvers=department_approvers,
-		is_mandatory=frappe.db.get_single_value(
-			"HR Settings", "leave_approver_mandatory_in_leave_application"
+		is_mandatory=_get_hr_setting_safe(
+			"leave_approver_mandatory_in_leave_application", 0
 		),
 	)
 
@@ -106,7 +114,7 @@ def is_user_leave_approver(employee_id: str | None = None) -> dict:
 	is_approver = has_approver_role or bool(special_employees)
 
 	if not is_approver:
-		prevent_self = frappe.db.get_single_value("HR Settings", "prevent_self_leave_approval")
+		prevent_self = _get_hr_setting_safe("prevent_self_leave_approval", 0)
 		return {
 			"is_approver": False,
 			"type": "none",
@@ -116,12 +124,15 @@ def is_user_leave_approver(employee_id: str | None = None) -> dict:
 		}
 
 	if has_global_approver:
-		employees = frappe.get_list(
-			"Employee",
-			filters={"status": ["in", ["Active", "Suspended"]]},
-			fields=["name", "employee_name"],
-			order_by="employee_name ASC",
-		)
+		try:
+			employees = frappe.get_list(
+				"Employee",
+				filters={"status": ["in", ["Active", "Suspended"]]},
+				fields=["name", "employee_name"],
+				order_by="employee_name ASC",
+			)
+		except Exception:
+			employees = []
 		existing = {e["name"] for e in employees}
 		for emp in special_employees:
 			if emp["name"] not in existing:
@@ -134,7 +145,7 @@ def is_user_leave_approver(employee_id: str | None = None) -> dict:
 	if has_global_approver and my_employee and not any(e["name"] == my_employee.name for e in employees):
 		employees.insert(0, my_employee)
 
-	prevent_self = frappe.db.get_single_value("HR Settings", "prevent_self_leave_approval")
+	prevent_self = _get_hr_setting_safe("prevent_self_leave_approval", 0)
 
 	approver_type = "global" if has_global_approver else "special"
 	return {
@@ -842,12 +853,57 @@ def get_compensatory_leave_types() -> list[str]:
 
 
 @frappe.whitelist()
-def get_holidays_for_employee(employee: str) -> list[dict]:
-	from hrms.utils.holiday_list import get_holiday_list_for_employee
+def get_holidays_for_employee(employee: str = None) -> list[dict]:
+	if not employee:
+		user = frappe.session.user
+		employee = frappe.db.get_value("Employee", {"user_id": user}, "name")
 
-	holiday_list = get_holiday_list_for_employee(employee, raise_exception=False)
+	holiday_list = None
+	if employee:
+		from hrms.utils.holiday_list import get_holiday_list_for_employee
+
+		try:
+			holiday_list = get_holiday_list_for_employee(employee, raise_exception=False)
+		except Exception:
+			holiday_list = None
+
+		if not holiday_list:
+			holiday_list = frappe.db.get_value("Employee", employee, "holiday_list")
+
+		if not holiday_list:
+			company = frappe.db.get_value("Employee", employee, "company")
+			if company:
+				holiday_list = frappe.db.get_value("Company", company, "default_holiday_list")
+
+	if not holiday_list:
+		today = frappe.utils.today()
+		active_hl = frappe.get_all(
+			"Holiday List",
+			filters={"from_date": ("<=", today), "to_date": (">=", today)},
+			order_by="from_date desc",
+			limit=1,
+			pluck="name",
+		)
+		if active_hl:
+			holiday_list = active_hl[0]
+
+	if not holiday_list:
+		hl = frappe.get_all("Holiday List", order_by="from_date desc", limit=1, pluck="name")
+		if hl:
+			holiday_list = hl[0]
+
 	if not holiday_list:
 		return []
+
+	# Auto-populate weekly off dates if list has weekly_off configured but child table is empty
+	try:
+		hl_doc = frappe.get_doc("Holiday List", holiday_list)
+		if hl_doc.weekly_off and not hl_doc.holidays:
+			hl_doc.get_weekly_off_dates()
+			hl_doc.save(ignore_permissions=True)
+			frappe.db.commit()
+	except Exception:
+		pass
 
 	Holiday = frappe.qb.DocType("Holiday")
 	holidays = (
@@ -858,7 +914,10 @@ def get_holidays_for_employee(employee: str) -> list[dict]:
 	).run(as_dict=True)
 
 	for holiday in holidays:
-		holiday["description"] = frappe.utils.strip_html_tags(holiday["description"] or "").strip()
+		desc = frappe.utils.strip_html_tags(holiday["description"] or "").strip()
+		if not desc:
+			desc = "Weekly Off" if holiday.get("weekly_off") else "Holiday"
+		holiday["description"] = desc
 
 	return holidays
 
@@ -1237,8 +1296,7 @@ def can_delete_leave_types():
 
 @frappe.whitelist()
 def get_employee_leave_balance_map(employee: str | None = None) -> dict[str, dict[str, float]]:
-	from frappe.utils import getdate
-	from hrms.hr.doctype.leave_application.leave_application import get_leave_details
+	from frappe.utils import getdate, flt
 
 	if not employee:
 		employee = frappe.db.get_value(
@@ -1251,23 +1309,183 @@ def get_employee_leave_balance_map(employee: str | None = None) -> dict[str, dic
 	date = getdate()
 	leave_map = {}
 
-	leave_details = get_leave_details(employee, date)
-	allocation = leave_details.get("leave_allocation", {})
+	try:
+		from hrms.hr.doctype.leave_application.leave_application import get_leave_details
+		leave_details = get_leave_details(employee, date)
+		allocation = leave_details.get("leave_allocation", {})
 
-	for leave_type, details in allocation.items():
-		leave_map[leave_type] = {
-			"allocated_leaves": details.get("total_leaves", 0),
-			"balance_leaves": details.get("remaining_leaves", 0),
-			"used_leaves": details.get("leaves_taken", 0),
-			"pending_leaves": details.get("leaves_pending_approval", 0) or details.get("pending_leaves", 0),
-		}
+		for leave_type, details in allocation.items():
+			tot = flt(details.get("total_leaves", 0))
+			if tot > 0:
+				leave_map[leave_type] = {
+					"allocated_leaves": tot,
+					"balance_leaves": flt(details.get("remaining_leaves", 0)),
+					"used_leaves": flt(details.get("leaves_taken", 0)),
+					"pending_leaves": flt(details.get("leaves_pending_approval", 0) or details.get("pending_leaves", 0)),
+				}
+	except Exception:
+		pass
+
+	# Direct fallback to Leave Allocation records if get_leave_details was empty or failed
+	if not leave_map and frappe.db.exists("DocType", "Leave Allocation"):
+		try:
+			alloc_records = frappe.get_all(
+				"Leave Allocation",
+				filters={
+					"employee": employee,
+					"docstatus": 1,
+					"from_date": ["<=", str(date)],
+					"to_date": [">=", str(date)],
+				},
+				fields=["leave_type", "total_leaves_allocated", "new_leaves_allocated"]
+			)
+			for rec in alloc_records:
+				lt = rec.leave_type
+				tot = flt(rec.total_leaves_allocated or rec.new_leaves_allocated)
+				if tot <= 0:
+					continue
+				taken = 0.0
+				if frappe.db.exists("DocType", "Leave Application"):
+					taken_res = frappe.db.sql("""
+						SELECT SUM(total_leave_days) as taken
+						FROM `tabLeave Application`
+						WHERE employee=%s AND leave_type=%s AND docstatus=1
+					""", (employee, lt), as_dict=True)
+					if taken_res and taken_res[0].taken:
+						taken = flt(taken_res[0].taken)
+				rem = max(0.0, tot - taken)
+				leave_map[lt] = {
+					"allocated_leaves": tot,
+					"balance_leaves": rem,
+					"used_leaves": taken,
+					"pending_leaves": 0.0,
+				}
+		except Exception:
+			pass
 
 	return leave_map
 
 
 @frappe.whitelist()
+def get_employee_allocated_leave_types(employee: str | None = None) -> list[dict]:
+	"""
+	Returns only the leave types allocated to the specified employee with remaining balance,
+	plus any Leave Without Pay (LWP) types that do not require allocation.
+	Label format: 'Leave Type - (available)' e.g. 'Casual Leave - (5)'
+	"""
+	from frappe.utils import getdate, flt
+	date = getdate()
+
+	if not employee:
+		employee = frappe.db.get_value(
+			"Employee", {"user_id": frappe.session.user, "status": "Active"}, "name"
+		)
+
+	if not employee:
+		return []
+
+	result = []
+	allocated_map = {}
+
+	# 1. Try standard HRMS get_leave_details
+	try:
+		from hrms.hr.doctype.leave_application.leave_application import get_leave_details
+		details = get_leave_details(employee, date)
+		allocation = details.get("leave_allocation", {})
+		for lt, d in allocation.items():
+			rem = flt(d.get("remaining_leaves", 0))
+			allocated_map[lt] = {
+				"balance": rem,
+				"total": flt(d.get("total_leaves", 0)),
+				"is_lwp": 0
+			}
+	except Exception:
+		pass
+
+	# 2. Fallback to direct Leave Allocation query if get_leave_details returned empty or failed
+	if not allocated_map and frappe.db.exists("DocType", "Leave Allocation"):
+		try:
+			alloc_records = frappe.get_all(
+				"Leave Allocation",
+				filters={
+					"employee": employee,
+					"docstatus": 1,
+					"from_date": ["<=", str(date)],
+					"to_date": [">=", str(date)],
+				},
+				fields=["leave_type", "total_leaves_allocated", "new_leaves_allocated"]
+			)
+			for rec in alloc_records:
+				lt = rec.leave_type
+				tot = flt(rec.total_leaves_allocated or rec.new_leaves_allocated)
+				taken = 0
+				if frappe.db.exists("DocType", "Leave Application"):
+					taken_res = frappe.db.sql("""
+						SELECT SUM(total_leave_days) as taken
+						FROM `tabLeave Application`
+						WHERE employee=%s AND leave_type=%s AND docstatus=1
+					""", (employee, lt), as_dict=True)
+					if taken_res and taken_res[0].taken:
+						taken = flt(taken_res[0].taken)
+				rem = max(0.0, tot - taken)
+				allocated_map[lt] = {
+					"balance": rem,
+					"total": tot,
+					"is_lwp": 0
+				}
+		except Exception:
+			pass
+
+	# 3. Add Leave Without Pay (LWP) types if any exist
+	lwp_types = []
+	if frappe.db.exists("DocType", "Leave Type"):
+		try:
+			lwp_types = frappe.get_all(
+				"Leave Type",
+				filters={"is_lwp": 1},
+				fields=["name", "leave_type_name"]
+			)
+		except Exception:
+			lwp_types = []
+
+	# Build return list for allocated types
+	for lt_name, data in allocated_map.items():
+		bal = data["balance"]
+		bal_str = str(int(bal)) if bal == int(bal) else str(round(bal, 1))
+		result.append({
+			"name": lt_name,
+			"leave_type_name": lt_name,
+			"balance_leaves": bal,
+			"total_leaves": data["total"],
+			"is_lwp": 0,
+			"label": f"{lt_name} - ({bal_str})"
+		})
+
+	# Sort allocated types alphabetically
+	result.sort(key=lambda x: x["leave_type_name"])
+
+	# Append LWP types
+	for lwp in lwp_types:
+		name = lwp.name or lwp.leave_type_name
+		if not any(r["name"] == name for r in result):
+			result.append({
+				"name": name,
+				"leave_type_name": name,
+				"balance_leaves": None,
+				"total_leaves": None,
+				"is_lwp": 1,
+				"label": f"{name} - (LWP)"
+			})
+
+	return result
+
+
+@frappe.whitelist()
 def get_leave_types(search_text: str | None = None, page: int = 1, page_size: int = 0) -> dict | list[dict]:
 	"""Return all Leave Type records with key fields for listing."""
+	if not frappe.db.exists("DocType", "Leave Type"):
+		return {"rows": [], "total": 0, "page": page, "page_size": page_size} if page_size > 0 else []
+
 	filters = {}
 	if search_text:
 		filters["leave_type_name"] = ["like", f"%{search_text}%"]
@@ -1298,6 +1516,7 @@ def get_leave_types(search_text: str | None = None, page: int = 1, page_size: in
 		order_by="leave_type_name asc",
 		limit_start=limit_start,
 		limit_page_length=limit_page_length,
+		ignore_permissions=True,
 	)
 
 	if page_size > 0:
@@ -1324,8 +1543,16 @@ def save_leave_type(leave_type_data: dict) -> dict:
 	- If leave_type_data contains 'name', updates the existing document
 	- Otherwise creates a new Leave Type
 	"""
-	frappe.only_for(["HR Manager", "System Manager"])
+	frappe.only_for(["HR Manager", "System Manager", "Administrator"])
 	try:
+		if not frappe.db.exists("DocType", "Leave Type"):
+			return {"success": False, "error": _("Leave Type DocType does not exist on this site")}
+
+		current_mod = frappe.db.get_value("DocType", "Leave Type", "module")
+		if current_mod != "HR":
+			frappe.db.set_value("DocType", "Leave Type", "module", "HR", update_modified=False)
+			frappe.clear_cache(doctype="Leave Type")
+
 		name = leave_type_data.get("name")
 		leave_type_name = leave_type_data.get("leave_type_name")
 

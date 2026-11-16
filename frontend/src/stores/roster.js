@@ -298,6 +298,9 @@ export const useRosterStore = defineStore("roster", () => {
 	const allowMultipleShiftsResource = createResource({
 		url: "arijentek_core.api.roster.allow_multiple_shifts",
 		auto: false,
+		onError(err) {
+			console.warn("Could not check multiple shifts setting:", err);
+		},
 	});
 
 	// Frequency options resource for Schedule Settings
@@ -513,9 +516,22 @@ export const useRosterStore = defineStore("roster", () => {
 		return isShiftApproverResource.data;
 	}
 
-	async function checkAllowMultipleShifts() {
-		await allowMultipleShiftsResource.fetch();
-		return allowMultipleShiftsResource.data;
+	let allowMultipleShiftsPromise = null;
+	async function checkAllowMultipleShifts(force = false) {
+		if (allowMultipleShiftsPromise && !force) {
+			return allowMultipleShiftsPromise;
+		}
+		allowMultipleShiftsPromise = (async () => {
+			try {
+				await allowMultipleShiftsResource.fetch();
+				return allowMultipleShiftsResource.data;
+			} catch (e) {
+				return 0;
+			} finally {
+				setTimeout(() => { allowMultipleShiftsPromise = null; }, 5000);
+			}
+		})();
+		return allowMultipleShiftsPromise;
 	}
 
 	// ---------------------------------------------------------------------------

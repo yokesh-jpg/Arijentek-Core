@@ -74,9 +74,14 @@ function broadcastAuthSync(payload) {
 }
 
 export const useAuthStore = defineStore("auth", () => {
+	const isGuestOnLogin =
+		typeof window !== "undefined" &&
+		window.location.pathname.includes("/login") &&
+		(!window.frappe_user || window.frappe_user === "Guest");
+
 	const user = ref(null);
 	const isLoggedIn = ref(false);
-	const ready = ref(false);
+	const ready = ref(isGuestOnLogin);
 
 	function handleCrossTabSync(payload) {
 		if (!payload || !payload.action) return;
@@ -188,7 +193,7 @@ export const useAuthStore = defineStore("auth", () => {
 	const userResource = createResource({
 		url: "arijentek_core.api.user_info.get_user_info",
 		method: "GET",
-		auto: true,
+		auto: !isGuestOnLogin,
 		cache: false,
 		onSuccess(data) {
 			if (!data || data === "Guest" || data?.user === "Guest") {
@@ -290,6 +295,7 @@ export const useAuthStore = defineStore("auth", () => {
 		user.value = null;
 		isLoggedIn.value = false;
 		ready.value = false;
+		clearPortalPermissionsCache();
 		clearClientSession();
 
 		if (typeof window !== "undefined") {
@@ -321,3 +327,67 @@ export const useAuthStore = defineStore("auth", () => {
 		init,
 	};
 });
+
+const PORTAL_PERMS_SESSION_KEY = "portal_permissions_cache";
+
+let portalPermissionsCache = null;
+try {
+	if (typeof sessionStorage !== "undefined") {
+		const cached = sessionStorage.getItem(PORTAL_PERMS_SESSION_KEY);
+		if (cached) {
+			portalPermissionsCache = JSON.parse(cached);
+		}
+	}
+} catch (_) {}
+
+let portalPermissionsPromise = null;
+
+export function getCachedPortalPermissionsSync() {
+	if (!portalPermissionsCache) {
+		try {
+			if (typeof sessionStorage !== "undefined") {
+				const cached = sessionStorage.getItem(PORTAL_PERMS_SESSION_KEY);
+				if (cached) {
+					portalPermissionsCache = JSON.parse(cached);
+				}
+			}
+		} catch (_) {}
+	}
+	return portalPermissionsCache;
+}
+
+export async function fetchPortalPermissionsCached(apiPrefix = "arijentek_core") {
+	if (portalPermissionsCache) return portalPermissionsCache;
+	if (portalPermissionsPromise) return portalPermissionsPromise;
+
+	portalPermissionsPromise = (async () => {
+		try {
+			const res = await fetch(`/api/method/${apiPrefix}.api.dashboard.get_all_portal_permissions`);
+			const json = await res.json();
+			portalPermissionsCache = json.message || null;
+			if (portalPermissionsCache && typeof sessionStorage !== "undefined") {
+				try {
+					sessionStorage.setItem(PORTAL_PERMS_SESSION_KEY, JSON.stringify(portalPermissionsCache));
+				} catch (_) {}
+			}
+			return portalPermissionsCache;
+		} catch (e) {
+			console.warn("Could not fetch portal permissions:", e);
+			return null;
+		} finally {
+			portalPermissionsPromise = null;
+		}
+	})();
+
+	return portalPermissionsPromise;
+}
+
+export function clearPortalPermissionsCache() {
+	portalPermissionsCache = null;
+	portalPermissionsPromise = null;
+	try {
+		if (typeof sessionStorage !== "undefined") {
+			sessionStorage.removeItem(PORTAL_PERMS_SESSION_KEY);
+		}
+	} catch (_) {}
+}

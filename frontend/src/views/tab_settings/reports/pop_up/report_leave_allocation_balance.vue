@@ -58,6 +58,7 @@ import SearchableDropdown from '../../../../components/SearchableDropdown.vue';
 import DateRangePicker from '../../../../components/DateRangePicker.vue';
 import ReportDialog from '@/components/ReportDialog.vue';
 import ReportTable from '@/components/ReportTable.vue';
+import { exportReportPdf } from '@/utils/reportExport.js';
 
 const props = defineProps({
 	show: {
@@ -209,7 +210,7 @@ const exportPDF = () => {
 	params.set('pdf', '1');
 
 	const url = `/api/method/arijentek_core.api.leave.report_leave_allocation_balance_list?${params.toString()}`;
-	window.open(url, '_blank');
+	exportReportPdf({ title: 'Leave Allocation Balance Report', url });
 };
 
 const getBalanceBadgeClass = (balance) => {

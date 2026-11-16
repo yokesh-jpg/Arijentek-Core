@@ -213,7 +213,7 @@
                 <button
                   type="button"
                   @click="fetchEmployees"
-                  :disabled="fetchingEmployees || !formData.company"
+                  :disabled="fetchingEmployees"
                   class="btn-primary disabled:bg-black/[0.08] dark:disabled:bg-white/[0.06] disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   <div v-if="fetchingEmployees" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -273,6 +273,10 @@
                         <div class="flex flex-col">
                           <span class="text-sm font-semibold text-[#17181B] dark:text-white">{{ emp.employee_name || emp.name }}</span>
                           <span class="text-xs text-[#656A72] dark:text-white/60">{{ emp.name }}</span>
+                          <span v-if="emp.existing_salary_slip" class="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400 mt-0.5">
+                            <span class="material-symbols-outlined !text-[13px]">warning</span>
+                            Salary slip already exists: {{ emp.existing_salary_slip }}
+                          </span>
                         </div>
                       </td>
                       <td class="px-6 py-4 border-b border-black/[0.05] dark:border-white/[0.06] hidden sm:table-cell">
@@ -356,16 +360,20 @@ const employeeFilters = ref({
   salary_slip_based_on_timesheet: false
 });
 
+const eligibleEmployees = computed(() => {
+  return filteredEmployees.value.filter(emp => !emp.existing_salary_slip);
+});
+
 const isAllSelected = computed(() => {
-  if (filteredEmployees.value.length === 0) return false;
-  return selectedEmployeeIds.value.length === filteredEmployees.value.length;
+  if (eligibleEmployees.value.length === 0) return false;
+  return selectedEmployeeIds.value.length === eligibleEmployees.value.length;
 });
 
 function toggleSelectAll() {
   if (isAllSelected.value) {
     selectedEmployeeIds.value = [];
   } else {
-    selectedEmployeeIds.value = filteredEmployees.value.map(emp => emp.name);
+    selectedEmployeeIds.value = eligibleEmployees.value.map(emp => emp.name);
   }
 }
 
@@ -435,12 +443,8 @@ async function loadOptions() {
       
       // Default company
       if (companyOptions.value.length > 0) {
-        // Try getting user default
-        const defaultCompany = await call('frappe.client.get_value', {
-          doctype: 'Global Defaults',
-          fieldname: 'default_company'
-        });
-        const matched = companyOptions.value.find(o => o.value === defaultCompany?.message?.default_company) 
+        const defaultCo = res.default_company;
+        const matched = companyOptions.value.find(o => o.value === defaultCo) 
           || companyOptions.value[0];
         if (matched) {
           formData.value.company = matched.value;
@@ -556,6 +560,7 @@ watch(
 async function fetchEmployees() {
   if (!formData.value.company) {
     errors.value.company = 'Company is required to fetch employees';
+    notify('Please select a company before fetching employees.', 'error');
     return;
   }
   
@@ -579,7 +584,10 @@ async function fetchEmployees() {
     
     const res = await call('arijentek_core.api.payroll.get_payroll_eligible_employees', params);
     filteredEmployees.value = res || [];
-    selectedEmployeeIds.value = []; // Default unchecked initially
+    // Auto-select only eligible employees who do not already have a salary slip
+    selectedEmployeeIds.value = filteredEmployees.value
+      .filter(e => !e.existing_salary_slip)
+      .map(e => e.name);
     hasFetchedEmployees.value = true;
   } catch (err) {
     console.error(err);
@@ -657,9 +665,14 @@ async function submitForm() {
       submit: true
     };
     
-    await call('arijentek_core.api.payroll.save_payroll_entry', {
+    const res = await call('arijentek_core.api.payroll.save_payroll_entry', {
       doc: payload
     });
+    if (res && res.success === false) {
+      submitError.value = res.error || 'Failed to save payroll entry';
+      notify(submitError.value, 'error');
+      return;
+    }
     emit('save');
     show.value = false;
   } catch (err) {

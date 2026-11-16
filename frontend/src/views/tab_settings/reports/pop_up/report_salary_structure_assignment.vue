@@ -66,6 +66,7 @@ import { ref, reactive, watch } from 'vue';
 import SearchableDropdown from '../../../../components/SearchableDropdown.vue';
 import ReportDialog from '@/components/ReportDialog.vue';
 import ReportTable from '@/components/ReportTable.vue';
+import { exportReportPdf } from '@/utils/reportExport.js';
 
 const props = defineProps({
 	show: {
@@ -196,7 +197,7 @@ const exportPDF = () => {
 	params.set('pdf', '1');
 
 	const url = `/api/method/arijentek_core.api.payroll.report_salary_structure_assignment_list?${params.toString()}`;
-	window.open(url, '_blank');
+	exportReportPdf({ title: 'Salary Structure Assignment Report', url });
 };
 
 const formatCurrency = (val) => {

@@ -69,8 +69,12 @@
 							:options="availableHolidays"
 							labelKey="label"
 							valueKey="holiday_date"
-							placeholder="Select holiday"
+							:placeholder="loadingHolidays ? 'Loading holidays…' : 'Select holiday'"
+							:disabled="loadingHolidays"
 						/>
+						<p v-if="!loadingHolidays && !availableHolidays.length && formData.employee" class="text-xs text-amber-600 dark:text-amber-400">
+							No holidays or weekly offs found for the assigned holiday list.
+						</p>
 						<p v-if="errors.holiday_date" class="field-error">{{ errors.holiday_date }}</p>
 					</div>
 
@@ -226,6 +230,7 @@ const submitError = ref('');
 const submitting = ref(false);
 const compLeaveTypes = ref([]);
 const holidays = ref([]);
+const loadingHolidays = ref(false);
 
 const checkActivePeriod = async () => {
 	noActivePeriodError.value = '';
@@ -245,7 +250,19 @@ watch(show, async (newVal) => {
 		submitError.value = '';
 		noActivePeriodError.value = '';
 
-		if (currEmployee.value) {
+		if (!employeeStore.employee) {
+			try {
+				await employeeStore.fetchEmployee();
+			} catch (_) {}
+		}
+
+		if (leaveStore.isApprover && (!leaveStore.approvedEmployeeList || !leaveStore.approvedEmployeeList.length)) {
+			try {
+				await leaveStore.fetchApprovedEmployeeList();
+			} catch (_) {}
+		}
+
+		if (!props.editId && currEmployee.value) {
 			formData.value.employee = currEmployee.value;
 		}
 
@@ -254,15 +271,25 @@ watch(show, async (newVal) => {
 
 		if (props.editId) {
 			await fetchDetails();
+		} else if (formData.value.employee) {
+			await fetchHolidays(formData.value.employee);
 		}
 	}
 });
 
 watch(
 	() => formData.value.employee,
-	(employee_id) => {
+	async (employee_id, old_id) => {
 		if (employee_id) {
-			fetchHolidays(employee_id);
+			if (old_id && old_id !== employee_id && !props.editId) {
+				formData.value.holiday_date = '';
+				formData.value.work_from_date = '';
+				formData.value.work_end_date = '';
+				formData.value.half_day_date = '';
+			}
+			await fetchHolidays(employee_id);
+		} else {
+			holidays.value = [];
 		}
 	}
 );
@@ -297,18 +324,23 @@ async function fetchCompLeaveTypes() {
 }
 
 async function fetchHolidays(employee_id) {
+	loadingHolidays.value = true;
 	try {
-		const data = await call('arijentek_core.api.leave.get_holidays_for_employee', { employee: employee_id });
-		holidays.value = data || [];
+		const data = await call('arijentek_core.api.leave.get_holidays_for_employee', {
+			employee: employee_id || undefined
+		});
+		holidays.value = Array.isArray(data) ? data : [];
 	} catch (err) {
 		holidays.value = [];
+	} finally {
+		loadingHolidays.value = false;
 	}
 }
 
 async function fetchDetails() {
 	try {
 		const data = await call('arijentek_core.api.leave.get_compensatory_leave_requests', {
-			employee: formData.value.employee
+			employee: formData.value.employee || undefined
 		});
 		const record = data?.find(r => r.name === props.editId);
 		if (record) {
@@ -322,6 +354,9 @@ async function fetchDetails() {
 				half_day_date: record.half_day_date || '',
 				reason: record.reason || ''
 			};
+			if (record.employee) {
+				await fetchHolidays(record.employee);
+			}
 		}
 	} catch (err) {
 		submitError.value = getErrorMessage(err, 'Failed to fetch request details');
@@ -338,7 +373,16 @@ function onHalfDayToggle() {
 
 function formatDate(dateStr) {
 	if (!dateStr) return '';
-	return new Date(dateStr).toLocaleDateString('en-US', {
+	const [y, m, d] = String(dateStr).split('T')[0].split('-').map(Number);
+	if (!y || !m || !d) {
+		return new Date(dateStr).toLocaleDateString('en-US', {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric'
+		});
+	}
+	const date = new Date(y, m - 1, d);
+	return date.toLocaleDateString('en-US', {
 		month: 'short',
 		day: 'numeric',
 		year: 'numeric'

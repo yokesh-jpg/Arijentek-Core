@@ -9,14 +9,16 @@
 		<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
 			<div v-if="pageSize != null" class="flex items-center gap-2">
 				<span class="text-xs text-[#5C6169] dark:text-white/55">Per page</span>
-				<SelectField
-					:model-value="pageSize"
-					:options="sizes"
-					:block="false"
-					trigger-class="page-size-select"
+				<select
+					:value="size"
+					class="page-size-select"
 					aria-label="Rows per page"
-					@update:model-value="setSize"
-				/>
+					@change="setSize($event.target.value)"
+				>
+					<option v-for="s in sizes" :key="s" :value="s">
+						{{ s }}
+					</option>
+				</select>
 			</div>
 			<div class="flex items-center gap-1">
 				<button type="button" class="pager-btn" :disabled="page <= 1" @click="$emit('update:page', page - 1)">Previous</button>
@@ -29,7 +31,6 @@
 
 <script setup>
 import { computed } from 'vue'
-import SelectField from './SelectField.vue'
 
 const props = defineProps({
 	page: { type: Number, required: true },

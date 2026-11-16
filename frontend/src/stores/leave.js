@@ -126,21 +126,21 @@ export const useLeaveStore = defineStore("leave", () => {
 		},
 	});
 
-	// Get leave types from HRMS
+	// Get employee allocated leave types
 	const leaveTypesResource = createResource({
-		url: "hrms.api.get_leave_types",
+		url: "arijentek_core.api.leave.get_employee_allocated_leave_types",
 		auto: false,
 		onSuccess(data) {
-			if (data && Array.isArray(data)) {
-				leaveTypes.value = data.map((name) => ({
-					name: name,
-					leave_type_name: name,
-				}));
-			} else {
-				leaveTypes.value = [];
-			}
+			const rows = Array.isArray(data) ? data : (data?.rows || []);
+			leaveTypes.value = rows.map((lt) => ({
+				name: typeof lt === 'string' ? lt : (lt.name || lt.leave_type_name),
+				leave_type_name: typeof lt === 'string' ? lt : (lt.leave_type_name || lt.name),
+				label: lt.label || (typeof lt === 'string' ? lt : (lt.leave_type_name || lt.name)),
+				balance_leaves: lt.balance_leaves,
+				total_leaves: lt.total_leaves,
+				is_lwp: lt.is_lwp,
+			}));
 		},
-
 	});
 
 	// Check if current user is a leave approver
@@ -161,7 +161,7 @@ export const useLeaveStore = defineStore("leave", () => {
 			}
 		},
 		onError(err) {
-			console.error("Approver check failed:", err);
+			console.warn("Approver check failed:", err);
 			isApprover.value = false;
 			isGlobalApprover.value = false;
 			preventSelfApproval.value = false;
@@ -387,7 +387,8 @@ export const useLeaveStore = defineStore("leave", () => {
 		url: "arijentek_core.api.leave.get_leave_types",
 		auto: false,
 		onSuccess(data) {
-			allLeaveTypesList.value = data || [];
+			const rows = Array.isArray(data) ? data : (data?.rows || data?.data || []);
+			allLeaveTypesList.value = rows;
 		},
 	});
 
@@ -526,8 +527,15 @@ export const useLeaveStore = defineStore("leave", () => {
 		await holidayListsResource.fetch(params);
 	}
 
-	async function checkApproverStatus() {
-		await approverCheckResource.fetch();
+	let approverCheckPromise = null;
+	async function checkApproverStatus(force = false) {
+		if (approverCheckPromise && !force) {
+			return approverCheckPromise;
+		}
+		approverCheckPromise = approverCheckResource.fetch().finally(() => {
+			setTimeout(() => { approverCheckPromise = null; }, 3000);
+		});
+		return approverCheckPromise;
 	}
 
 	function init(empId) {

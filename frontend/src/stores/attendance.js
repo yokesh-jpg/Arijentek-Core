@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { createResource } from "frappe-ui";
 import { ref, computed } from "vue";
+import { fetchPortalPermissionsCached } from "./auth";
 
 export const useAttendanceStore = defineStore("attendance", () => {
 	const todayStatus = ref(null);
@@ -515,13 +516,8 @@ export const useAttendanceStore = defineStore("attendance", () => {
 	async function loadPermissions(consolidatedPerms = null) {
 		let perms = consolidatedPerms;
 		if (!perms) {
-			try {
-				const res = await fetch("/api/method/arijentek_core.api.dashboard.get_all_portal_permissions");
-				const json = await res.json();
-				perms = json.message?.attendance;
-			} catch (err) {
-				console.error("Failed to load attendance permissions:", err);
-			}
+			const json = await fetchPortalPermissionsCached("arijentek_core");
+			perms = json?.attendance;
 		}
 		if (perms) {
 			createAttendancePermissionResource.data = perms.can_create_attendance;

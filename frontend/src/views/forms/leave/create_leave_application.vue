@@ -71,6 +71,9 @@
 								valueKey="name"
 								placeholder="Select leave type"
 							/>
+							<p v-if="availableLeaveTypes.length === 0 && formData.employee" class="text-[12px] text-amber-600 dark:text-amber-400">
+								No allocated leave types available for this employee.
+							</p>
 							<p v-if="errors.leave_type" class="field-error">{{ errors.leave_type }}</p>
 						</div>
 
@@ -308,9 +311,12 @@ async function initializeForm() {
 			fetchApprovalDetails(currEmployee.value);
 		}
 
-		// Fetch leave types for employee
+		// Fetch leave types and balances for employee
 		if (formData.value.employee) {
-			await leaveStore.fetchLeaveTypes(formData.value.employee);
+			await Promise.all([
+				leaveStore.fetchLeaveTypes(formData.value.employee),
+				leaveStore.fetchLeaveBalances(formData.value.employee),
+			]);
 		}
 	}
 }
@@ -340,7 +346,10 @@ async function fetchLeaveApplicationDetails() {
 			};
 
 			if (appData.employee) {
-				await leaveStore.fetchLeaveTypes(appData.employee);
+				await Promise.all([
+					leaveStore.fetchLeaveTypes(appData.employee),
+					leaveStore.fetchLeaveBalances(appData.employee),
+				]);
 				if (!appData.leave_approver) {
 					fetchApprovalDetails(appData.employee);
 				}
@@ -396,7 +405,13 @@ watch(
 	() => formData.value.employee,
 	async (empId, oldVal) => {
 		if (empId && empId !== oldVal) {
-			await leaveStore.fetchLeaveTypes(empId);
+			if (oldVal && !props.editId) {
+				formData.value.leave_type = '';
+			}
+			await Promise.all([
+				leaveStore.fetchLeaveTypes(empId),
+				leaveStore.fetchLeaveBalances(empId),
+			]);
 			if (!props.editId || oldVal) {
 				fetchApprovalDetails(empId);
 			}
@@ -418,40 +433,65 @@ function fetchApprovalDetails(empId) {
 	leaveApprovalResource.fetch({ employee: empId });
 }
 
-// Available leave types from store
+// Available leave types from store (allocated to selected employee)
 const availableLeaveTypes = computed(() => {
 	const types = leaveStore.leaveTypes || [];
 	const balances = leaveStore.leaveBalances || [];
 
-	const withAvailable = types.map((type) => {
+	const list = types.map((type) => {
 		const typeName = type.name || type.leave_type_name;
-		const balance = balances.find(b => b.leave_type === typeName);
-		const days = balance ? balance.balance_leaves : null;
-		const suffix = days === null || days === undefined
-			? ''
-			: ` - ${days} Day${days !== 1 ? 's' : ''}`;
-		return { ...type, label: `${typeName}${suffix}` };
+		let label = type.label;
+		if (!label) {
+			const balance = balances.find(b => b.leave_type === typeName);
+			if (balance && balance.balance_leaves !== undefined && balance.balance_leaves !== null) {
+				const bVal = balance.balance_leaves;
+				const bStr = Number.isInteger(bVal) ? bVal : bVal.toFixed(1);
+				label = `${typeName} - (${bStr})`;
+			} else if (type.is_lwp) {
+				label = `${typeName} - (LWP)`;
+			} else {
+				label = `${typeName} - (0)`;
+			}
+		}
+		return {
+			name: typeName,
+			leave_type_name: typeName,
+			label,
+			balance_leaves: type.balance_leaves,
+			is_lwp: type.is_lwp,
+		};
 	});
 
 	// Ensure current selection is in the list
 	const currentSelected = formData.value.leave_type;
-	if (currentSelected && !withAvailable.some(t => t.name === currentSelected)) {
+	if (currentSelected && !list.some(t => t.name === currentSelected)) {
 		const balance = balances.find(b => b.leave_type === currentSelected);
-		const days = balance ? balance.balance_leaves : null;
-		const suffix = days === null || days === undefined
-			? ''
-			: ` - ${days} Day${days !== 1 ? 's' : ''}`;
-		return [...withAvailable, { name: currentSelected, leave_type_name: currentSelected, label: `${currentSelected}${suffix}` }];
+		const days = balance?.balance_leaves;
+		const bStr = days !== undefined && days !== null ? (Number.isInteger(days) ? days : days.toFixed(1)) : '0';
+		list.push({
+			name: currentSelected,
+			leave_type_name: currentSelected,
+			label: `${currentSelected} - (${bStr})`,
+			balance_leaves: days,
+			is_lwp: 0,
+		});
 	}
-	return withAvailable;
+	return list;
 });
 
 // Balance label for selected leave type
 const selectedBalanceLabel = computed(() => {
 	const leaveType = formData.value.leave_type;
-	if (!leaveType || !leaveStore.leaveBalances?.length) return null;
+	if (!leaveType) return null;
 
-	const balance = leaveStore.leaveBalances.find(b => b.leave_type === leaveType);
+	const matched = (leaveStore.leaveTypes || []).find(t => (t.name === leaveType || t.leave_type_name === leaveType));
+	if (matched) {
+		if (matched.is_lwp) return 'Unlimited (LWP)';
+		const bal = matched.balance_leaves ?? 0;
+		return `${bal} Day${bal !== 1 ? 's' : ''}`;
+	}
+
+	const balance = (leaveStore.leaveBalances || []).find(b => b.leave_type === leaveType);
 	if (balance) {
 		const bal = balance.balance_leaves ?? 0;
 		return `${bal} Day${bal !== 1 ? 's' : ''}`;

@@ -95,12 +95,14 @@ def get_internal_employee_names() -> list[str]:
 	return frappe.get_all("Employee", filters={INTERNAL_MARKER: 1}, pluck="name")
 
 
-def internal_employee_sql(table: str = "`tabEmployee`") -> str:
+def internal_employee_sql(table: str = "`tabEmployee`", user: str | None = None) -> str:
 	"""SQL fragment excluding internal employees ("" pre-migrate).
 
 	For the raw-SQL staff surfaces (roster matrix, commission summary)
 	which never see ``permission_query_conditions``.
 	"""
+	if _sees_internal(user):
+		return ""
 	if not _has_marker_field("Employee"):
 		return ""
 	return f"({table}.{INTERNAL_MARKER} IS NULL OR {table}.{INTERNAL_MARKER} = 0)"

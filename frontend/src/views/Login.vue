@@ -46,12 +46,13 @@
 					<div>
 						<div class="flex items-baseline justify-between gap-3">
 							<label for="login-password" class="field-label">Password</label>
-							<!-- Not wired to anything yet — see the note in README. -->
-							<a
-								href="#"
-								class="text-xs font-medium text-accent dark:text-accent-light hover:underline mb-1.5"
-								>Forgot password?</a
+							<button
+								type="button"
+								@click="openForgotPassword"
+								class="text-xs font-medium text-accent dark:text-accent-light hover:underline mb-1.5 cursor-pointer bg-transparent border-none p-0"
 							>
+								Forgot password?
+							</button>
 						</div>
 						<div class="relative">
 							<span
@@ -108,13 +109,70 @@
 				Authorised access only · v4.2.0
 			</p>
 		</div>
+
+		<!-- Forgot Password Dialog -->
+		<Dialog v-model="showForgotPassword" :options="{ size: 'md' }">
+			<template #body>
+				<div class="modal-panel p-6 space-y-4">
+					<div class="flex items-start justify-between gap-3">
+						<div>
+							<h3 class="text-base font-semibold text-[#17181B] dark:text-white">Reset Password</h3>
+							<p class="text-xs text-[#5C6169] dark:text-white/60 mt-1">
+								Enter your registered email address and we'll send you instructions to reset your password.
+							</p>
+						</div>
+						<button @click="showForgotPassword = false" class="btn-icon-ghost shrink-0" aria-label="Close">
+							<span class="material-symbols-outlined !text-[18px]">close</span>
+						</button>
+					</div>
+
+					<div v-if="resetSuccess" class="p-3.5 rounded-xl bg-green-500/10 border border-green-500/20 text-xs text-green-700 dark:text-green-300">
+						If an active account exists for this email, password reset instructions have been sent. Please check your inbox.
+					</div>
+
+					<div v-else class="space-y-3">
+						<div v-if="resetError" class="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-600 dark:text-red-400">
+							{{ resetError }}
+						</div>
+						<div>
+							<label class="field-label">Email or Username</label>
+							<input
+								v-model="resetEmail"
+								type="text"
+								placeholder="you@example.com"
+								class="field-input mt-1"
+								:disabled="resetLoading"
+								@keydown.enter.prevent="handleResetPassword"
+							/>
+						</div>
+					</div>
+
+					<div class="flex items-center justify-end gap-2 pt-2">
+						<button type="button" class="btn-secondary" @click="showForgotPassword = false">
+							{{ resetSuccess ? 'Close' : 'Cancel' }}
+						</button>
+						<button
+							v-if="!resetSuccess"
+							type="button"
+							class="btn-primary flex items-center gap-1.5"
+							:disabled="resetLoading || !resetEmail.trim()"
+							@click="handleResetPassword"
+						>
+							<span v-if="resetLoading" class="material-symbols-outlined !text-[16px] animate-spin">progress_activity</span>
+							{{ resetLoading ? 'Sending…' : 'Send Instructions' }}
+						</button>
+					</div>
+				</div>
+			</template>
+		</Dialog>
 	</div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
-import { createResource } from 'frappe-ui'
-import { getSafeErrorMessage } from '../utils/errorSanitizer.js'
+import { Dialog, createResource, call } from 'frappe-ui'
+import { getErrorMessage } from '@/utils.js'
+import { notify } from '@/utils/feedback.js'
 
 const usernameOrEmail = ref('')
 const password = ref('')
@@ -122,15 +180,53 @@ const showPassword = ref(false)
 const loading = ref(false)
 const errorMsg = ref('')
 
+const showForgotPassword = ref(false)
+const resetEmail = ref('')
+const resetLoading = ref(false)
+const resetSuccess = ref(false)
+const resetError = ref('')
+
+function openForgotPassword() {
+	resetEmail.value = usernameOrEmail.value || ''
+	resetSuccess.value = false
+	resetError.value = ''
+	showForgotPassword.value = true
+}
+
+async function handleResetPassword() {
+	const user = resetEmail.value.trim()
+	if (!user) return
+	resetLoading.value = true
+	resetError.value = ''
+	try {
+		await call('frappe.core.doctype.user.user.reset_password', { user })
+		resetSuccess.value = true
+		notify('Password reset instructions sent', 'success')
+	} catch (err) {
+		resetError.value = getErrorMessage(err, 'Could not send reset instructions. Please try again.')
+	} finally {
+		resetLoading.value = false
+	}
+}
+
 // Vite serves this app under BASE_URL, so a root-relative path would 404.
 const asset = (p) => `${import.meta.env.BASE_URL}${p}`
 
 const loginResource = createResource({
-	url: 'login',
+	url: 'arijentek_core.api.auth.login',
 	makeParams() {
-		return { usr: (usernameOrEmail.value || '').trim(), pwd: password.value }
+		let usr = (usernameOrEmail.value || '').trim()
+		if (usr.toLowerCase() === 'admin@example.com') {
+			usr = 'Administrator'
+		}
+		return { usr, pwd: password.value }
 	},
-	onSuccess() {
+	onSuccess(data) {
+		if (data && data.success === false) {
+			loading.value = false
+			errorMsg.value = data.message || 'Invalid login credentials'
+			return
+		}
 		try {
 			const usr = (usernameOrEmail.value || '').trim()
 			const syncPayload = { action: 'new_login', user: usr, timestamp: Date.now() }
@@ -148,14 +244,18 @@ const loginResource = createResource({
 	},
 	onError(err) {
 		loading.value = false
-		errorMsg.value = getSafeErrorMessage(err, 'Invalid login credentials')
+		errorMsg.value = getErrorMessage(err, 'Invalid login credentials. Please check your username and password.')
 	},
 })
 
-function handleLogin() {
+async function handleLogin() {
 	errorMsg.value = ''
 	loading.value = true
-	loginResource.submit()
+	try {
+		await loginResource.submit()
+	} catch (e) {
+		// Handled in onError callback
+	}
 }
 </script>
 

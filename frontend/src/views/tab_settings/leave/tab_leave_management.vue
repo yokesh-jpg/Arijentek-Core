@@ -45,6 +45,10 @@
 				</p>
 			</div>
 		</div>
+		<div v-else-if="balanceEmployee && !isBalancesLoading && !displayedLeaveBalances.length" class="glass-card !p-3.5 flex items-center gap-2.5 text-[#5C6169] dark:text-white/60 text-xs sm:text-[13px]">
+			<span class="material-symbols-outlined text-[#656A72] dark:text-white/55 !text-[18px]">info</span>
+			<span>No leave allocations found for {{ selectedEmployeeName }}.</span>
+		</div>
 
 		<!-- ===== Filters ===== -->
 		<div class="glass-card !p-3 flex flex-wrap items-center gap-2">
@@ -240,15 +244,14 @@ const balancesQuery = useQuery({
 		return []
 	},
 	enabled: computed(() => Boolean(targetBalanceEmployee.value)),
-	placeholderData: (previousData) => previousData,
 	staleTime: 1000 * 60 * 5,
 })
 
 const isBalancesLoading = computed(() => balancesQuery.isLoading.value)
 
-// Keep leaveStore.leaveBalances synchronized
+// Keep leaveStore.leaveBalances synchronized only for self
 watch(balancesQuery.data, (data) => {
-	if (data) {
+	if (data && targetBalanceEmployee.value === currEmployee.value) {
 		leaveStore.leaveBalances = data
 	}
 }, { immediate: true })
@@ -274,6 +277,11 @@ const availableEmployeeOptions = computed(() => {
 	return opts
 })
 
+const selectedEmployeeName = computed(() => {
+	const opt = availableEmployeeOptions.value.find((o) => o.name === balanceEmployee.value)
+	return opt?.employee_name || balanceEmployee.value || 'this employee'
+})
+
 function balancePct(lb) {
 	const total = Number(lb?.allocated_leaves || 0)
 	if (!total) return 0
@@ -281,23 +289,9 @@ function balancePct(lb) {
 }
 
 const displayedLeaveBalances = computed(() => {
-	if (balancesQuery.data.value && balancesQuery.data.value.length > 0) {
-		return balancesQuery.data.value
-	}
-	if (leaveStore.leaveBalances && leaveStore.leaveBalances.length > 0) {
-		return leaveStore.leaveBalances
-	}
-	const types = leaveStore.allLeaveTypesList || []
-	if (types.length > 0) {
-		return types.map((lt) => ({
-			leave_type: lt.leave_type_name || lt.name,
-			allocated_leaves: Number(lt.max_leaves_allowed || 0),
-			balance_leaves: Number(lt.max_leaves_allowed || 0),
-			used_leaves: 0,
-			pending_leaves: 0,
-		}))
-	}
-	return []
+	if (!balanceEmployee.value) return []
+	const balances = balancesQuery.data.value || []
+	return balances.filter((b) => Number(b.allocated_leaves || 0) > 0)
 })
 
 function actionsForApp(app) {
@@ -495,20 +489,26 @@ watch(balanceEmployee, () => {
 })
 
 onMounted(async () => {
-	await employeeStore.init()
-	const employeeId = employeeStore.employee?.name
-	if (employeeId && !balanceEmployee.value) {
-		balanceEmployee.value = employeeId
-	}
-	// Always fetch fresh leave applications on mount
-	pager.fetchPage()
+	await Promise.allSettled([
+		employeeStore.init(),
+		leaveStore.checkApproverStatus(),
+	])
 
-	// Load approver status and employee list in parallel
-	leaveStore.checkApproverStatus().then(async () => {
-		if (leaveStore.isApprover || leaveStore.canSubmit) {
-			await leaveStore.fetchEmployeeList()
-		}
-		if (employeeId && leaveStore.isApprover) {
+	if (!leaveStore.canSubmit) {
+		try {
+			const canSub = await call('arijentek_core.api.leave.can_submit_leave_application')
+			if (canSub) leaveStore.canSubmit = true
+		} catch (e) {}
+	}
+
+	const employeeId = employeeStore.employee?.name
+	const canSeeAll = Boolean(leaveStore.isApprover || canSubmitLeaveApplication.value)
+
+	if (canSeeAll) {
+		// When user has permission to see all employees, default filter to All Employees
+		balanceEmployee.value = ''
+		await leaveStore.fetchEmployeeList()
+		if (employeeId && leaveStore.isApprover && leaveStore.approvedEmployeeList) {
 			const hasSelf = leaveStore.approvedEmployeeList.some((e) => e.name === employeeId)
 			if (!hasSelf) {
 				leaveStore.approvedEmployeeList.unshift({
@@ -517,7 +517,12 @@ onMounted(async () => {
 				})
 			}
 		}
-	}).catch(() => {})
+	} else if (employeeId && !balanceEmployee.value) {
+		balanceEmployee.value = employeeId
+	}
+
+	// Always fetch fresh leave applications on mount
+	pager.fetchPage()
 })
 
 onActivated(() => {

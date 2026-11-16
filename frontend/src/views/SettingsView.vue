@@ -108,11 +108,17 @@ const loadingDisableAutoAttendance = ref(false)
 const settingsQuery = useQuery({
 	queryKey: ['hr-settings'],
 	queryFn: async () => {
-		const res = await call('arijentek_core.api.hr_settings.get_hr_settings')
-		return res || {}
+		try {
+			const res = await call('arijentek_core.api.hr_settings.get_hr_settings')
+			return res || {}
+		} catch (e) {
+			console.warn('Failed to load HR settings:', e)
+			return {}
+		}
 	},
 	placeholderData: (previousData) => previousData,
 	staleTime: 1000 * 60 * 5,
+	retry: 1,
 })
 
 const initialLoading = computed(() => settingsQuery.isLoading.value && !settingsQuery.data.value)

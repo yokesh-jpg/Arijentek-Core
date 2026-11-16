@@ -29,6 +29,9 @@ def get_expense_claims(
 	Returns:
 		List of expense claim dicts
 	"""
+	if not frappe.db.exists("DocType", "Expense Claim"):
+		return []
+
 	if not employee:
 		user = frappe.session.user
 		employee = frappe.db.get_value("Employee", {"user_id": user}, "name")
@@ -80,22 +83,6 @@ def get_expense_claims(
 		)
 
 	return claims
-
-
-@frappe.whitelist()
-def get_expense_types() -> list:
-	"""
-	Get available expense claim types.
-
-	Returns:
-		List of expense type dicts with name and description
-	"""
-	types = frappe.get_all(
-		"Expense Claim Type",
-		fields=["name", "expense_type as label"],
-		order_by="name asc",
-	)
-	return types
 
 
 @frappe.whitelist(methods=["POST"])
@@ -726,6 +713,9 @@ def can_read_expense_claim():
 	Returns True if the current user has permission to read Expense Claim.
 	This is true for 'HR Manager', 'System Manager', or users with explicit read permissions on the 'Expense Claim' Doctype.
 	"""
+	if not frappe.db.exists("DocType", "Expense Claim"):
+		return False
+
 	user = frappe.session.user
 
 	roles = frappe.get_roles(user)
@@ -744,6 +734,9 @@ def can_create_expense_claim():
 	Returns True if the current user has permission to create a Expense Claim.
 	This is true for 'HR Manager', 'System Manager', or users with explicit create permissions on the 'Expense Claim' Doctype.
 	"""
+	if not frappe.db.exists("DocType", "Expense Claim"):
+		return False
+
 	user = frappe.session.user
 
 	roles = frappe.get_roles(user)
@@ -762,6 +755,9 @@ def can_edit_expense_claim():
 	Returns True if the current user has permission to edit (write) an Expense Claim.
 	This is true for 'HR Manager', 'System Manager', or users with explicit write permissions on the 'Expense Claim' Doctype.
 	"""
+	if not frappe.db.exists("DocType", "Expense Claim"):
+		return False
+
 	user = frappe.session.user
 
 	roles = frappe.get_roles(user)
@@ -780,6 +776,9 @@ def can_delete_expense_claim():
 	Returns True if the current user has permission to delete an Expense Claim.
 	This is true for 'HR Manager', 'System Manager', or users with explicit delete permissions on the 'Expense Claim' Doctype.
 	"""
+	if not frappe.db.exists("DocType", "Expense Claim"):
+		return False
+
 	user = frappe.session.user
 
 	roles = frappe.get_roles(user)
@@ -798,6 +797,9 @@ def can_approve_expense_claim():
 	Returns True if the current user has permission to approve (submit) an Expense Claim.
 	This is true for 'HR Manager', 'System Manager', or users with explicit submit permissions on the 'Expense Claim' Doctype.
 	"""
+	if not frappe.db.exists("DocType", "Expense Claim"):
+		return False
+
 	user = frappe.session.user
 
 	roles = frappe.get_roles(user)
@@ -814,12 +816,18 @@ def can_approve_expense_claim():
 def can_read_expense_types():
 	"""
 	Returns True if the current user has permission to read Expense Claim Types.
-	This is true for 'HR Manager', 'System Manager', or users with explicit read permissions on the 'Expense Claim Type' Doctype.
+	This is true for 'HR Manager', 'System Manager', 'Administrator', 'HR User', 'Employee',
+	or users with explicit read permissions on the 'Expense Claim Type' Doctype.
 	"""
+	if not frappe.db.exists("DocType", "Expense Claim Type"):
+		return False
+
 	user = frappe.session.user
+	if user == "Administrator":
+		return True
 
 	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if any(r in roles for r in ("HR Manager", "System Manager", "HR User", "Employee", "Expense Approver")):
 		return True
 
 	if frappe.has_permission("Expense Claim Type", "read"):
@@ -834,10 +842,15 @@ def can_create_expense_types():
 	Returns True if the current user has permission to create an Expense Claim Type.
 	This is true for 'HR Manager', 'System Manager', or users with explicit create permissions on the 'Expense Claim Type' Doctype.
 	"""
+	if not frappe.db.exists("DocType", "Expense Claim Type"):
+		return False
+
 	user = frappe.session.user
+	if user == "Administrator":
+		return True
 
 	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if any(r in roles for r in ("HR Manager", "System Manager", "HR User")):
 		return True
 
 	if frappe.has_permission("Expense Claim Type", "create"):
@@ -852,10 +865,15 @@ def can_delete_expense_types():
 	Returns True if the current user has permission to delete an Expense Claim Type.
 	This is true for 'HR Manager', 'System Manager', or users with explicit delete permissions on the 'Expense Claim Type' Doctype.
 	"""
+	if not frappe.db.exists("DocType", "Expense Claim Type"):
+		return False
+
 	user = frappe.session.user
+	if user == "Administrator":
+		return True
 
 	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if any(r in roles for r in ("HR Manager", "System Manager", "HR User")):
 		return True
 
 	if frappe.has_permission("Expense Claim Type", "delete"):
@@ -870,10 +888,15 @@ def can_edit_expense_types():
 	Returns True if the current user has permission to edit an Expense Claim Type.
 	This is true for 'HR Manager', 'System Manager', or users with explicit write permissions on the 'Expense Claim Type' Doctype.
 	"""
+	if not frappe.db.exists("DocType", "Expense Claim Type"):
+		return False
+
 	user = frappe.session.user
+	if user == "Administrator":
+		return True
 
 	roles = frappe.get_roles(user)
-	if "HR Manager" in roles or "System Manager" in roles:
+	if any(r in roles for r in ("HR Manager", "System Manager", "HR User")):
 		return True
 
 	if frappe.has_permission("Expense Claim Type", "write"):
@@ -1073,7 +1096,9 @@ def get_expense_types(name=None, page: int = 1, page_size: int = 0):
 	full filtered set; `page_size` = 0 keeps the legacy behaviour (all rows).
 	"""
 	if not can_read_expense_types():
-		frappe.throw("Not permitted")
+		if page_size > 0:
+			return {"data": [], "total": 0, "page": page, "page_size": page_size}
+		return []
 
 	filters = {}
 	if name:
