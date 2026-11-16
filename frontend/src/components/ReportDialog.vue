@@ -53,6 +53,20 @@
 					<slot v-else />
 				</div>
 
+				<!-- Generating status banner with loader animation -->
+				<Transition name="fade">
+					<div
+						v-if="isPdfGenerating"
+						class="px-5 py-2.5 bg-accent/5 dark:bg-accent/10 border-t border-accent/20 flex items-center justify-between text-xs text-accent shrink-0"
+					>
+						<div class="flex items-center gap-2 min-w-0">
+							<span class="material-symbols-outlined !text-[18px] animate-spin shrink-0">progress_activity</span>
+							<span class="font-medium truncate">{{ pdfNoticeMessage || 'Compiling PDF report…' }}</span>
+						</div>
+						<span class="text-[11px] opacity-75 shrink-0 ml-2">You can wait or continue working</span>
+					</div>
+				</Transition>
+
 				<footer class="modal-footer justify-between">
 					<!-- The row count is the one thing worth stating here: it tells you
 					     what the export will contain before you trigger it. -->
@@ -62,16 +76,26 @@
 					<div class="flex items-center gap-2">
 						<slot name="actions" />
 						<button class="btn-secondary" @click="$emit('close')">Close</button>
-						<button class="btn-secondary" :disabled="!count" @click="$emit('export-excel')">
+						<button class="btn-secondary" :class="{ 'opacity-60': !count }" @click="handleExportExcel">
 							<span class="material-symbols-outlined !text-[18px]">table_view</span>
 							<span class="hidden sm:inline">Excel</span>
 						</button>
 						<!-- Export was a red button. Red is the destructive colour
 						     everywhere else in this app; downloading a report is the
 						     opposite of destructive. -->
-						<button class="btn-primary" :disabled="!count" @click="$emit('export-pdf')">
-							<span class="material-symbols-outlined !text-[18px]">picture_as_pdf</span>
-							<span class="hidden sm:inline">PDF</span>
+						<button
+							class="btn-primary inline-flex items-center justify-center gap-1.5 min-w-[72px]"
+							:class="{ 'opacity-60 cursor-not-allowed': !count || isPdfGenerating }"
+							:disabled="isPdfGenerating"
+							@click="handleExportPDF"
+						>
+							<span
+								v-if="isPdfGenerating"
+								class="material-symbols-outlined !text-[18px] animate-spin shrink-0"
+								aria-hidden="true"
+							>progress_activity</span>
+							<span v-else class="material-symbols-outlined !text-[18px]">picture_as_pdf</span>
+							<span class="hidden sm:inline">{{ isPdfGenerating ? 'Generating…' : 'PDF' }}</span>
 						</button>
 					</div>
 				</footer>
@@ -81,12 +105,32 @@
 </template>
 
 <script setup>
+import { ref, computed, watch } from 'vue';
+import { notify } from '@/utils/feedback.js';
+import { useReportNotificationsStore } from '@/stores/reportNotifications.js';
+
+const reportStore = useReportNotificationsStore();
+const localGenerating = ref(false);
+const pdfNoticeMessage = ref('');
+let noticeTimer = null;
+
+const isPdfGenerating = computed(() => {
+	if (localGenerating.value) return true;
+	const pTitle = (props.title || '').toLowerCase().replace(/report/g, '').trim();
+	return reportStore.reports.some(r => {
+		if (r.status !== 'generating') return false;
+		const rTitle = (r.title || '').toLowerCase().replace(/report/g, '').trim();
+		return rTitle.includes(pTitle) || pTitle.includes(rTitle) ||
+			pTitle.split(/\s+/).some(w => w.length > 3 && rTitle.includes(w));
+	});
+});
+
 /* All 22 report dialogs were the same shell written out 22 times - overlay,
    header with an icon tile, filter strip, loading overlay, table, empty state,
    footer with a record count and two export buttons. They had drifted apart in
    padding, header casing, empty-state wording and button colour. One shell so
    they cannot drift again; each report supplies only its filters and body. */
-defineProps({
+const props = defineProps({
 	show: { type: Boolean, default: false },
 	title: { type: String, required: true },
 	subtitle: { type: String, default: '' },
@@ -103,5 +147,41 @@ defineProps({
 	extraWide: { type: Boolean, default: false },
 })
 
-defineEmits(['close', 'export-excel', 'export-pdf'])
+const emit = defineEmits(['close', 'export-excel', 'export-pdf'])
+
+function handleExportExcel() {
+	if (!props.count) {
+		notify('No records available to export', 'info');
+		return;
+	}
+	emit('export-excel');
+}
+
+function handleExportPDF() {
+	if (!props.count) {
+		notify('No records available to export', 'info');
+		return;
+	}
+	localGenerating.value = true;
+	pdfNoticeMessage.value = 'Compiling PDF report…';
+	if (noticeTimer) clearTimeout(noticeTimer);
+	noticeTimer = setTimeout(() => {
+		if (isPdfGenerating.value) {
+			pdfNoticeMessage.value = 'PDF creation takes time, please wait or continue your work.';
+		}
+	}, 5000);
+
+	emit('export-pdf');
+}
+
+watch(
+	() => reportStore.isGeneratingAny,
+	(generating) => {
+		if (!generating) {
+			localGenerating.value = false;
+			pdfNoticeMessage.value = '';
+			if (noticeTimer) clearTimeout(noticeTimer);
+		}
+	}
+);
 </script>

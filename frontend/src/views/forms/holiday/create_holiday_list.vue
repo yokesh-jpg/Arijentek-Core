@@ -17,7 +17,7 @@
         <div class="modal-body !space-y-5">
           <div>
             <label class="field-label" for="hl-name">List name <span class="text-red-500 dark:text-red-400">*</span></label>
-            <input id="hl-name" v-model="formData.holiday_list_name" type="text" class="field-input" placeholder="e.g. Zevar Retail 2026" />
+            <input id="hl-name" v-model="formData.holiday_list_name" type="text" class="field-input" :placeholder="holidayListPlaceholder" />
             <p v-if="errors.holiday_list_name" class="field-error">{{ errors.holiday_list_name }}</p>
           </div>
 
@@ -198,6 +198,10 @@ import { getErrorMessage, stripHtml } from '../../../utils.js';
 import { useLeaveStore } from '../../../stores/leave.js';
 import SearchableDropdown from '../../../components/SearchableDropdown.vue';
 import DateField from '../../../components/DateField.vue'
+import { useBrandStore } from '../../../stores/brand';
+
+const brandStore = useBrandStore();
+const holidayListPlaceholder = computed(() => `e.g. ${brandStore.companyName || 'Company'} 2026`);
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },

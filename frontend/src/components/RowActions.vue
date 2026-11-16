@@ -142,8 +142,8 @@ function place() {
 }
 
 function onDocDown(e) {
-	if (triggerEl.value?.contains(e.target)) return
-	if (popEl.value?.contains(e.target)) return
+	if (triggerEl.value && (triggerEl.value === e.target || triggerEl.value.contains(e.target))) return
+	if (popEl.value && (popEl.value === e.target || popEl.value.contains(e.target))) return
 	close()
 }
 
@@ -161,7 +161,7 @@ async function openMenu() {
 	open.value = true
 	await nextTick()
 	place()
-	document.addEventListener('pointerdown', onDocDown, true)
+	document.addEventListener('pointerdown', onDocDown)
 	window.addEventListener('scroll', onReflow, true)
 	window.addEventListener('resize', onReflow)
 }
@@ -169,7 +169,7 @@ async function openMenu() {
 function close() {
 	if (!open.value) return
 	open.value = false
-	document.removeEventListener('pointerdown', onDocDown, true)
+	document.removeEventListener('pointerdown', onDocDown)
 	window.removeEventListener('scroll', onReflow, true)
 	window.removeEventListener('resize', onReflow)
 }

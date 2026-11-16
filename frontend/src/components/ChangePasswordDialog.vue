@@ -3,7 +3,7 @@
 		<div
 			v-if="modelValue"
 			class="fixed inset-0 z-[120] flex items-center justify-center bg-[#0B0B0E]/70 backdrop-blur-sm p-4"
-			@click="close"
+			@click.self="close"
 		>
 			<div class="modal-panel max-w-md" @click.stop>
 				<header class="flex items-start justify-between gap-3 px-5 py-4 border-b border-black/[0.07] dark:border-white/10 shrink-0">

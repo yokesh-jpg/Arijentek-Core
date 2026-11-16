@@ -24,6 +24,7 @@
 import { ref, watch } from 'vue';
 import ReportDialog from '@/components/ReportDialog.vue';
 import ReportTable from '@/components/ReportTable.vue';
+import { exportReportPdf } from '@/utils/reportExport.js';
 
 const props = defineProps({
 	show: {
@@ -83,7 +84,7 @@ const exportExcel = () => {
 
 const exportPDF = () => {
 	const url = `/api/method/arijentek_core.api.roster.report_shift_types_list?pdf=1`;
-	window.open(url, '_blank');
+	exportReportPdf({ title: 'Shift Types Report', url });
 };
 </script>
 

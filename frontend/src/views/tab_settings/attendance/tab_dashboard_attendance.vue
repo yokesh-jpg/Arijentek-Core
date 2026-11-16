@@ -195,6 +195,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { createResource } from "frappe-ui";
 import { useEmployeeStore } from "@/stores/employee";
 import { useAttendanceStore } from "@/stores/attendance";
+import { notify } from "@/utils/feedback.js";
 import ActiveEmployeesList from "../../forms/attendance/active_employees_list.vue";
 import SelectField from '../../../components/SelectField.vue'
 
@@ -567,11 +568,19 @@ const selectedMonthKey = computed({
 
 async function handleClockIn() {
 	const empId = employeeStore.employee?.name;
-	if (empId) await attendanceStore.clockIn(empId);
+	if (empId) {
+		await attendanceStore.clockIn(empId);
+	} else {
+		notify("Your user account is not linked to an Employee record. Please contact HR.", "error");
+	}
 }
 async function handleClockOut() {
 	const empId = employeeStore.employee?.name;
-	if (empId) await attendanceStore.clockOut(empId);
+	if (empId) {
+		await attendanceStore.clockOut(empId);
+	} else {
+		notify("Your user account is not linked to an Employee record. Please contact HR.", "error");
+	}
 }
 async function handleBreak() {
 	if (isOnBreak.value) await attendanceStore.endBreak();

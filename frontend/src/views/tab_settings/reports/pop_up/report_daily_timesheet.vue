@@ -67,6 +67,7 @@ import DateRangePicker from '../../../../components/DateRangePicker.vue';
 import SearchableDropdown from '../../../../components/SearchableDropdown.vue';
 import ReportDialog from '@/components/ReportDialog.vue';
 import ReportTable from '@/components/ReportTable.vue';
+import { exportReportPdf } from '@/utils/reportExport.js';
 
 const props = defineProps({
 	show: {
@@ -209,7 +210,7 @@ const exportPDF = () => {
 	params.set('pdf', '1');
 
 	const url = `/api/method/arijentek_core.api.attendance.report_daily_timesheet_summary?${params.toString()}`;
-	window.open(url, '_blank');
+	exportReportPdf({ title: 'Daily Timesheet Summary', url });
 };
 
 ;

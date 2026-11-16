@@ -266,7 +266,7 @@ def _gender_options() -> set[str]:
 def _insert_employee(
 	payload: dict, email: str, first_name: str, last_name: str, gender: str, date_of_birth: str
 ) -> str:
-	company = _resolve_default_company()
+	company = _resolve_default_company(payload.get("company"))
 	doc = frappe.new_doc("Employee")
 	doc.company = company
 	doc.first_name = first_name
@@ -312,13 +312,18 @@ def _elevated_insert(doc) -> str:
 	return doc.name
 
 
-def _resolve_default_company() -> str:
-	"""payload company → session-user default → Global Defaults."""
+def _resolve_default_company(explicit_company: str | None = None) -> str:
+	"""payload company → session-user default → Global Defaults → single company site fallback."""
 	# Read BEFORE any elevation block — user defaults track the acting user.
 	company = (
-		frappe.defaults.get_user_default("Company")
+		explicit_company
+		or frappe.defaults.get_user_default("Company")
 		or frappe.db.get_single_value("Global Defaults", "default_company")
 	)
+	if not company:
+		companies = frappe.get_all("Company", pluck="name", limit_page_length=2)
+		if len(companies) == 1:
+			company = companies[0]
 	if not company:
 		frappe.throw(_("No default company found — set one in Global Defaults first."))
 	return company
@@ -474,7 +479,7 @@ def _overview_options() -> dict:
 
 
 def update_staff_member(payload: dict) -> dict:
-	"""Re-persona / enable / disable / password reset, with tier protections."""
+	"""Re-persona / profile fields / enable / disable / password reset, with tier protections."""
 	require_permission("staff.manage")
 
 	user = (payload.get("user") or "").strip()
@@ -483,12 +488,45 @@ def update_staff_member(payload: dict) -> dict:
 
 	_assert_may_mutate(user)
 
+	if not frappe.db.exists("User", user):
+		frappe.throw(_("User {0} not found.").format(user), frappe.DoesNotExistError)
+
 	updates = {}
+	user_doc = frappe.get_doc("User", user)
+	doc_modified = False
+
+	# Basic user fields (first_name, last_name, gender, birth_date)
+	for f in ("first_name", "last_name", "gender"):
+		if payload.get(f) is not None and getattr(user_doc, f, None) != payload.get(f):
+			setattr(user_doc, f, payload.get(f))
+			updates[f] = payload.get(f)
+			doc_modified = True
+
+	if payload.get("date_of_birth") is not None:
+		dob = payload.get("date_of_birth") or None
+		if str(user_doc.birth_date or "") != str(dob or ""):
+			user_doc.birth_date = dob
+			updates["date_of_birth"] = dob
+			doc_modified = True
+
 	requested_profiles = _normalize_persona_list(
 		payload.get("role_profiles") or payload.get("role_profile")
 	)
 	if requested_profiles:
-		updates.update(_reassign_persona(user, requested_profiles))
+		for profile in requested_profiles:
+			_assert_persona_assignable(profile)
+		user_doc.set("role_profiles", [])
+		for profile in requested_profiles:
+			user_doc.append("role_profiles", {"role_profile": profile})
+		user_doc.role_profile_name = None
+		doc_modified = True
+		updates["role_profiles"] = requested_profiles
+		updates["role_profile"] = requested_profiles[0]
+
+	if doc_modified:
+		user_doc.save(ignore_permissions=True)
+		updates["roles"] = sorted({r.role for r in frappe.get_doc("User", user).roles})
+
 	if payload.get("password") is not None or payload.get("generate_password"):
 		updates.update(_reset_password(user, payload.get("password")))
 	if payload.get("enabled") is not None:

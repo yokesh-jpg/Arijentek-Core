@@ -297,6 +297,7 @@ def login(usr, pwd, remember_me=False):
 		user_id = frappe.db.get_value("Employee", {"name": usr}, "user_id")
 		if not user_id:
 			frappe.clear_messages()
+			frappe.msgprint(frappe._("No user account is linked to this Employee ID."), raise_exception=False)
 			frappe.local.response["http_status_code"] = 401
 			return {
 				"success": False,
@@ -310,6 +311,7 @@ def login(usr, pwd, remember_me=False):
 		frappe.local.login_manager.login()
 	except frappe.AuthenticationError:
 		frappe.clear_messages()
+		frappe.msgprint(frappe._("Invalid login credentials"), raise_exception=False)
 		frappe.local.response["http_status_code"] = 401
 		return {
 			"success": False,
@@ -318,6 +320,7 @@ def login(usr, pwd, remember_me=False):
 	except Exception as e:
 		frappe.clear_messages()
 		frappe.log_error(title="Login Exception", message=frappe.get_traceback())
+		frappe.msgprint(frappe._("Invalid login credentials. Please verify your username and password."), raise_exception=False)
 		frappe.local.response["http_status_code"] = 401
 		return {
 			"success": False,

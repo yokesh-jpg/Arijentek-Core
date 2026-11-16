@@ -20,7 +20,7 @@
 							class="h-9 w-9 rounded-xl object-contain border border-white/10 shadow-sm"
 						/>
 						<div>
-							<h1 class="text-base font-semibold text-white leading-tight">Arijentek</h1>
+							<h1 v-if="brandStore.companyName" class="text-base font-semibold text-white leading-tight">{{ brandStore.companyName }}</h1>
 							<p class="text-xs text-white/50">Employee Portal</p>
 						</div>
 					</div>
@@ -306,14 +306,112 @@
 				</nav>
 
 				<div class="ml-auto flex items-center gap-1.5 shrink-0">
-					<button
-						class="w-9 h-9 grid place-items-center rounded-full text-[#5C6169] dark:text-white/85 hover:bg-accent/[0.06] dark:hover:bg-white/5 transition-colors"
-						aria-label="Notifications"
-					>
-						<span class="material-symbols-outlined !text-[20px] icon-loading-guard"
-							>notifications</span
+					<!-- Notifications Bell & Dropdown -->
+					<div class="relative">
+						<button
+							@click="notificationsOpen = !notificationsOpen"
+							class="w-9 h-9 grid place-items-center rounded-full text-[#5C6169] dark:text-white/85 hover:bg-accent/[0.06] dark:hover:bg-white/5 transition-colors relative"
+							aria-label="Notifications"
+							:aria-expanded="notificationsOpen"
 						>
-					</button>
+							<span class="material-symbols-outlined !text-[20px] icon-loading-guard">
+								{{ reportStore.unreadCount > 0 ? 'notifications_active' : 'notifications' }}
+							</span>
+							<span
+								v-if="reportStore.unreadCount > 0"
+								class="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-accent text-white text-[10px] font-bold grid place-items-center leading-none shadow-sm"
+							>
+								{{ reportStore.unreadCount > 9 ? '9+' : reportStore.unreadCount }}
+							</span>
+						</button>
+
+						<template v-if="notificationsOpen">
+							<div class="fixed inset-0 z-40" @click="notificationsOpen = false"></div>
+							<div
+								class="absolute right-0 top-full mt-2 w-80 sm:w-96 z-50 rounded-[16px] bg-white dark:bg-surface-2 border border-[#ECECF1] dark:border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.35)] py-2 overflow-hidden"
+							>
+								<div class="flex items-center justify-between px-4 py-2 border-b border-black/[0.06] dark:border-white/10">
+									<div class="flex items-center gap-2">
+										<h3 class="text-xs font-semibold text-[#17181B] dark:text-white uppercase tracking-wider">Notifications</h3>
+										<span v-if="reportStore.unreadCount > 0" class="text-[11px] font-semibold bg-accent/10 text-accent px-1.5 py-0.5 rounded-full">
+											{{ reportStore.unreadCount }} new
+										</span>
+									</div>
+									<button
+										v-if="reportStore.reports.length > 0"
+										type="button"
+										@click="reportStore.markAllAsRead()"
+										class="text-xs font-medium text-accent hover:underline cursor-pointer"
+									>
+										Mark all read
+									</button>
+								</div>
+
+								<div class="max-h-[380px] overflow-y-auto divide-y divide-black/[0.04] dark:divide-white/[0.06]">
+									<div
+										v-for="rep in reportStore.reports"
+										:key="rep.id"
+										class="p-3.5 hover:bg-black/[0.02] dark:hover:bg-white/[0.04] transition-colors flex items-start gap-3"
+										:class="{ 'bg-accent/[0.03]': !rep.read }"
+									>
+										<div
+											class="w-8 h-8 rounded-lg grid place-items-center shrink-0"
+											:class="rep.status === 'ready' ? 'bg-green-500/10 text-green-600 dark:text-green-400' : rep.status === 'generating' ? 'bg-amber-500/10 text-amber-600 animate-pulse' : 'bg-red-500/10 text-red-600'"
+										>
+											<span class="material-symbols-outlined !text-[18px]">
+												{{ rep.status === 'ready' ? 'picture_as_pdf' : rep.status === 'generating' ? 'hourglass_top' : 'error' }}
+											</span>
+										</div>
+
+										<div class="flex-1 min-w-0">
+											<div class="flex items-center justify-between gap-1">
+												<h4 class="text-xs font-semibold text-[#17181B] dark:text-white truncate">{{ rep.title }}</h4>
+												<span class="text-[10px] text-[#656A72] dark:text-white/50 shrink-0">
+													{{ rep.completedAt ? 'Ready' : 'Generating…' }}
+												</span>
+											</div>
+											<p class="text-[11px] text-[#656A72] dark:text-white/60 mt-0.5 truncate">
+												{{ rep.status === 'ready' ? 'PDF report is ready to view.' : rep.status === 'generating' ? 'Creating PDF, please wait…' : (rep.error || 'Failed') }}
+											</p>
+
+											<div v-if="rep.status === 'ready'" class="flex items-center gap-2 mt-2">
+												<button
+													type="button"
+													@click="reportStore.openViewer(rep); notificationsOpen = false"
+													class="text-xs font-semibold px-2.5 py-1 rounded-md bg-accent text-white hover:bg-accent-hover transition-colors inline-flex items-center gap-1 cursor-pointer"
+												>
+													<span class="material-symbols-outlined !text-[13px]">visibility</span>
+													<span>View PDF</span>
+												</button>
+												<button
+													type="button"
+													@click="reportStore.downloadPdf(rep)"
+													class="text-xs font-medium px-2 py-1 rounded-md text-[#5C6169] dark:text-white/70 hover:bg-black/[0.05] dark:hover:bg-white/10 transition-colors inline-flex items-center gap-1 cursor-pointer"
+												>
+													<span class="material-symbols-outlined !text-[13px]">download</span>
+													<span>Download</span>
+												</button>
+											</div>
+										</div>
+
+										<button
+											type="button"
+											@click="reportStore.removeReport(rep.id)"
+											class="text-[#656A72] dark:text-white/40 hover:text-red-500 transition-colors shrink-0"
+											title="Remove"
+										>
+											<span class="material-symbols-outlined !text-[14px]">close</span>
+										</button>
+									</div>
+
+									<div v-if="reportStore.reports.length === 0" class="py-10 text-center">
+										<span class="material-symbols-outlined !text-[28px] text-[#C4C7CC] dark:text-white/20">notifications_none</span>
+										<p class="text-xs text-[#656A72] dark:text-white/50 mt-1">No notifications</p>
+									</div>
+								</div>
+							</div>
+						</template>
+					</div>
 					<div class="w-px h-6 bg-[#ECECF1] dark:bg-white/10 mx-1.5"></div>
 
 					<div class="relative">
@@ -429,7 +527,7 @@
 										</span>
 									</span>
 								</button>
-								<button @click="openPasswordDialog" class="menu-row">
+								<button type="button" @click.stop="openPasswordDialog" class="menu-row">
 									<span class="material-symbols-outlined !text-[18px] menu-icon">lock_reset</span>
 									<span class="min-w-0">
 										<span class="block text-[13px] font-medium leading-tight">Change password</span>
@@ -506,6 +604,8 @@
 				</div>
 			</nav>
 		</div>
+
+		<PdfViewerModal />
 	</div>
 </template>
 
@@ -514,14 +614,20 @@ import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import NavIcon from './NavIcon.vue'
 import ChangePasswordDialog from './ChangePasswordDialog.vue'
-import { useAuthStore } from '@/stores/auth'
+import PdfViewerModal from './PdfViewerModal.vue'
+import { useAuthStore, fetchPortalPermissionsCached } from '@/stores/auth'
 import { useEmployeeStore } from '@/stores/employee'
 import { useTeamStore } from '@/stores/team'
 import { useAttendanceStore } from '@/stores/attendance'
 import { usePayrollStore } from '@/stores/payroll'
 import { useTasksStore } from '@/stores/tasks'
+import { useBrandStore } from '@/stores/brand'
+import { useReportNotificationsStore } from '@/stores/reportNotifications.js'
 
 const auth = useAuthStore()
+const brandStore = useBrandStore()
+const reportStore = useReportNotificationsStore()
+const notificationsOpen = ref(false)
 const route = useRoute()
 const router = useRouter()
 const employeeStore = useEmployeeStore()
@@ -759,13 +865,13 @@ function toggleDarkMode() {
 onMounted(async () => {
 	if (!auth.isLoggedIn) return
 
+	brandStore.fetchCompanyName()
+
 	await employeeStore.init()
 
 	try {
-		const res = await fetch('/api/method/arijentek_core.api.dashboard.get_all_portal_permissions')
-		const json = await res.json()
-		if (json.message) {
-			const perms = json.message
+		const perms = await fetchPortalPermissionsCached('arijentek_core')
+		if (perms) {
 			attendanceStore.loadPermissions(perms.attendance)
 			payrollStore.loadPermissions(perms.payroll)
 			tasksStore.loadPermissions(perms.tasks)

@@ -51,15 +51,25 @@
 
 			<div class="relative flex-1 min-w-[180px]">
 				<span
-					class="material-symbols-outlined !text-[18px] absolute left-3 top-1/2 -translate-y-1/2 text-[#656A72] dark:text-white/60"
+					class="material-symbols-outlined !text-[18px] absolute left-3 top-1/2 -translate-y-1/2 text-[#656A72] dark:text-white/60 pointer-events-none"
 					>search</span
 				>
 				<input
 					v-model="searchQuery"
 					type="search"
+					@search="searchQuery = $event.target.value"
 					placeholder="Search tasks…"
-					class="w-full h-10 pl-10 pr-3 rounded-[12px] text-[13px] bg-black/[0.03] dark:bg-white/[0.06] border border-transparent focus:border-accent/30 focus:bg-white dark:focus:bg-white/[0.09] outline-none transition-colors placeholder:text-[#656A72] dark:text-white/60"
+					class="w-full h-10 pl-10 pr-9 rounded-[12px] text-[13px] bg-black/[0.03] dark:bg-white/[0.06] border border-transparent focus:border-accent/30 focus:bg-white dark:focus:bg-white/[0.09] outline-none transition-colors placeholder:text-[#656A72] dark:text-white/60"
 				/>
+				<button
+					v-if="searchQuery"
+					type="button"
+					@click="searchQuery = ''"
+					class="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full grid place-items-center text-[#656A72] dark:text-white/60 hover:text-[#17181B] dark:hover:text-white hover:bg-black/[0.06] dark:hover:bg-white/[0.1] transition-colors"
+					aria-label="Clear search"
+				>
+					<span class="material-symbols-outlined !text-[14px]">close</span>
+				</button>
 			</div>
 
 			<!-- Filters button: phone only. Five dropdowns stacked full width ate
@@ -514,7 +524,7 @@
 					<span class="material-symbols-outlined !text-[18px]">edit</span>Edit
 				</button>
 				<button
-					@click.stop="handleDeleteTodo(menuTodo.id)"
+					@click.stop="handleDeleteTodo(menuTodo.name || menuTodo.id)"
 					class="w-full text-left px-3 py-2 text-[13px] text-red-600 dark:text-red-400 hover:bg-red-500/[0.07] flex items-center gap-2.5"
 				>
 					<span class="material-symbols-outlined !text-[18px]">delete</span>Delete
@@ -526,7 +536,7 @@
 					v-for="st in visibleStatuses"
 					:key="st"
 					v-show="st !== menuTodo.status"
-					@click.stop="handleUpdateStatus(menuTodo.id, st)"
+					@click.stop="handleUpdateStatus(menuTodo.name || menuTodo.id, st)"
 					class="w-full text-left px-3 py-2 text-[13px] text-[#17181B] dark:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.06] flex items-center gap-2.5"
 				>
 					<span class="material-symbols-outlined !text-[18px]">{{
@@ -574,7 +584,7 @@ import CreateTasks from "@/views/forms/tasks/create_tasks.vue";
 import CreateStatus from "@/views/forms/tasks/create_status.vue";
 import ViewTask from "@/views/page_views/task/view_tasks.vue";
 import DateRangePicker from "@/components/DateRangePicker.vue";
-import { getErrorMessage } from "@/utils";
+import { getErrorMessage, stripHtml } from "@/utils";
 
 const tasksStore = useTasksStore();
 
@@ -687,6 +697,7 @@ const hasActiveFilters = computed(
 		Boolean(searchQuery.value) ||
 		Boolean(selectedPriorityFilter.value) ||
 		Boolean(selectedStatusFilter.value) ||
+		Boolean(selectedUserFilter.value) ||
 		Boolean(dateFrom.value) ||
 		Boolean(dateTo.value)
 );
@@ -742,11 +753,19 @@ const filteredTodos = computed(() => {
 	let list = tasksStore.todos || [];
 
 	if (searchQuery.value) {
-		const q = searchQuery.value.toLowerCase();
-		list = list.filter(t => 
-			(t.id && t.id.toLowerCase().includes(q)) || 
-			(t.description && t.description.toLowerCase().includes(q))
-		);
+		const q = searchQuery.value.trim().toLowerCase();
+		list = list.filter(t => {
+			const cleanDesc = t.description ? stripHtml(t.description).toLowerCase() : '';
+			return (
+				(t.id && t.id.toLowerCase().includes(q)) || 
+				cleanDesc.includes(q) ||
+				(t.priority && t.priority.toLowerCase().includes(q)) ||
+				(t.status && t.status.toLowerCase().includes(q)) ||
+				(t.allocated_to_name && t.allocated_to_name.toLowerCase().includes(q)) ||
+				(t.allocated_to && t.allocated_to.toLowerCase().includes(q)) ||
+				(t.assigned_by_name && t.assigned_by_name.toLowerCase().includes(q))
+			);
+		});
 	}
 
 	if (selectedPriorityFilter.value) {
@@ -772,9 +791,11 @@ function clearFilters() {
 	searchQuery.value = "";
 	selectedPriorityFilter.value = "";
 	selectedStatusFilter.value = "";
+	selectedUserFilter.value = "";
 	datePreset.value = "All Time";
 	dateFrom.value = "";
 	dateTo.value = "";
+	tasksStore.fetchTodos(null);
 }
 
 function openAddTaskDialog() {
@@ -804,7 +825,7 @@ function openEditTaskDialog(todo) {
 	showAddTaskDialog.value = true;
 
 	// Fetch the full detail
-	tasksStore.fetchTodoDetail(todo.id).then(fullTodo => {
+	tasksStore.fetchTodoDetail(todo.name || todo.id).then(fullTodo => {
 		if (fullTodo) {
 			currentTodoToEdit.value = fullTodo;
 		}

@@ -163,6 +163,11 @@
           
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="flex flex-col gap-1.5">
+              <label class="field-label">Company <span class="text-red-600 dark:text-red-400">*</span></label>
+              <SearchableDropdown v-model="formData.company" :options="companyOptions" placeholder="Select company" />
+              <p v-if="errors.company" class="field-error">{{ errors.company }}</p>
+            </div>
+            <div class="flex flex-col gap-1.5">
               <label class="field-label">Employee number</label>
               <input v-model="formData.employee_number" type="text" class="field-input">
               <p v-if="errors.employee_number" class="field-error">{{ errors.employee_number }}</p>
@@ -457,6 +462,7 @@ const showCreateHolidayList = ref(false);
 const companyHasHolidayList = ref(true);
 const showPassword = ref(false);
 const searchRole = ref('');
+const companyOptions = ref([]);
 
 const filteredRoles = computed(() => {
   const allRoles = teamStore.rolesResource?.data || [];
@@ -489,6 +495,7 @@ const getInitialFormData = () => ({
   user_image: '',
   employee_number: '',
   date_of_joining: '',
+  company: '',
   status: 'Active',
   designation: '',
   branch: '',
@@ -610,9 +617,21 @@ watch(show, async (newVal) => {
     searchRole.value = '';
     
     leaveStore.fetchHolidayLists();
-    teamStore.unlinkedUsersResource.reload();
+    if (typeof teamStore.unlinkedUsersResource?.fetch === 'function') {
+      teamStore.unlinkedUsersResource.fetch().catch(() => {});
+    }
     teamStore.usersListResource.reload();
     teamStore.employeeListResource.reload();
+
+    try {
+      const companyData = await call('arijentek_core.api.teams_permissons.get_employee_company_options', {});
+      if (companyData) {
+        companyOptions.value = companyData.options || [];
+        if (!formData.value.company) formData.value.company = companyData.default || '';
+      }
+    } catch (e) {
+      console.error('Failed to fetch company options:', e);
+    }
     
     try {
       const hlRes = await call('frappe.client.get_list', {
@@ -692,6 +711,11 @@ const validate = () => {
   }
   if (!formData.value.date_of_joining) {
     errors.value.date_of_joining = 'Date of Joining is mandatory';
+    isValid = false;
+    firstErrorTab = firstErrorTab || 'basic';
+  }
+  if (!formData.value.company) {
+    errors.value.company = 'Company is mandatory';
     isValid = false;
     firstErrorTab = firstErrorTab || 'basic';
   }

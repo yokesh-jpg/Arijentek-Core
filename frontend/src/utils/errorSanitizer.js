@@ -6,6 +6,8 @@
  * all retail, employee portal, and POS interfaces.
  */
 
+import { useBrandStore } from '@/stores/brand'
+
 export const PROHIBITED_PATTERNS = [
 	// JavaScript Engine Runtime Errors
 	/Cannot read properties/i,
@@ -78,17 +80,21 @@ export function parseRawError(err) {
 
 	let rawMessage = ''
 	let rawTitle = ''
-	let status = err.status || err.statusCode || err.httpStatus || 0
+	let status = err.status || err.statusCode || err.httpStatus || err.response?.status || 0
 
 	if (typeof err === 'string') {
 		rawMessage = err
-	} else if (err instanceof Error) {
-		rawMessage = err.message || err.toString()
-		rawTitle = err.name || ''
-		status = err.status || status
 	} else if (typeof err === 'object') {
+		rawTitle = err.title || err.exception_type || err.exc_type || err.name || ''
+
+		// Direct API response object payload (e.g. { success: false, message: "..." })
+		if (!(err instanceof Error) && err.message) {
+			if (typeof err.message === 'string') rawMessage = err.message
+			else if (typeof err.message === 'object' && err.message.message) rawMessage = err.message.message
+		}
+
 		// Frappe server messages JSON
-		if (err._server_messages) {
+		if (!rawMessage && err._server_messages) {
 			try {
 				const msgs = JSON.parse(err._server_messages)
 				if (Array.isArray(msgs) && msgs.length > 0) {
@@ -106,8 +112,25 @@ export function parseRawError(err) {
 			else if (m && typeof m === 'object' && m.message) rawMessage = m.message
 		}
 
+		if (!rawMessage && err.responseJSON) {
+			const r = err.responseJSON
+			if (r.message && typeof r.message === 'object' && r.message.message) rawMessage = r.message.message
+			else if (typeof r.message === 'string') rawMessage = r.message
+			else if (r.exc) rawMessage = r.exc
+		}
+
+		if (!rawMessage && err.response?.data) {
+			const r = err.response.data
+			if (r.message && typeof r.message === 'object' && r.message.message) rawMessage = r.message.message
+			else if (typeof r.message === 'string') rawMessage = r.message
+			else if (r.exc) rawMessage = r.exc
+		}
+
 		if (!rawMessage && err.message) {
-			rawMessage = typeof err.message === 'string' ? err.message : JSON.stringify(err.message)
+			const msgStr = typeof err.message === 'string' ? err.message : JSON.stringify(err.message)
+			if (!msgStr.startsWith('/api/method/')) {
+				rawMessage = msgStr
+			}
 		}
 		if (!rawMessage && err.exception) {
 			rawMessage = typeof err.exception === 'string' ? err.exception : JSON.stringify(err.exception)
@@ -118,8 +141,6 @@ export function parseRawError(err) {
 		if (!rawMessage && err.error) {
 			rawMessage = typeof err.error === 'string' ? err.error : (err.error?.message || JSON.stringify(err.error))
 		}
-
-		rawTitle = err.title || err.exception_type || err.exc_type || err.name || ''
 	}
 
 	// Strip HTML tags if present (e.g. Frappe <p>, <b>, or <html> error traces)
@@ -130,6 +151,16 @@ export function parseRawError(err) {
 	return { rawMessage, rawTitle, status }
 }
 
+/* Support-team label derives from the backend company name — never a hardcoded brand. Falls back to the generic team when the name is not loaded yet (e.g. early transport errors) or the store is unavailable. */
+function getSupportTeamLabel() {
+	try {
+		const brand = useBrandStore()
+		return brand.companyName ? `${brand.companyName} Technical Support` : 'Technical Support'
+	} catch (e) {
+		return 'Technical Support'
+	}
+}
+
 export function sanitizeError(err, customTitle = '') {
 	const { rawMessage, rawTitle, status } = parseRawError(err)
 	const combined = `${rawTitle} ${rawMessage}`.toLowerCase()
@@ -137,7 +168,7 @@ export function sanitizeError(err, customTitle = '') {
 	let title = customTitle || ''
 	let message = ''
 	let actionHint = 'Please try again or contact support if the issue persists.'
-	let supportTeam = 'Support'
+	let supportTeam = getSupportTeamLabel()
 	let iconType = 'error' // 'error', 'lock', 'wifi-off', 'warning', 'info'
 
 	// 1. Authentication & Session Expired (401)
@@ -269,7 +300,7 @@ export function sanitizeError(err, customTitle = '') {
 			message = 'The requested operation could not be completed.'
 		}
 		actionHint = 'Please retry or contact support if the issue persists.'
-		supportTeam = 'Technical Support'
+		supportTeam = getSupportTeamLabel()
 		iconType = 'error'
 	}
 

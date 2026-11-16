@@ -35,6 +35,10 @@ export const useExpenseStore = defineStore("expense", () => {
 		onSuccess(data) {
 			expenseTypes.value = data || [];
 		},
+		onError(err) {
+			console.warn("Could not load expense types:", err);
+			expenseTypes.value = [];
+		},
 	});
 
 	// Expense Summary
@@ -192,27 +196,47 @@ export const useExpenseStore = defineStore("expense", () => {
 	}
 
 	async function fetchTypes() {
-		await typesResource.fetch();
+		try {
+			await typesResource.fetch();
+		} catch (e) {
+			// Handled in onError
+		}
 	}
 
 	async function fetchSummary(employeeId) {
 		if (!employeeId) return;
-		await summaryResource.fetch({ employee_id: employeeId });
+		try {
+			await summaryResource.fetch({ employee_id: employeeId });
+		} catch (e) {
+			// Handled in onError
+		}
 	}
 
 	async function fetchPayableAccounts(company) {
 		if (!company) return;
-		await payableAccountsResource.fetch({ company });
+		try {
+			await payableAccountsResource.fetch({ company });
+		} catch (e) {
+			// Handled in onError
+		}
 	}
 
 	async function fetchApprovers(employeeId) {
 		if (!employeeId) return;
-		await approversResource.fetch({ employee: employeeId });
+		try {
+			await approversResource.fetch({ employee: employeeId });
+		} catch (e) {
+			// Handled in onError
+		}
 	}
 
 	async function fetchCompanyDefaults(company) {
 		if (!company) return;
-		await defaultsResource.fetch({ company });
+		try {
+			await defaultsResource.fetch({ company });
+		} catch (e) {
+			// Handled in onError
+		}
 	}
 
 	async function init(employeeId) {
@@ -223,8 +247,8 @@ export const useExpenseStore = defineStore("expense", () => {
 			} else {
 				await fetchClaims(employeeId);
 			}
-			fetchTypes();
-			fetchSummary(employeeId);
+			await fetchTypes();
+			await fetchSummary(employeeId);
 		}
 	}
 

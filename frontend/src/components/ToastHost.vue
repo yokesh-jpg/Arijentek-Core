@@ -22,13 +22,33 @@
 			>
 				<div class="flex items-start gap-3">
 					<div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" :class="TONES[t.type] || TONES.info">
-						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<span
+							v-if="t.type === 'loading'"
+							class="material-symbols-outlined !text-[20px] animate-spin text-accent dark:text-accent-light shrink-0"
+							aria-hidden="true"
+						>progress_activity</span>
+						<svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" :d="ICONS[t.type] || ICONS.info" />
 						</svg>
 					</div>
 					<div class="flex-1 min-w-0 pt-0.5">
 						<div class="text-sm font-semibold leading-snug text-[#17181B] dark:text-white">{{ t.title || TITLES[t.type] }}</div>
 						<p v-if="t.message" class="mt-0.5 text-[13px] leading-snug text-[#5C6169] dark:text-white/60 break-words">{{ t.message }}</p>
+
+						<!-- Proper animated loading progress bar for loading toasts -->
+						<div v-if="t.type === 'loading'" class="mt-2.5 w-full bg-accent/15 dark:bg-white/10 rounded-full h-1.5 overflow-hidden">
+							<div class="h-full bg-accent dark:bg-accent-light rounded-full animate-indeterminate"></div>
+						</div>
+
+						<button
+							v-if="t.action"
+							type="button"
+							class="mt-2 text-xs font-semibold px-2.5 py-1 rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors inline-flex items-center gap-1 cursor-pointer pointer-events-auto"
+							@click="t.action.onClick(); feedback.dismiss(t.id)"
+						>
+							<span v-if="t.action.icon" class="material-symbols-outlined !text-[14px]">{{ t.action.icon }}</span>
+							<span>{{ t.action.label }}</span>
+						</button>
 					</div>
 					<button
 						type="button"
@@ -51,9 +71,10 @@ import { useFeedbackStore } from '@/stores/feedback.js'
 
 const feedback = useFeedbackStore()
 
-const TITLES = { success: 'Action completed', error: 'Action restricted', warning: 'Attention needed', info: 'Notice' }
+const TITLES = { loading: 'Generating PDF…', success: 'Action completed', error: 'Action restricted', warning: 'Attention needed', info: 'Notice' }
 /* green-*, not emerald-*: emerald is remapped to the accent in this app. */
 const TONES = {
+	loading: 'bg-accent/10 text-accent dark:bg-accent-soft/15 dark:text-accent-light',
 	success: 'bg-green-500/[0.12] text-green-600 dark:bg-green-400/15 dark:text-green-400',
 	error: 'bg-red-500/10 text-red-600 dark:bg-red-400/15 dark:text-red-400',
 	warning: 'bg-amber-500/[0.12] text-amber-600 dark:bg-amber-400/15 dark:text-amber-400',
@@ -66,3 +87,22 @@ const ICONS = {
 	info: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
 }
 </script>
+
+<style scoped>
+@keyframes indeterminate {
+	0% {
+		transform: translateX(-100%) scaleX(0.2);
+	}
+	50% {
+		transform: translateX(35%) scaleX(0.7);
+	}
+	100% {
+		transform: translateX(200%) scaleX(0.2);
+	}
+}
+.animate-indeterminate {
+	width: 50%;
+	animation: indeterminate 1.5s infinite ease-in-out;
+	transform-origin: 0% 50%;
+}
+</style>

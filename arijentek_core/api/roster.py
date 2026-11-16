@@ -132,12 +132,16 @@ def get_next_three_days_roster(employee_id=None):
 @frappe.whitelist()
 def get_shift_types():
 	"""Return all Shift Type names for the dropdown."""
-	types = frappe.get_all(
-		"Shift Type",
-		fields=["name"],
-		order_by="name asc",
-	)
-	return types
+	try:
+		types = frappe.get_all(
+			"Shift Type",
+			fields=["name"],
+			order_by="name asc",
+			ignore_permissions=True,
+		)
+		return types
+	except Exception:
+		return []
 
 
 @frappe.whitelist()
@@ -756,7 +760,19 @@ def _get_weekly_notes(employee_id, week_start, week_end):
 
 def _ensure_roster_visibility(employee_id):
 	"""Reject employee_ids the current user cannot see (self, unless roster admin)."""
-	if employee_id and employee_id not in {e["name"] for e in get_employee_list()}:
+	if not employee_id:
+		return
+
+	if frappe.session.user == "Administrator":
+		return
+
+	# Any user is always permitted to view their own employee roster
+	my_emp = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+	if my_emp and employee_id == my_emp:
+		return
+
+	allowed_ids = {e["name"] for e in get_employee_list()}
+	if employee_id not in allowed_ids:
 		frappe.throw(
 			_("You are not authorized to view this employee's roster"), frappe.PermissionError
 		)
@@ -1206,6 +1222,16 @@ def get_employee_list():
 		""".format(exclude=f"AND {exclude_internal}" if exclude_internal else ""),
 			as_dict=True,
 		)
+		# Ensure current user's own employee record is always present in their employee list
+		my_employee = frappe.db.get_value(
+			"Employee",
+			{"user_id": user},
+			["name", "employee_name", "department", "designation"],
+			as_dict=True,
+		)
+		if my_employee and my_employee["name"] not in {e["name"] for e in employees}:
+			employees.insert(0, my_employee)
+
 		return employees
 	else:
 		# Regular user sees only themselves
@@ -1389,7 +1415,11 @@ def allow_multiple_shifts():
 	Check if 'Allow Multiple Shift Assignments for Same Date' is enabled in HR Settings.
 	"""
 	from frappe.utils import cint
-	return cint(frappe.db.get_single_value("HR Settings", "allow_multiple_shift_assignments"))
+	try:
+		return cint(frappe.db.get_single_value("HR Settings", "allow_multiple_shift_assignments"))
+	except Exception:
+		val = frappe.db.get_value("Singles", {"doctype": "HR Settings", "field": "allow_multiple_shift_assignments"}, "value")
+		return cint(val)
 
 
 @frappe.whitelist()
@@ -2463,8 +2493,19 @@ def save_shift_location(location_name=None, name=None):
 	if not target_name:
 		frappe.throw(_("Location Name is required"))
 
+	if frappe.db.exists("DocType", "Shift Location"):
+		current_mod = frappe.db.get_value("DocType", "Shift Location", "module")
+		if current_mod != "HR":
+			frappe.db.set_value("DocType", "Shift Location", "module", "HR", update_modified=False)
+			frappe.clear_cache(doctype="Shift Location")
+		doctype = "Shift Location"
+	elif frappe.db.exists("DocType", "Zevar Shift Location"):
+		doctype = "Zevar Shift Location"
+	else:
+		frappe.throw(_("Shift Location DocType does not exist on this site"))
+
 	doc = frappe.get_doc({
-		"doctype": "Shift Location",
+		"doctype": doctype,
 		"location_name": target_name
 	})
 	doc.insert()

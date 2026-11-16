@@ -81,6 +81,25 @@
 			</div>
 		</div>
 
+		<!-- Error Alert Banner -->
+		<div
+			v-if="fetchError"
+			class="mb-4 flex items-center justify-between gap-3 p-4 rounded-xl bg-red-500/[0.08] border border-red-500/20 text-red-700 dark:text-red-300 text-sm"
+			role="alert"
+		>
+			<div class="flex items-center gap-2">
+				<span class="material-symbols-outlined !text-[20px] text-red-600 dark:text-red-400">error</span>
+				<span>{{ fetchError }}</span>
+			</div>
+			<button
+				type="button"
+				@click="retryFetch"
+				class="px-3 py-1 text-xs font-semibold rounded-lg bg-red-600/10 hover:bg-red-600/20 text-red-700 dark:text-red-300 transition-colors"
+			>
+				Retry
+			</button>
+		</div>
+
 		<!-- ===== List ===== -->
 		<DataTable
 			:columns="listColumns"
@@ -279,9 +298,17 @@ const statsQuery = useQuery({
   },
   placeholderData: (previousData) => previousData,
   staleTime: 1000 * 60 * 5,
+  retry: 1,
 });
 
 const statsData = computed(() => statsQuery.data.value || { total: 0, Open: 0, Investigated: 0, Resolved: 0, Invalid: 0 });
+
+const fetchError = ref('');
+function retryFetch() {
+  fetchError.value = '';
+  pager.fetchPage();
+  statsQuery.refetch();
+}
 
 /* First load only: isLoading is false during refetches (placeholderData keeps
    the previous figures), so filters swapping never flash the skeleton. */
@@ -340,9 +367,11 @@ const fetchIssues = async (page, pageSize) => {
     }
     const rows = Array.isArray(res) ? res : (res?.data || []);
     const total = Array.isArray(res) ? res.length : Number(res?.total || 0);
+    fetchError.value = '';
     return { rows, total };
   } catch (error) {
     console.error("Failed to fetch issues:", error);
+    fetchError.value = getErrorMessage(error, "Failed to load issues. Please retry.");
     return { rows: [], total: 0 };
   }
 };

@@ -51,6 +51,12 @@
 			:show="activeModal === 'salary_structure_assignment_report'"
 			@close="activeModal = null"
 		/>
+
+		<!-- Sales Commission Pop-up Modal -->
+		<ReportSalesCommission
+			:show="activeModal === 'sales_commission_report'"
+			@close="activeModal = null"
+		/>
 	</div>
 </template>
 
@@ -59,6 +65,7 @@ import { ref } from 'vue';
 import ReportSalarySlip from './pop_up/report_salary_slip.vue';
 import ReportPayrollEntry from './pop_up/report_payroll_entry.vue';
 import ReportSalaryStructureAssignment from './pop_up/report_salary_structure_assignment.vue';
+import ReportSalesCommission from './pop_up/report_sales_commission.vue';
 
 const activeModal = ref(null);
 
@@ -86,6 +93,14 @@ const payrollReports = [
 		icon: 'badge',
 		badge: 'Core Report',
 		colorClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+	},
+	{
+		id: 'sales_commission_report',
+		title: 'Sales Commission Report',
+		description: 'View salesperson invoice contributions and calculate 2% commission for employees exceeding 30,000 threshold with Excel export.',
+		icon: 'monetization_on',
+		badge: 'Commission & Excel',
+		colorClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
 	},
 ];
 

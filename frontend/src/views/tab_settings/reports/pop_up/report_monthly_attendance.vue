@@ -4,11 +4,11 @@
 		title="Monthly attendance"
 		subtitle="Attendance per employee across the month, by status."
 		:loading="loading"
-		:empty="!reportData.length"
+		:empty="!filteredRows.length"
 		empty-icon="calendar_month"
 		empty-title="No attendance records."
 		empty-text="Nothing was recorded for this month under these filters."
-		:count="reportData.length"
+		:count="filteredRows.length"
 		unit="employee"
 		unit-plural="employees"
 		wide
@@ -106,118 +106,182 @@
 		</template>
 
 		<!-- Monthly Attendance Matrix Crosstab Table -->
-		<div class="w-full select-text">
-			<table class="w-full border-separate border-spacing-0 text-left text-xs min-w-max">
-				<thead>
-					<tr>
-						<!-- Pinned Column 1: ID (Locked to exactly 130px) -->
-						<th class="sticky top-0 left-0 z-30 bg-[#F8F9FA] dark:bg-surface-2 px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider w-[130px] min-w-[130px] max-w-[130px] border-b border-black/[0.08] dark:border-white/10 select-none">
-							ID
-						</th>
-						<!-- Pinned Column 2: Employee Name (Starts exactly at 130px) -->
-						<th class="sticky top-0 left-[130px] z-30 bg-[#F8F9FA] dark:bg-surface-2 px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider w-[160px] min-w-[160px] max-w-[160px] border-b border-r border-black/[0.08] dark:border-white/10 select-none shadow-[4px_0_8px_-3px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-3px_rgba(0,0,0,0.3)]">
-							Employee
-						</th>
-						<!-- Department -->
-						<th class="sticky top-0 z-20 bg-[#F8F9FA] dark:bg-surface-2 px-2.5 py-2 text-left text-[11px] font-bold uppercase tracking-wider w-[105px] min-w-[105px] max-w-[105px] border-b border-black/[0.08] dark:border-white/10 select-none">
-							Department
-						</th>
-						<!-- Shift -->
-						<th class="sticky top-0 z-20 bg-[#F8F9FA] dark:bg-surface-2 px-2 py-2 text-left text-[11px] font-bold uppercase tracking-wider w-[80px] min-w-[80px] max-w-[80px] border-b border-black/[0.08] dark:border-white/10 select-none">
-							Shift
-						</th>
-
-						<!-- Day Columns (1..31) with 100% Solid Backgrounds (No Bleed-Through on Vertical Scroll) -->
-						<th
-							v-for="day in dayColumns"
-							:key="day.fieldname"
-							class="sticky top-0 z-20 px-0.5 py-1.5 text-center w-[32px] min-w-[32px] max-w-[32px] border-b border-l border-black/[0.06] dark:border-white/10 select-none"
-							:class="isWeekend(day.dayAbbr) ? 'bg-[#FEF6E9] dark:bg-[#2A2318]' : 'bg-[#F8F9FA] dark:bg-surface-2'"
-						>
-							<div class="font-bold text-[11px] leading-tight text-[#17181B] dark:text-white tabular-nums">{{ day.dayNum }}</div>
-							<div
-								class="text-[9px] font-semibold uppercase leading-tight"
-								:class="isWeekend(day.dayAbbr) ? 'text-amber-700 dark:text-amber-400' : 'text-[#656A72] dark:text-white/50'"
-							>
-								{{ day.dayAbbr }}
-							</div>
-						</th>
-
-						<!-- Summary Columns (P, A, HD, L, Late, Early) with 100% Solid Backgrounds -->
-						<th class="sticky top-0 z-20 px-1 py-1.5 text-center w-[34px] min-w-[34px] max-w-[34px] text-[10px] font-bold text-emerald-800 dark:text-emerald-300 bg-[#ECFDF5] dark:bg-[#0D281E] border-b border-l border-emerald-500/25 select-none" title="Total Present">P</th>
-						<th class="sticky top-0 z-20 px-1 py-1.5 text-center w-[34px] min-w-[34px] max-w-[34px] text-[10px] font-bold text-rose-800 dark:text-rose-300 bg-[#FFF1F2] dark:bg-[#2D1217] border-b border-l border-rose-500/25 select-none" title="Total Absent">A</th>
-						<th class="sticky top-0 z-20 px-1 py-1.5 text-center w-[34px] min-w-[34px] max-w-[34px] text-[10px] font-bold text-amber-800 dark:text-amber-300 bg-[#FFFBEB] dark:bg-[#2B1D0E] border-b border-l border-amber-500/25 select-none" title="Total Half Day">HD</th>
-						<th class="sticky top-0 z-20 px-1 py-1.5 text-center w-[34px] min-w-[34px] max-w-[34px] text-[10px] font-bold text-blue-800 dark:text-blue-300 bg-[#EFF6FF] dark:bg-[#0E1D33] border-b border-l border-blue-500/25 select-none" title="Total Leave">L</th>
-						<th class="sticky top-0 z-20 px-1 py-1.5 text-center w-[36px] min-w-[36px] max-w-[36px] text-[10px] font-bold text-orange-800 dark:text-orange-300 bg-[#FFF7ED] dark:bg-[#2E190E] border-b border-l border-orange-500/25 select-none" title="Total Late Entries">Late</th>
-						<th class="sticky top-0 z-20 px-1 py-1.5 text-center w-[36px] min-w-[36px] max-w-[36px] text-[10px] font-bold text-purple-800 dark:text-purple-300 bg-[#FAF5FF] dark:bg-[#221233] border-b border-l border-purple-500/25 select-none" title="Total Early Exits">Early</th>
-					</tr>
-				</thead>
-				<tbody class="text-[#17181B] dark:text-white">
-					<tr
-						v-for="(row, idx) in reportData"
-						:key="row.employee || idx"
-						class="group hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors"
+		<div class="w-full select-text flex flex-col">
+			<!-- In-Table Quick Search & Active Page Indicator -->
+			<div
+				v-if="reportData.length > 0"
+				class="px-4 py-2 bg-[#F8F9FA] dark:bg-surface-2/60 border-b border-black/[0.06] dark:border-white/[0.08] flex flex-wrap items-center justify-between gap-3 shrink-0"
+			>
+				<div class="relative w-80 max-w-full">
+					<span class="material-symbols-outlined !text-[18px] absolute left-2.5 top-1/2 -translate-y-1/2 text-[#656A72] dark:text-white/40 pointer-events-none">search</span>
+					<input
+						v-model="searchQuery"
+						type="text"
+						placeholder="Quick search employee ID, name, branch…"
+						class="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg border border-black/10 dark:border-white/15 bg-white dark:bg-surface-1 text-[#17181B] dark:text-white placeholder-[#9AA0A8] focus:outline-none focus:ring-1 focus:ring-accent"
+					/>
+					<button
+						v-if="searchQuery"
+						type="button"
+						@click="searchQuery = ''"
+						class="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#656A72] hover:text-[#17181B] dark:text-white/40 dark:hover:text-white cursor-pointer"
+						aria-label="Clear search"
 					>
-						<!-- Pinned Column 1: ID (Locked to 130px) -->
-						<td class="sticky left-0 z-10 bg-white dark:bg-surface-1 group-hover:bg-[#F9FAFB] dark:group-hover:bg-surface-2 px-3 py-1.5 font-mono text-[11px] font-medium text-[#656A72] dark:text-white/60 whitespace-nowrap w-[130px] min-w-[130px] max-w-[130px] border-b border-black/[0.05] dark:border-white/[0.06] truncate" :title="row.employee">
-							{{ row.employee }}
-						</td>
-						<!-- Pinned Column 2: Name (Locked to 160px at left: 130px - No Overlap) -->
-						<td class="sticky left-[130px] z-10 bg-white dark:bg-surface-1 group-hover:bg-[#F9FAFB] dark:group-hover:bg-surface-2 px-3 py-1.5 whitespace-nowrap w-[160px] min-w-[160px] max-w-[160px] border-b border-r border-black/[0.08] dark:border-white/10 shadow-[4px_0_8px_-3px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-3px_rgba(0,0,0,0.3)]">
-							<div class="font-semibold text-[12px] text-[#17181B] dark:text-white truncate" :title="row.employee_name">
-								{{ row.employee_name }}
-							</div>
-							<div v-if="row.branch && row.branch !== '-'" class="text-[10px] text-[#656A72] dark:text-white/50 truncate">
-								{{ row.branch }}
-							</div>
-						</td>
-						<!-- Department -->
-						<td class="px-2.5 py-1.5 text-[11px] text-[#656A72] dark:text-white/70 whitespace-nowrap w-[105px] min-w-[105px] max-w-[105px] truncate border-b border-black/[0.05] dark:border-white/[0.06]" :title="row.department">
-							{{ row.department || '—' }}
-						</td>
-						<!-- Shift -->
-						<td class="px-2 py-1.5 text-[11px] text-[#656A72] dark:text-white/70 whitespace-nowrap w-[80px] min-w-[80px] max-w-[80px] truncate border-b border-black/[0.05] dark:border-white/[0.06]" :title="row.shift">
-							{{ row.shift || '—' }}
-						</td>
-
-						<!-- Day Columns (1..31) -->
-						<td
-							v-for="day in dayColumns"
-							:key="day.fieldname"
-							class="px-0.5 py-1 text-center w-[32px] min-w-[32px] max-w-[32px] border-b border-l border-black/[0.04] dark:border-white/[0.06]"
-							:class="isWeekend(day.dayAbbr) ? 'bg-amber-500/[0.03] dark:bg-amber-400/[0.03]' : ''"
+						✕
+					</button>
+				</div>
+				<div class="flex items-center gap-3 text-xs text-[#5C6169] dark:text-white/60">
+					<span>
+						Showing <strong class="text-[#17181B] dark:text-white tabular-nums">{{ pg.rows.length }}</strong> of
+						<strong class="text-[#17181B] dark:text-white tabular-nums">{{ pg.total }}</strong> employees
+					</span>
+					<span class="text-black/20 dark:text-white/20">|</span>
+					<div class="flex items-center gap-1.5">
+						<button
+							type="button"
+							class="px-2 py-0.5 rounded border border-black/10 dark:border-white/15 bg-white dark:bg-surface-1 hover:bg-black/[0.04] disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors cursor-pointer text-xs"
+							:disabled="pg.page <= 1"
+							@click="pg.page--"
 						>
-							<span
-								class="inline-flex items-center justify-center w-[24px] h-[22px] rounded text-[10px] font-bold leading-none tracking-tight transition-transform"
-								:class="getDayBadgeClass(row[day.fieldname])"
-								:title="formatDayTooltip(day, row[day.fieldname])"
-							>
-								{{ formatDayValue(row[day.fieldname]) }}
-							</span>
-						</td>
+							Prev
+						</button>
+						<span class="tabular-nums">Page {{ pg.page }} / {{ Math.max(1, Math.ceil(pg.total / (Number(pg.size) || 50))) }}</span>
+						<button
+							type="button"
+							class="px-2 py-0.5 rounded border border-black/10 dark:border-white/15 bg-white dark:bg-surface-1 hover:bg-black/[0.04] disabled:opacity-40 disabled:cursor-not-allowed font-medium transition-colors cursor-pointer text-xs"
+							:disabled="pg.page >= Math.ceil(pg.total / (Number(pg.size) || 50))"
+							@click="pg.page++"
+						>
+							Next
+						</button>
+					</div>
+				</div>
+			</div>
 
-						<!-- Summary Columns -->
-						<td class="px-1 py-1.5 text-center text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/[0.04] border-b border-l border-black/[0.04] dark:border-white/[0.06] tabular-nums w-[34px] min-w-[34px] max-w-[34px]">
-							{{ row.total_present ?? 0 }}
-						</td>
-						<td class="px-1 py-1.5 text-center text-[11px] font-semibold text-rose-700 dark:text-rose-400 bg-rose-500/[0.04] border-b border-l border-black/[0.04] dark:border-white/[0.06] tabular-nums w-[34px] min-w-[34px] max-w-[34px]">
-							{{ row.total_absent ?? 0 }}
-						</td>
-						<td class="px-1 py-1.5 text-center text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/[0.04] border-b border-l border-black/[0.04] dark:border-white/[0.06] tabular-nums w-[34px] min-w-[34px] max-w-[34px]">
-							{{ row.total_half_day ?? 0 }}
-						</td>
-						<td class="px-1 py-1.5 text-center text-[11px] font-semibold text-blue-700 dark:text-blue-400 bg-blue-500/[0.04] border-b border-l border-black/[0.04] dark:border-white/[0.06] tabular-nums w-[34px] min-w-[34px] max-w-[34px]">
-							{{ row.total_leave ?? 0 }}
-						</td>
-						<td class="px-1 py-1.5 text-center text-[11px] font-semibold text-orange-700 dark:text-orange-400 bg-orange-500/[0.04] border-b border-l border-black/[0.04] dark:border-white/[0.06] tabular-nums w-[36px] min-w-[36px] max-w-[36px]">
-							{{ row.total_late_entries ?? 0 }}
-						</td>
-						<td class="px-1 py-1.5 text-center text-[11px] font-semibold text-purple-700 dark:text-purple-400 bg-purple-500/[0.04] border-b border-l border-black/[0.04] dark:border-white/[0.06] tabular-nums w-[36px] min-w-[36px] max-w-[36px]">
-							{{ row.total_early_exits ?? 0 }}
-						</td>
-					</tr>
-				</tbody>
-			</table>
+			<!-- Matrix Table with Paginated Rows -->
+			<div class="w-full overflow-x-auto table-scroll">
+				<table class="w-full border-separate border-spacing-0 text-left text-xs min-w-max">
+					<thead>
+						<tr>
+							<!-- Pinned Column 1: ID (Locked to exactly 130px) -->
+							<th class="sticky top-0 left-0 z-30 bg-[#F8F9FA] dark:bg-surface-2 px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider w-[130px] min-w-[130px] max-w-[130px] border-b border-black/[0.08] dark:border-white/10 select-none">
+								ID
+							</th>
+							<!-- Pinned Column 2: Employee Name (Starts exactly at 130px) -->
+							<th class="sticky top-0 left-[130px] z-30 bg-[#F8F9FA] dark:bg-surface-2 px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider w-[160px] min-w-[160px] max-w-[160px] border-b border-r border-black/[0.08] dark:border-white/10 select-none shadow-[4px_0_8px_-3px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-3px_rgba(0,0,0,0.3)]">
+								Employee
+							</th>
+							<!-- Department -->
+							<th class="sticky top-0 z-20 bg-[#F8F9FA] dark:bg-surface-2 px-2.5 py-2 text-left text-[11px] font-bold uppercase tracking-wider w-[105px] min-w-[105px] max-w-[105px] border-b border-black/[0.08] dark:border-white/10 select-none">
+								Department
+							</th>
+							<!-- Shift -->
+							<th class="sticky top-0 z-20 bg-[#F8F9FA] dark:bg-surface-2 px-2 py-2 text-left text-[11px] font-bold uppercase tracking-wider w-[80px] min-w-[80px] max-w-[80px] border-b border-black/[0.08] dark:border-white/10 select-none">
+								Shift
+							</th>
+
+							<!-- Day Columns (1..31) with 100% Solid Backgrounds (No Bleed-Through on Vertical Scroll) -->
+							<th
+								v-for="day in dayColumns"
+								:key="day.fieldname"
+								class="sticky top-0 z-20 px-0.5 py-1.5 text-center w-[32px] min-w-[32px] max-w-[32px] border-b border-l border-black/[0.06] dark:border-white/10 select-none"
+								:class="isWeekend(day.dayAbbr) ? 'bg-[#FEF6E9] dark:bg-[#2A2318]' : 'bg-[#F8F9FA] dark:bg-surface-2'"
+							>
+								<div class="font-bold text-[11px] leading-tight text-[#17181B] dark:text-white tabular-nums">{{ day.dayNum }}</div>
+								<div
+									class="text-[9px] font-semibold uppercase leading-tight"
+									:class="isWeekend(day.dayAbbr) ? 'text-amber-700 dark:text-amber-400' : 'text-[#656A72] dark:text-white/50'"
+								>
+									{{ day.dayAbbr }}
+								</div>
+							</th>
+
+							<!-- Summary Columns (P, A, HD, L, Late, Early) with 100% Solid Backgrounds -->
+							<th class="sticky top-0 z-20 px-1 py-1.5 text-center w-[34px] min-w-[34px] max-w-[34px] text-[10px] font-bold text-emerald-800 dark:text-emerald-300 bg-[#ECFDF5] dark:bg-[#0D281E] border-b border-l border-emerald-500/25 select-none" title="Total Present">P</th>
+							<th class="sticky top-0 z-20 px-1 py-1.5 text-center w-[34px] min-w-[34px] max-w-[34px] text-[10px] font-bold text-rose-800 dark:text-rose-300 bg-[#FFF1F2] dark:bg-[#2D1217] border-b border-l border-rose-500/25 select-none" title="Total Absent">A</th>
+							<th class="sticky top-0 z-20 px-1 py-1.5 text-center w-[34px] min-w-[34px] max-w-[34px] text-[10px] font-bold text-amber-800 dark:text-amber-300 bg-[#FFFBEB] dark:bg-[#2B1D0E] border-b border-l border-amber-500/25 select-none" title="Total Half Day">HD</th>
+							<th class="sticky top-0 z-20 px-1 py-1.5 text-center w-[34px] min-w-[34px] max-w-[34px] text-[10px] font-bold text-blue-800 dark:text-blue-300 bg-[#EFF6FF] dark:bg-[#0E1D33] border-b border-l border-blue-500/25 select-none" title="Total Leave">L</th>
+							<th class="sticky top-0 z-20 px-1 py-1.5 text-center w-[36px] min-w-[36px] max-w-[36px] text-[10px] font-bold text-orange-800 dark:text-orange-300 bg-[#FFF7ED] dark:bg-[#2E190E] border-b border-l border-orange-500/25 select-none" title="Total Late Entries">Late</th>
+							<th class="sticky top-0 z-20 px-1 py-1.5 text-center w-[36px] min-w-[36px] max-w-[36px] text-[10px] font-bold text-purple-800 dark:text-purple-300 bg-[#FAF5FF] dark:bg-[#221233] border-b border-l border-purple-500/25 select-none" title="Total Early Exits">Early</th>
+						</tr>
+					</thead>
+					<tbody class="text-[#17181B] dark:text-white">
+						<tr
+							v-for="(row, idx) in pg.rows"
+							:key="row.employee || idx"
+							class="group hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors"
+						>
+							<!-- Pinned Column 1: ID (Locked to 130px) -->
+							<td class="sticky left-0 z-10 bg-white dark:bg-surface-1 group-hover:bg-[#F9FAFB] dark:group-hover:bg-surface-2 px-3 py-1.5 font-mono text-[11px] font-medium text-[#656A72] dark:text-white/60 whitespace-nowrap w-[130px] min-w-[130px] max-w-[130px] border-b border-black/[0.05] dark:border-white/[0.06] truncate" :title="row.employee">
+								{{ row.employee }}
+							</td>
+							<!-- Pinned Column 2: Name (Locked to 160px at left: 130px - No Overlap) -->
+							<td class="sticky left-[130px] z-10 bg-white dark:bg-surface-1 group-hover:bg-[#F9FAFB] dark:group-hover:bg-surface-2 px-3 py-1.5 whitespace-nowrap w-[160px] min-w-[160px] max-w-[160px] border-b border-r border-black/[0.08] dark:border-white/10 shadow-[4px_0_8px_-3px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-3px_rgba(0,0,0,0.3)]">
+								<div class="font-semibold text-[12px] text-[#17181B] dark:text-white truncate" :title="row.employee_name">
+									{{ row.employee_name }}
+								</div>
+								<div v-if="row.branch && row.branch !== '-'" class="text-[10px] text-[#656A72] dark:text-white/50 truncate">
+									{{ row.branch }}
+								</div>
+							</td>
+							<!-- Department -->
+							<td class="px-2.5 py-1.5 text-[11px] text-[#656A72] dark:text-white/70 whitespace-nowrap w-[105px] min-w-[105px] max-w-[105px] truncate border-b border-black/[0.05] dark:border-white/[0.06]" :title="row.department">
+								{{ row.department || '—' }}
+							</td>
+							<!-- Shift -->
+							<td class="px-2 py-1.5 text-[11px] text-[#656A72] dark:text-white/70 whitespace-nowrap w-[80px] min-w-[80px] max-w-[80px] truncate border-b border-black/[0.05] dark:border-white/[0.06]" :title="row.shift">
+								{{ row.shift || '—' }}
+							</td>
+
+							<!-- Day Columns (1..31) -->
+							<td
+								v-for="day in dayColumns"
+								:key="day.fieldname"
+								class="px-0.5 py-1 text-center w-[32px] min-w-[32px] max-w-[32px] border-b border-l border-black/[0.04] dark:border-white/[0.06]"
+								:class="isWeekend(day.dayAbbr) ? 'bg-amber-500/[0.03] dark:bg-amber-400/[0.03]' : ''"
+							>
+								<span
+									class="inline-flex items-center justify-center w-[24px] h-[22px] rounded text-[10px] font-bold leading-none tracking-tight transition-transform"
+									:class="getDayBadgeClass(row[day.fieldname])"
+									:title="formatDayTooltip(day, row[day.fieldname])"
+								>
+									{{ formatDayValue(row[day.fieldname]) }}
+								</span>
+							</td>
+
+							<!-- Summary Columns -->
+							<td class="px-1 py-1.5 text-center text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/[0.04] border-b border-l border-black/[0.04] dark:border-white/[0.06] tabular-nums w-[34px] min-w-[34px] max-w-[34px]">
+								{{ row.total_present ?? 0 }}
+							</td>
+							<td class="px-1 py-1.5 text-center text-[11px] font-semibold text-rose-700 dark:text-rose-400 bg-rose-500/[0.04] border-b border-l border-black/[0.04] dark:border-white/[0.06] tabular-nums w-[34px] min-w-[34px] max-w-[34px]">
+								{{ row.total_absent ?? 0 }}
+							</td>
+							<td class="px-1 py-1.5 text-center text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/[0.04] border-b border-l border-black/[0.04] dark:border-white/[0.06] tabular-nums w-[34px] min-w-[34px] max-w-[34px]">
+								{{ row.total_half_day ?? 0 }}
+							</td>
+							<td class="px-1 py-1.5 text-center text-[11px] font-semibold text-blue-700 dark:text-blue-400 bg-blue-500/[0.04] border-b border-l border-black/[0.04] dark:border-white/[0.06] tabular-nums w-[34px] min-w-[34px] max-w-[34px]">
+								{{ row.total_leave ?? 0 }}
+							</td>
+							<td class="px-1 py-1.5 text-center text-[11px] font-semibold text-orange-700 dark:text-orange-400 bg-orange-500/[0.04] border-b border-l border-black/[0.04] dark:border-white/[0.06] tabular-nums w-[36px] min-w-[36px] max-w-[36px]">
+								{{ row.total_late_entries ?? 0 }}
+							</td>
+							<td class="px-1 py-1.5 text-center text-[11px] font-semibold text-purple-700 dark:text-purple-400 bg-purple-500/[0.04] border-b border-l border-black/[0.04] dark:border-white/[0.06] tabular-nums w-[36px] min-w-[36px] max-w-[36px]">
+								{{ row.total_early_exits ?? 0 }}
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+
+			<!-- Pager Footer -->
+			<TablePager
+				v-if="pg.total > 0"
+				v-model:page="pg.page"
+				v-model:page-size="pg.size"
+				:total="pg.total"
+				:sizes="[25, 50, 100]"
+				class="px-5 py-2.5 border-t border-black/[0.06] dark:border-white/[0.08] bg-[#F8F9FA] dark:bg-surface-2/40"
+			/>
 		</div>
 	</ReportDialog>
 </template>
@@ -227,6 +291,9 @@ import { ref, reactive, computed, watch } from 'vue';
 import SearchableDropdown from '../../../../components/SearchableDropdown.vue';
 import DateRangePicker from '../../../../components/DateRangePicker.vue';
 import ReportDialog from '@/components/ReportDialog.vue';
+import TablePager from '@/components/TablePager.vue';
+import { usePager } from '@/composables/usePager.js';
+import { exportReportPdf } from '@/utils/reportExport.js';
 
 const props = defineProps({
 	show: {
@@ -274,6 +341,27 @@ const filters = reactive({
 
 const columns = ref([]);
 const reportData = ref([]);
+const searchQuery = ref('');
+
+// Fast in-memory client search over 1,500+ employees without re-fetching
+const filteredRows = computed(() => {
+	const q = searchQuery.value.trim().toLowerCase();
+	if (!q) return reportData.value;
+	return reportData.value.filter((row) => {
+		const id = String(row.employee || '').toLowerCase();
+		const name = String(row.employee_name || '').toLowerCase();
+		const dept = String(row.department || '').toLowerCase();
+		const branch = String(row.branch || '').toLowerCase();
+		return id.includes(q) || name.includes(q) || dept.includes(q) || branch.includes(q);
+	});
+});
+
+// Standard TablePager: Paginates rows to 50 (or 25/100) per page, cutting DOM elements from 108,000+ down to ~3,600!
+const pg = usePager(() => filteredRows.value, 50);
+
+watch(searchQuery, () => {
+	pg.page = 1;
+});
 
 const dayColumns = computed(() => {
 	return columns.value
@@ -298,45 +386,41 @@ const isWeekend = (abbr) => {
 
 const formatDayValue = (val) => {
 	if (!val || val === '-') return '—';
-	return String(val).toUpperCase();
+	return val;
+};
+
+const STATUS_NAMES = {
+	P: 'Present',
+	A: 'Absent',
+	HD: 'Half Day',
+	'HD/P': 'Half Day (Present)',
+	'HD/A': 'Half Day (Absent)',
+	L: 'On Leave',
+	H: 'Holiday',
+	WO: 'Weekly Off',
+	WFH: 'Work From Home',
 };
 
 const formatDayTooltip = (day, status) => {
-	const s = String(status || '').toUpperCase().trim();
-	const names = {
-		P: 'Present',
-		A: 'Absent',
-		HD: 'Half Day',
-		L: 'On Leave',
-		H: 'Holiday',
-		WO: 'Weekly Off',
-		WFH: 'Work From Home',
-	};
-	return `Day ${day.dayNum} (${day.dayAbbr}): ${names[s] || s || 'No Record'}`;
+	return `Day ${day.dayNum} (${day.dayAbbr}): ${STATUS_NAMES[status] || status || 'No Record'}`;
 };
 
+const STATUS_BADGE_CLASSES = {
+	P: 'text-emerald-700 dark:text-emerald-300 bg-emerald-100/90 dark:bg-emerald-950/80 border border-emerald-300/80 dark:border-emerald-700/80 shadow-2xs',
+	A: 'text-rose-700 dark:text-rose-300 bg-rose-100/90 dark:bg-rose-950/80 border border-rose-300/80 dark:border-rose-700/80 shadow-2xs',
+	HD: 'text-amber-700 dark:text-amber-300 bg-amber-100/90 dark:bg-amber-950/80 border border-amber-300/80 dark:border-amber-700/80 shadow-2xs',
+	'HD/P': 'text-amber-700 dark:text-amber-300 bg-amber-100/90 dark:bg-amber-950/80 border border-amber-300/80 dark:border-amber-700/80 shadow-2xs',
+	'HD/A': 'text-amber-700 dark:text-amber-300 bg-amber-100/90 dark:bg-amber-950/80 border border-amber-300/80 dark:border-amber-700/80 shadow-2xs',
+	L: 'text-blue-700 dark:text-blue-300 bg-blue-100/90 dark:bg-blue-950/80 border border-blue-300/80 dark:border-blue-700/80 shadow-2xs',
+	H: 'text-purple-700 dark:text-purple-300 bg-purple-100/90 dark:bg-purple-950/80 border border-purple-300/80 dark:border-purple-700/80 shadow-2xs',
+	WO: 'text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700',
+	WFH: 'text-teal-700 dark:text-teal-300 bg-teal-100/90 dark:bg-teal-950/80 border border-teal-300/80 dark:border-teal-700/80 shadow-2xs',
+};
+const DEFAULT_BADGE_CLASS = 'text-gray-400 dark:text-white/20 font-normal';
+
 const getDayBadgeClass = (status) => {
-	const s = String(status || '').toUpperCase().trim();
-	switch (s) {
-		case 'P':
-			return 'text-emerald-700 dark:text-emerald-300 bg-emerald-100/90 dark:bg-emerald-950/80 border border-emerald-300/80 dark:border-emerald-700/80 shadow-2xs';
-		case 'A':
-			return 'text-rose-700 dark:text-rose-300 bg-rose-100/90 dark:bg-rose-950/80 border border-rose-300/80 dark:border-rose-700/80 shadow-2xs';
-		case 'HD':
-		case 'HD/P':
-		case 'HD/A':
-			return 'text-amber-700 dark:text-amber-300 bg-amber-100/90 dark:bg-amber-950/80 border border-amber-300/80 dark:border-amber-700/80 shadow-2xs';
-		case 'L':
-			return 'text-blue-700 dark:text-blue-300 bg-blue-100/90 dark:bg-blue-950/80 border border-blue-300/80 dark:border-blue-700/80 shadow-2xs';
-		case 'H':
-			return 'text-purple-700 dark:text-purple-300 bg-purple-100/90 dark:bg-purple-950/80 border border-purple-300/80 dark:border-purple-700/80 shadow-2xs';
-		case 'WO':
-			return 'text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700';
-		case 'WFH':
-			return 'text-teal-700 dark:text-teal-300 bg-teal-100/90 dark:bg-teal-950/80 border border-teal-300/80 dark:border-teal-700/80 shadow-2xs';
-		default:
-			return 'text-gray-400 dark:text-white/20 font-normal';
-	}
+	if (!status) return DEFAULT_BADGE_CLASS;
+	return STATUS_BADGE_CLASSES[status] || DEFAULT_BADGE_CLASS;
 };
 
 watch(
@@ -413,8 +497,10 @@ async function fetchReportData() {
 			const result = json.message || {};
 			if (result.columns) columns.value = result.columns;
 			reportData.value = result.data || [];
+			pg.page = 1;
 		} else {
 			reportData.value = [];
+			pg.page = 1;
 		}
 	} catch (e) {
 		console.error('Error fetching report data', e);
@@ -464,7 +550,7 @@ const exportPDF = () => {
 	params.set('pdf', '1');
 
 	const url = `/api/method/arijentek_core.api.attendance.report_mark_attendance_list?${params.toString()}`;
-	window.open(url, '_blank');
+	exportReportPdf({ title: 'Monthly Attendance Sheet', url });
 };
 </script>
 

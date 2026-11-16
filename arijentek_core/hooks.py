@@ -93,6 +93,7 @@ after_install = [
 	"arijentek_core.api.overtime_type.create_standard_overtime_type",
 	"arijentek_core.api.expense_type.update_standard_expense_types",
 	"arijentek_core.api.overtime_slip_perm.setup_overtime_slip_permission",
+	"arijentek_core.api.payroll_account.setup_payroll_payable_account",
 ]
 after_migrate = [
 	"arijentek_core.custom_fields.setup_custom_fields",
@@ -100,6 +101,7 @@ after_migrate = [
 	"arijentek_core.api.overtime_type.create_standard_overtime_type",
 	"arijentek_core.api.expense_type.update_standard_expense_types",
 	"arijentek_core.api.overtime_slip_perm.setup_overtime_slip_permission",
+	"arijentek_core.api.payroll_account.setup_payroll_payable_account",
 ]
 
 # Uninstallation

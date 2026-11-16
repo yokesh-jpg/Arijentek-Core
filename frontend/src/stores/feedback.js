@@ -28,7 +28,7 @@ export const useFeedbackStore = defineStore('feedback', () => {
 
 	const DURATION = { success: 4500, error: 8000, warning: 6000, info: 5000 }
 
-	function show(type, message, title = '') {
+	function show(type, message, title = '', action = null) {
 		const id = ++nextId
 		let finalTitle = title
 		let finalMessage = message
@@ -42,15 +42,30 @@ export const useFeedbackStore = defineStore('feedback', () => {
 			finalMessage = typeof message === 'string' ? message : message?.message || JSON.stringify(message)
 		}
 
-		toasts.value.unshift({ id, type, title: finalTitle, message: finalMessage })
+		toasts.value.unshift({ id, type, title: finalTitle, message: finalMessage, action })
 		if (toasts.value.length > 3) toasts.value.pop()
-		setTimeout(() => dismiss(id), DURATION[type] || 5000)
+		if (type !== 'loading') {
+			setTimeout(() => dismiss(id), action ? 8000 : (DURATION[type] || 5000))
+		}
 		return id
+	}
+
+	function update(id, { type, message, title, action } = {}) {
+		const t = toasts.value.find((item) => item.id === id)
+		if (t) {
+			if (type !== undefined) t.type = type
+			if (message !== undefined) t.message = message
+			if (title !== undefined) t.title = title
+			if (action !== undefined) t.action = action
+			if (type !== 'loading') {
+				setTimeout(() => dismiss(id), action ? 8000 : (DURATION[type] || 5000))
+			}
+		}
 	}
 
 	function dismiss(id) {
 		toasts.value = toasts.value.filter((t) => t.id !== id)
 	}
 
-	return { confirmState, confirm, _resolveConfirm, toasts, show, dismiss }
+	return { confirmState, confirm, _resolveConfirm, toasts, show, update, dismiss }
 })

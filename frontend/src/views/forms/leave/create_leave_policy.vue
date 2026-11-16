@@ -116,7 +116,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { Dialog, call } from 'frappe-ui';
 import { getErrorMessage } from '../../../utils.js';
 import { useLeaveStore } from '../../../stores/leave';
@@ -126,6 +126,12 @@ import CreateLeaveTypes from './create_leave_types.vue';
 const leaveStore = useLeaveStore();
 
 const showCreateLeaveTypeModal = ref(false);
+
+onMounted(async () => {
+	if (!leaveStore.allLeaveTypesList?.length) {
+		await leaveStore.fetchAllLeaveTypes();
+	}
+});
 
 const onLeaveTypeSaved = async (savedData) => {
 	await leaveStore.fetchAllLeaveTypes();
@@ -176,6 +182,9 @@ watch(show, async (newVal) => {
 		formData.value = getInitialFormData();
 		errors.value = {};
 		submitError.value = '';
+		if (!leaveStore.allLeaveTypesList?.length) {
+			await leaveStore.fetchAllLeaveTypes();
+		}
 		if (props.editId) {
 			await fetchLeavePolicyDetails();
 		}

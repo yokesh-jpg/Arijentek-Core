@@ -1,5 +1,5 @@
 <template>
-  <Dialog :options="{ size: '3xl' }" v-model="show">
+  <Dialog :options="{ size: '3xl' }" v-model="show" @close="show = false">
     <template #body>
       <div class="modal-panel">
         <!-- Custom Header -->
@@ -108,13 +108,13 @@
   </Dialog>
 
   <!-- Role Permissions Popup -->
-  <ViewRoles v-model="showRoleView" :roleName="selectedRole" />
+  <ViewRoles v-if="showRoleView" v-model="showRoleView" :roleName="selectedRole" />
 </template>
 
 <script setup>
 import { ref, watch, computed } from 'vue';
 import ViewRoles from '@/views/page_views/teams/view_roles.vue';
-import { Dialog, createResource } from 'frappe-ui';
+import { Dialog, call } from 'frappe-ui';
 import { useTeamStore } from '../../../stores/team.js';
 
 const teamStore = useTeamStore();
@@ -162,19 +162,10 @@ async function fetchDetails() {
 	error.value = '';
 	
 	try {
-		const res = createResource({
-			url: 'arijentek_core.api.teams_permissons.get_users_details',
-			auto: false
-		});
-		
-		const data = await res.fetch({ user_id: props.userId });
-		if (res.error) {
-			throw new Error(res.error.message || 'Failed to fetch user details');
-		}
-		
+		const data = await call('arijentek_core.api.teams_permissons.get_users_details', { user_id: props.userId });
 		details.value = data;
 	} catch (err) {
-		error.value = err.message || 'An error occurred while fetching details';
+		error.value = err?.message || 'An error occurred while fetching details';
 	} finally {
 		loading.value = false;
 	}

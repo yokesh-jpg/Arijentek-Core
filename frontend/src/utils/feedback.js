@@ -39,13 +39,16 @@ export function notify(message, type) {
 }
 
 export const toast = {
-	success: (m, title) => store()?.show('success', m, title),
-	error: (m, title) => {
+	loading: (m, title) => store()?.show('loading', m, title),
+	success: (m, title, action) => store()?.show('success', m, title, action),
+	error: (m, title, action) => {
 		const safe = sanitizeError(m, title)
-		return store()?.show('error', safe.message, safe.title)
+		return store()?.show('error', safe.message, safe.title, action)
 	},
-	warning: (m, title) => store()?.show('warning', m, title),
-	info: (m, title) => store()?.show('info', m, title),
+	warning: (m, title, action) => store()?.show('warning', m, title, action),
+	info: (m, title, action) => store()?.show('info', m, title, action),
+	update: (id, opts) => store()?.update(id, opts),
+	dismiss: (id) => store()?.dismiss(id),
 }
 
 /* confirm() returned a boolean synchronously; this returns a Promise of one,

@@ -184,7 +184,8 @@ onMounted(async () => {
 	const employeeId = employeeStore.employee?.name
 	if (employeeId) {
 		leaveStore.init(employeeId)
+	} else {
+		await leaveStore.checkApproverStatus()
 	}
-	await leaveStore.checkApproverStatus()
 })
 </script>

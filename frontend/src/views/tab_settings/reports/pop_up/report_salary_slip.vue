@@ -40,6 +40,7 @@ import SearchableDropdown from '../../../../components/SearchableDropdown.vue';
 import SelectField from '../../../../components/SelectField.vue'
 import ReportDialog from '@/components/ReportDialog.vue';
 import ReportTable from '@/components/ReportTable.vue';
+import { exportReportPdf } from '@/utils/reportExport.js';
 
 const props = defineProps({
 	show: {
@@ -165,7 +166,7 @@ const resetFilters = () => {
 
 const downloadRowPayslip = (slipName) => {
 	const url = `/api/method/arijentek_core.api.payroll.report_salary_slip_list?slip_name=${encodeURIComponent(slipName)}&pdf=1`;
-	window.open(url, '_blank');
+	exportReportPdf({ title: `Payslip - ${slipName}`, url });
 };
 
 const exportPDF = () => {
@@ -177,7 +178,7 @@ const exportPDF = () => {
 	params.set('pdf', '1');
 
 	const url = `/api/method/arijentek_core.api.payroll.report_salary_slip_list?${params.toString()}`;
-	window.open(url, '_blank');
+	exportReportPdf({ title: 'Salary Slip Summary Report', url });
 };
 
 const formatCurrency = (val) => {

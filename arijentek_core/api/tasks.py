@@ -69,6 +69,7 @@ def get_personal_todos(status: str | None = None, user_filter: str | None = None
 	return [
 		{
 			"id": todo.name,
+			"name": todo.name,
 			"description": todo.description,
 			"date": str(todo.date) if todo.date else None,
 			"creation_date": str(todo.creation.date()) if todo.creation else None,
@@ -683,6 +684,7 @@ def get_todo(name: str):
 
 	return {
 		"id": todo.name,
+		"name": todo.name,
 		"description": todo.description,
 		"date": str(todo.date) if todo.date else None,
 		"creation_date": str(todo.creation.date()) if todo.creation else None,

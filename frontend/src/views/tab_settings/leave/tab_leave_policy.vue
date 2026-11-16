@@ -190,5 +190,8 @@ watch(searchQuery, () => {
 
 onMounted(() => {
 	pager.fetchPage()
+	if (!leaveStore.allLeaveTypesList?.length) {
+		leaveStore.fetchAllLeaveTypes()
+	}
 })
 </script>

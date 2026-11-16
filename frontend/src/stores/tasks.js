@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { createResource } from "frappe-ui";
 import { ref, computed } from "vue";
+import { fetchPortalPermissionsCached } from "./auth";
 
 export const useTasksStore = defineStore("tasks", () => {
 	const todos = ref([]);
@@ -160,13 +161,8 @@ export const useTasksStore = defineStore("tasks", () => {
 	async function loadPermissions(consolidatedPerms = null) {
 		let perms = consolidatedPerms;
 		if (!perms) {
-			try {
-				const res = await fetch("/api/method/arijentek_core.api.dashboard.get_all_portal_permissions");
-				const json = await res.json();
-				perms = json.message?.tasks;
-			} catch (err) {
-				console.error("Failed to load tasks permissions:", err);
-			}
+			const json = await fetchPortalPermissionsCached("arijentek_core");
+			perms = json?.tasks;
 		}
 		if (perms) {
 			permissions.value.can_read = !!perms.can_read_todo;

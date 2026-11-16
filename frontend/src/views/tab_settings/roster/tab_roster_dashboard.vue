@@ -677,16 +677,28 @@ const isMouseDown = ref(false);
 let startX = 0;
 let scrollLeft = 0;
 
-// Server-side pagination for shift requests
+// Server-side pagination for shift requests with in-flight deduplication
+let inFlightShiftRequests = null;
 async function fetchShiftRequestsPage(page, pageSize) {
-  const res = await call('arijentek_core.api.roster.get_shift_requests_list', {
-    page,
-    page_size: pageSize,
-    status: filterStatus.value || undefined,
-    employee: filterEmployee.value || undefined,
-    order_by: orderParam.value,
-  });
-  return { rows: res.data || [], total: Number(res.total) || 0 };
+  if (inFlightShiftRequests) return inFlightShiftRequests;
+  inFlightShiftRequests = (async () => {
+    try {
+      const res = await call('arijentek_core.api.roster.get_shift_requests_list', {
+        page,
+        page_size: pageSize,
+        status: filterStatus.value || undefined,
+        employee: filterEmployee.value || undefined,
+        order_by: orderParam.value,
+      });
+      return { rows: res.data || [], total: Number(res.total) || 0 };
+    } catch (e) {
+      console.warn('Failed to load shift requests:', e);
+      return { rows: [], total: 0 };
+    } finally {
+      setTimeout(() => { inFlightShiftRequests = null; }, 500);
+    }
+  })();
+  return inFlightShiftRequests;
 }
 
 const pager = useServerPager((page, size) => fetchShiftRequestsPage(page, size), { size: 10 });
