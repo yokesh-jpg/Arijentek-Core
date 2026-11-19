@@ -9,6 +9,8 @@ import frappe
 from frappe import _
 from frappe.utils import flt, get_first_day, get_last_day, today
 
+from arijentek_core.api.common_functions import get_default_company
+
 
 @frappe.whitelist()
 def get_expense_claims(
@@ -1005,11 +1007,12 @@ def get_expense_claim(
 	# the full filtered set (COUNT and SUM), so they are not affected
 	# by which page is being returned.
 	if page_size > 0:
-		total = frappe.db.sql(
+		total_res = frappe.db.sql(
 			"SELECT COUNT(*) AS count FROM `tabExpense Claim` WHERE {}".format(where_clause),
 			params,
 			as_dict=True,
-		)[0].count
+		)
+		total = total_res[0].count if total_res and total_res[0] else 0
 
 		stats = frappe.db.sql(
 			"""
@@ -1087,6 +1090,7 @@ def get_expense_claim(
 
 	return claims
 
+
 @frappe.whitelist()
 def get_expense_types(name=None, page: int = 1, page_size: int = 0):
 	"""
@@ -1113,12 +1117,14 @@ def get_expense_types(name=None, page: int = 1, page_size: int = 0):
 		limit_start=(max(1, page) - 1) * page_size if page_size > 0 else 0,
 	)
 
-	company = frappe.defaults.get_user_default("Company")
-	if not company:
-		company = frappe.get_all("Company", limit=1)[0].name
+	company = get_default_company()
 
 	for t in types:
-		account = frappe.db.get_value("Expense Claim Account", {"parent": t.name, "company": company}, "default_account")
+		account = (
+			frappe.db.get_value("Expense Claim Account", {"parent": t.name, "company": company}, "default_account")
+			if company
+			else None
+		)
 		t["default_account"] = account
 
 	if page_size > 0:
@@ -1158,9 +1164,9 @@ def save_expense_type(name, description=None, default_account=None, original_nam
 	doc.description = description
 
 	if default_account:
-		company = frappe.defaults.get_user_default("Company")
+		company = get_default_company()
 		if not company:
-			company = frappe.get_all("Company", limit=1)[0].name
+			frappe.throw(_("A Company must be configured before setting a default expense account."))
 
 		doc.set("accounts", [])
 		doc.append("accounts", {
@@ -1189,14 +1195,14 @@ def delete_expense_type(name):
 def get_default_expense_accounts():
 	"""
 	Get list of expense accounts for expense claim types.
-	Filters: is_group = 0, root_type = "Expense", company = "Zevar Core"
+	Filters: is_group = 0, root_type = "Expense", company = <resolved company>
 	"""
 	if frappe.session.user == "Guest":
 		frappe.throw("Not permitted")
 
-	company = frappe.defaults.get_user_default("Company")
+	company = get_default_company()
 	if not company:
-		company = frappe.get_all("Company", limit=1)[0].name
+		return []
 
 	return frappe.get_all(
 		"Account",

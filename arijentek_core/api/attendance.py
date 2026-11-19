@@ -1257,6 +1257,11 @@ def get_attendance_history(employee_id: str | None = None, month=None, year=None
 			params.append(override_employee_id)
 	else:
 		# override_employee_id is None: if employee_id is specified (e.g. self dashboard query)
+		if not employee_id:
+			if page_size > 0:
+				return {"data": [], "total": 0, "page": page, "page_size": page_size, "summary": {"Present": 0, "Absent": 0, "Half Day": 0, "On Leave": 0}}
+			return {"records": [], "summary": {"Present": 0, "Absent": 0, "Half Day": 0, "On Leave": 0}}
+
 		if employee_id not in permitted_employees:
 			frappe.throw(_("Not permitted to view attendance for this employee"), frappe.PermissionError)
 		filters.append("employee = %s")
@@ -1289,11 +1294,12 @@ def get_attendance_history(employee_id: str | None = None, month=None, year=None
 	# the full filtered set (COUNT and GROUP BY), so they are not affected
 	# by which page is being returned.
 	if page_size > 0:
-		total = frappe.db.sql(
+		total_res = frappe.db.sql(
 			"SELECT COUNT(*) AS count FROM `tabAttendance` WHERE {}".format(where_clause),
 			params,
 			as_dict=True,
-		)[0].count
+		)
+		total = total_res[0].count if total_res and total_res[0] else 0
 
 		summary = {"Present": 0, "Absent": 0, "Half Day": 0, "On Leave": 0}
 		for row in frappe.db.sql(
@@ -2283,6 +2289,9 @@ def get_employee_checkins(
 		if not employee_id:
 			employee_id = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
 		if not employee_id:
+			roles = frappe.get_roles(frappe.session.user)
+			if frappe.session.user == "Administrator" or "System Manager" in roles or "HR Manager" in roles:
+				return {"records": [], "total": 0, "page": page, "page_size": page_size} if page_size > 0 else []
 			frappe.throw(_("No employee record found for current user"))
 		if employee_id not in permitted_employees:
 			frappe.throw(_("Not permitted to view check-ins for this employee"), frappe.PermissionError)

@@ -353,15 +353,19 @@ const filterMatrixDept     = ref('');
 const filterMatrixEmployee = ref('');
 const filterMatrixDesig    = ref('');
 
-watch([selectedMonthKeyAssignment, filterMatrixDept, filterMatrixDesig, filterMatrixEmployee], async () => {
-  if (selectedMonthKeyAssignment.value) {
-    const [year, month] = selectedMonthKeyAssignment.value.split('-');
-    await rosterStore.fetchShiftMatrix(month, year, filterMatrixDept.value, filterMatrixDesig.value, filterMatrixEmployee.value);
-    if (showListView.value) {
-      if (pager.state.page !== 1) pager.state.page = 1;
-      else pager.fetchPage();
+let filterDebounceTimer = null;
+watch([selectedMonthKeyAssignment, filterMatrixDept, filterMatrixDesig, filterMatrixEmployee], () => {
+  if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+  filterDebounceTimer = setTimeout(async () => {
+    if (selectedMonthKeyAssignment.value) {
+      const [year, month] = selectedMonthKeyAssignment.value.split('-');
+      await rosterStore.fetchShiftMatrix(month, year, filterMatrixDept.value, filterMatrixDesig.value, filterMatrixEmployee.value);
+      if (showListView.value) {
+        if (pager.state.page !== 1) pager.state.page = 1;
+        else pager.fetchPage();
+      }
     }
-  }
+  }, 150);
 });
 
 // Matrix drag-to-scroll

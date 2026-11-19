@@ -450,7 +450,8 @@ def get_leave_applications_for_all(
 	total = 0
 	if page_size > 0:
 		count_query = f"SELECT COUNT(*) FROM `tabLeave Application` la WHERE {where_clause}"
-		total = frappe.db.sql(count_query, tuple(params))[0][0]
+		total_res = frappe.db.sql(count_query, tuple(params))
+		total = total_res[0][0] if total_res and total_res[0] else 0
 
 	limit_clause = ""
 	query_params = list(params)
@@ -1642,27 +1643,23 @@ def validate_delete_approved_entry(name: str) -> dict:
 			if doc.half_day:
 				date_difference -= 0.5
 
-			allocated = (
-				frappe.db.sql(
-					"""
+			alloc_res = frappe.db.sql(
+				"""
 				SELECT SUM(total_leaves_allocated) FROM `tabLeave Allocation`
 				WHERE employee = %s AND leave_type = %s AND docstatus = 1
 			""",
-					(doc.employee, doc.leave_type),
-				)[0][0]
-				or 0
+				(doc.employee, doc.leave_type),
 			)
+			allocated = (alloc_res[0][0] if alloc_res and alloc_res[0] else 0) or 0
 
-			used = (
-				frappe.db.sql(
-					"""
+			used_res = frappe.db.sql(
+				"""
 				SELECT SUM(total_leave_days) FROM `tabLeave Application`
 				WHERE employee = %s AND leave_type = %s AND docstatus = 1
 			""",
-					(doc.employee, doc.leave_type),
-				)[0][0]
-				or 0
+				(doc.employee, doc.leave_type),
 			)
+			used = (used_res[0][0] if used_res and used_res[0] else 0) or 0
 
 			if (allocated - date_difference) < used:
 				return {
@@ -3303,10 +3300,11 @@ def report_leave_allocation_balance_list(from_date=None, to_date=None, employee=
 			  AND from_date >= %s
 			  AND to_date <= %s
 		"""
-		leaves_taken = frappe.db.sql(
+		leaves_res = frappe.db.sql(
 			app_query,
 			(alloc.employee, alloc.leave_type, alloc.from_date, alloc.to_date)
-		)[0][0] or 0.0
+		)
+		leaves_taken = (leaves_res[0][0] if leaves_res and leaves_res[0] else 0.0) or 0.0
 
 		allocated = float(alloc.total_leaves_allocated or 0.0)
 		taken = float(leaves_taken)

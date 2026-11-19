@@ -8,6 +8,8 @@ from contextlib import contextmanager
 from frappe import _
 from frappe.utils import cint
 
+from arijentek_core.api.common_functions import get_default_company
+
 
 @frappe.whitelist()
 def generate_my_payslip(month: int | None = None, year: int | None = None):
@@ -1079,7 +1081,7 @@ def get_salary_structure_options():
 	if not can_read_salary_structure():
 		frappe.throw(_("You do not have permission to read Salary Structures"), frappe.PermissionError)
 
-	default_company = frappe.defaults.get_user_default("Company") or frappe.db.get_single_value("Global Defaults", "default_company")
+	default_company = get_default_company()
 	default_company_doc = None
 	if default_company:
 		default_company_doc = frappe.db.get_value("Company", default_company, ["name", "company_name", "default_currency"], as_dict=True)
@@ -1365,7 +1367,7 @@ def get_salary_structure_assignment_options():
 	if not can_read_salary_structure_assignment():
 		return {}
 
-	default_company = frappe.db.get_single_value("Global Defaults", "default_company") or frappe.defaults.get_user_default("Company")
+	default_company = get_default_company()
 
 	return {
 		"employees": get_active_employees(),
@@ -2141,14 +2143,15 @@ def get_employee_salary_slip_details(employee: str, start_date: str, end_date: s
 	# Fetch gross year to date (USD)
 	# Sum of gross_pay of all submitted Salary Slips for the employee in the current calendar year (based on end_date)
 	year = getdate(end_date).year
-	gross_year_to_date = frappe.db.sql("""
+	gross_res = frappe.db.sql("""
 		SELECT SUM(gross_pay)
 		FROM `tabSalary Slip`
 		WHERE employee = %s
 			AND docstatus = 1
 			AND start_date >= %s
 			AND end_date <= %s
-	""", (employee, f"{year}-01-01", f"{year}-12-31"))[0][0] or 0.0
+	""", (employee, f"{year}-01-01", f"{year}-12-31"))
+	gross_year_to_date = (gross_res[0][0] if gross_res and gross_res[0] else 0.0) or 0.0
 
 	# Fetch Timesheets (docstatus = 1, not billed or status not billed)
 	# Check if any timesheet exists in date range
@@ -2215,7 +2218,9 @@ def get_employee_salary_slip_details(employee: str, start_date: str, end_date: s
 		"timesheets": timesheets,
 		"hour_rate": hour_rate,
 		"timesheet_salary_component": timesheet_salary_component,
-		"salary_slip_based_on_timesheet": salary_slip_based_on_timesheet
+		"salary_slip_based_on_timesheet": salary_slip_based_on_timesheet,
+		"salary_structure": salary_structure or "",
+		"has_salary_structure": bool(salary_structure)
 	}
 
 
@@ -2272,8 +2277,22 @@ def save_salary_slip(doc):
 	if not ss.salary_structure:
 		ss.salary_structure = frappe.db.get_value(
 			"Salary Structure Assignment",
+			{"employee": ss.employee, "from_date": ["<=", ss.end_date or frappe.utils.nowdate()], "docstatus": 1},
+			"salary_structure",
+			order_by="from_date desc",
+		) or frappe.db.get_value(
+			"Salary Structure Assignment",
 			{"employee": ss.employee, "docstatus": 1},
-			"salary_structure"
+			"salary_structure",
+			order_by="from_date desc",
+		)
+
+	# Validate before save: if employee has no salary structure and no earnings or deductions are provided,
+	# prevent unhandled 417 expectation failed by validating upfront with a clear message
+	if not ss.salary_structure and not ss.get("earnings") and not ss.get("deductions"):
+		frappe.throw(
+			_("No active Salary Structure found for employee {0} for the given dates. Please assign a Salary Structure or add salary components first.").format(ss.employee),
+			frappe.ValidationError
 		)
 
 	# Handle earnings table
@@ -2831,7 +2850,12 @@ def can_read_overtime_type():
 	"""
 	if _is_payroll_admin():
 		return True
-	return bool(frappe.has_permission("Overtime Type", "read"))
+	if frappe.has_permission("Overtime Type", "read"):
+		return True
+	roles = frappe.get_roles(frappe.session.user)
+	if "Employee" in roles or "HR User" in roles or frappe.has_permission("Overtime Slip", "read") or frappe.has_permission("Overtime Slip", "create"):
+		return True
+	return False
 
 
 @frappe.whitelist()

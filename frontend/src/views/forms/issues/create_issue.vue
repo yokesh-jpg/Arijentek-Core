@@ -116,13 +116,15 @@
 							</div>
 
 							<div class="sm:col-span-2">
-								<label class="field-label">What happened</label>
+								<label class="field-label">What happened <span class="text-red-600 dark:text-red-400">*</span></label>
 								<textarea
 									v-model="formData.description"
 									rows="4"
 									placeholder="When, where, who was there, and what the effect was"
 									class="field-input"
+									:class="{ '!border-red-500/60': errors.description }"
 								></textarea>
+								<p v-if="errors.description" class="field-error">{{ errors.description }}</p>
 							</div>
 						</div>
 					</div>
@@ -394,6 +396,10 @@ function validate() {
   }
   if (!formData.value.grievance_type) {
     errors.value.grievance_type = 'Issue Type is required';
+    isValid = false;
+  }
+  if (!formData.value.description?.trim()) {
+    errors.value.description = 'Please describe what happened';
     isValid = false;
   }
 

@@ -15,6 +15,7 @@
     <script>
         window.csrf_token = "{{ frappe.session.csrf_token }}";
         window.frappe_user = "{{ frappe.session.user }}";
+        window.site_name = "{{ frappe.local.site }}";
 
         // URL Normalization: Immediately strip trailing slashes and migrate legacy hash routes
         // so browser URL stays cleanly as /employee-portal (just like /pos)
