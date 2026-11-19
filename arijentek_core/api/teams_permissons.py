@@ -986,17 +986,24 @@ def create_department(department_data):
 	if isinstance(department_data, str):
 		department_data = frappe.parse_json(department_data)
 
+	dept_name = (department_data.get("department_name") or "").strip()
+	if not dept_name:
+		frappe.throw(_("Department name is required"), frappe.ValidationError)
+
 	is_new = not department_data.get("name")
 	if is_new:
 		if not can_create_department():
 			frappe.throw("Not permitted to create Department", frappe.PermissionError)
+		existing = frappe.db.get_value("Department", {"department_name": dept_name}, "name")
+		if existing:
+			frappe.throw(_("Department '{0}' already exists.").format(dept_name), frappe.DuplicateEntryError)
 	else:
 		if not can_edit_department():
 			frappe.throw("Not permitted to edit Department", frappe.PermissionError)
 
 	doc_fields = {
 		"doctype": "Department",
-		"department_name": department_data.get("department_name")
+		"department_name": dept_name
 	}
 
 	if is_new:

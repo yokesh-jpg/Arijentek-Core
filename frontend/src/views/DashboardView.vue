@@ -717,20 +717,6 @@ onMounted(async () => {
 	}
 
 	// Real-time synchronization: listen for attendance updates
-	try {
-		socket = initSocket()
-		if (socket) {
-			socket.on('attendance_updated', () => {
-				queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-				if (employeeStore.employee?.name) {
-					attendance.fetchTodayStatus(employeeStore.employee.name)
-				}
-			})
-		}
-	} catch (e) {
-		console.warn('Socket connection not initialized:', e)
-	}
-
 	if (window.frappe?.realtime) {
 		window.frappe.realtime.on('attendance_updated', () => {
 			queryClient.invalidateQueries({ queryKey: ['dashboard'] })
@@ -738,6 +724,23 @@ onMounted(async () => {
 				attendance.fetchTodayStatus(employeeStore.employee.name)
 			}
 		})
+	} else if (window.site_name) {
+		try {
+			socket = initSocket({ transports: ['websocket', 'polling'], reconnectionAttempts: 3 })
+			if (socket) {
+				socket.on('attendance_updated', () => {
+					queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+					if (employeeStore.employee?.name) {
+						attendance.fetchTodayStatus(employeeStore.employee.name)
+					}
+				})
+				socket.on('connect_error', () => {
+					// Fallback gracefully without noisy unhandled console errors
+				})
+			}
+		} catch (e) {
+			console.warn('Socket connection not initialized:', e)
+		}
 	}
 })
 

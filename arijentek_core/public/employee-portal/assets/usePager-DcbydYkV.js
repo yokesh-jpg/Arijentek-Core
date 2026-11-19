@@ -1,1 +1,0 @@
-import{q as u,N as c,z as s,u as l}from"./index-BjvNv7G8.js";function p(n,e=10){const o=s(()=>l(n())||[]),t=c({page:1,size:e,total:s(()=>o.value.length),rows:s(()=>{const a=Number(t.size)||e,r=(t.page-1)*a;return o.value.slice(r,r+a)})});return u(()=>[t.total,t.size],()=>{const a=Math.max(1,Math.ceil(t.total/(Number(t.size)||e)));t.page>a&&(t.page=a)}),t}export{p as u};

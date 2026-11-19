@@ -17,7 +17,7 @@
         <div class="flex flex-col gap-4">
           <div class="flex flex-col gap-1.5">
             <label class="field-label">Department name <span class="text-red-500 dark:text-red-400">*</span></label>
-            <input v-model="formData.department_name" type="text" class="field-input">
+            <input v-model="formData.department_name" type="text" class="field-input" :class="{ '!border-red-500/60': errors.department_name }">
             <p v-if="errors.department_name" class="field-error">{{ errors.department_name }}</p>
           </div>
           
@@ -141,9 +141,22 @@ const validate = () => {
   errors.value = {};
   let isValid = true;
 
-  if (!formData.value.department_name) {
+  const trimmedName = (formData.value.department_name || '').trim();
+  if (!trimmedName) {
     errors.value.department_name = 'Department Name is mandatory';
     isValid = false;
+  } else if (!props.editId && teamStore.departmentsResource?.data) {
+    const list = Array.isArray(teamStore.departmentsResource.data) ? teamStore.departmentsResource.data : [];
+    const lower = trimmedName.toLowerCase();
+    const exists = list.some(d => {
+      const dName = (d.department_name || '').toLowerCase();
+      const dId = (d.name || '').toLowerCase();
+      return dName === lower || dId === lower || dId.startsWith(`${lower} -`);
+    });
+    if (exists) {
+      errors.value.department_name = `A department named "${trimmedName}" already exists`;
+      isValid = false;
+    }
   }
 
   return isValid;
@@ -153,12 +166,18 @@ const handleSave = async () => {
   submitError.value = '';
   if (validate()) {
     submitting.value = true;
+    const trimmedName = (formData.value.department_name || '').trim();
     try {
       await call('arijentek_core.api.teams_permissons.create_department', { department_data: formData.value });
       emit('save', formData.value);
       show.value = false;
     } catch (err) {
-      submitError.value = getErrorMessage(err, 'Failed to create department');
+      const errMsg = getErrorMessage(err, 'Failed to create department');
+      if (errMsg.toLowerCase().includes('already exists') || err.httpStatus === 409 || err.status_code === 409) {
+        errors.value.department_name = `Department "${trimmedName}" already exists. Please choose a different name.`;
+      } else {
+        submitError.value = errMsg;
+      }
     } finally {
       submitting.value = false;
     }

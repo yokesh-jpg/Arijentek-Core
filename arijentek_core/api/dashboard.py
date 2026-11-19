@@ -1,6 +1,8 @@
 import frappe
 from frappe.utils import flt
 
+from arijentek_core.api.common_functions import get_default_company
+
 def _warehouse_scope(warehouse):
 	return [warehouse] if warehouse else []
 from arijentek_core.services.store_registry import get_store_registry
@@ -567,7 +569,7 @@ def get_company_details():
 	if user and user != "Guest":
 		company = frappe.db.get_value("Employee", {"user_id": user, "status": "Active"}, "company")
 	if not company:
-		company = frappe.defaults.get_user_default("Company") or frappe.db.get_single_value("Global Defaults", "default_company")
+		company = get_default_company()
 
 	company_doc = {}
 	if company:

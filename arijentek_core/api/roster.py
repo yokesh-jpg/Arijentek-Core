@@ -10,6 +10,7 @@ from frappe import _
 from frappe.utils import add_days, getdate, time_diff_in_hours
 
 from arijentek_core.api.attendance import calculate_completed_shift_hours, calculate_hours, get_employee_roster
+from arijentek_core.api.common_functions import get_default_company
 
 
 @frappe.whitelist()
@@ -796,6 +797,24 @@ def get_weekly_roster(employee_id: str | None = None, start_date: str | None = N
 		employee_id = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
 
 	if not employee_id:
+		roles = frappe.get_roles(frappe.session.user)
+		if frappe.session.user == "Administrator" or "System Manager" in roles or "HR Manager" in roles:
+			today = getdate()
+			week_start = getdate(start_date) if start_date else (today - timedelta(days=today.weekday()))
+			week_end = add_days(week_start, 6)
+			return {
+				"employee_id": None,
+				"week_start": str(week_start),
+				"week_end": str(week_end),
+				"schedule": [],
+				"roster": {},
+				"notes": [],
+				"summary": {
+					"total_working_days": 0,
+					"total_hours": 0,
+					"target_hours": 0,
+				},
+			}
 		frappe.throw(_("No employee record found for current user"))
 
 	_ensure_roster_visibility(employee_id)
@@ -1005,6 +1024,22 @@ def get_monthly_roster(employee_id: str | None = None, year: int | str | None = 
 		employee_id = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
 
 	if not employee_id:
+		roles = frappe.get_roles(frappe.session.user)
+		if frappe.session.user == "Administrator" or "System Manager" in roles or "HR Manager" in roles:
+			today = date.today()
+			y = int(year) if year else today.year
+			m = int(month) if month else today.month
+			return {
+				"employee_id": None,
+				"year": y,
+				"month": m,
+				"calendar": [],
+				"summary": {
+					"total_working_days": 0,
+					"total_hours": 0.0,
+					"target_hours": 0.0,
+				},
+			}
 		frappe.throw(_("No employee record found for current user"))
 
 	_ensure_roster_visibility(employee_id)
@@ -1352,7 +1387,7 @@ def add_roster(
 			doc.cancel()
 		frappe.delete_doc("Shift Assignment", assignment_name, ignore_permissions=True)
 
-	company = frappe.db.get_single_value("Global Defaults", "default_company") or frappe.get_value("Employee", employee, "company")
+	company = (employee and frappe.get_value("Employee", employee, "company")) or get_default_company()
 
 	# --- Scheduled (recurring) shift assignment ---
 	if cint(schedule_enabled) and repeat_on_days and frequency:
@@ -1731,10 +1766,11 @@ def get_shift_assignment_list(month=None, year=None, department=None, designatio
 			return {"assignments": [], "total": 0, "page": int(page), "page_size": int(page_size)}
 
 	# Get total count
-	total = frappe.db.sql(f"""
+	total_res = frappe.db.sql(f"""
 		SELECT COUNT(*) as count FROM `tabShift Assignment` sa
 		WHERE {base_conditions}
-	""", params, as_dict=True)[0].count
+	""", params, as_dict=True)
+	total = total_res[0].count if total_res and total_res[0] else 0
 
 	# Add pagination. Sort first: order_by is client input going into raw
 	# SQL, so only whitelisted column/direction pairs are honoured; anything
@@ -1906,8 +1942,21 @@ def get_shift_matrix(month, year, department=None, designation=None, employee=No
 			"name": att.name
 		}
 
+	# Precompute days array for the month
+	from datetime import timedelta
+	days_arr = []
+	curr = start_date
+	one_day = timedelta(days=1)
+	while curr <= end_date:
+		days_arr.append({
+			"date": str(curr),
+			"day_num": curr.day,
+			"day_short": curr.strftime("%a")
+		})
+		curr += one_day
+
 	# Structure shift assignments by employee and date
-	from frappe.utils import add_days, getdate
+	from frappe.utils import getdate
 
 	emp_dict = {e.name: {"name": e.name, "employee_name": e.employee_name, "department": e.department, "designation": e.designation, "shifts": {}} for e in employees}
 
@@ -1934,10 +1983,11 @@ def get_shift_matrix(month, year, department=None, designation=None, employee=No
 			att_status = att_data.get("status") if att_data else None
 			att_name = att_data.get("name") if att_data else None
 
-			if d_str not in emp_dict[sa.employee]["shifts"]:
-				emp_dict[sa.employee]["shifts"][d_str] = []
+			shifts_for_emp = emp_dict[sa.employee]["shifts"]
+			if d_str not in shifts_for_emp:
+				shifts_for_emp[d_str] = []
 
-			emp_dict[sa.employee]["shifts"][d_str].append({
+			shifts_for_emp[d_str].append({
 				"name": sa.name,
 				"shift_assignment": sa.name,
 				"shift_type": sa.shift_type,
@@ -1950,18 +2000,7 @@ def get_shift_matrix(month, year, department=None, designation=None, employee=No
 				"attendance": att_status,
 				"attendance_id": att_name
 			})
-			current = add_days(current, 1)
-
-	# Generate days array
-	days_arr = []
-	curr = start_date
-	while curr <= end_date:
-		days_arr.append({
-			"date": str(curr),
-			"day_num": curr.day,
-			"day_short": curr.strftime("%a")
-		})
-		curr = add_days(curr, 1)
+			current += one_day
 
 	return {
 		"employees": list(emp_dict.values()),

@@ -451,6 +451,9 @@ def save_issue(doc):
 	if issue_doc.grievance_against_party == "Company/Others":
 		issue_doc.grievance_against_party = "Company"
 
+	if not (issue_doc.description or "").strip():
+		frappe.throw(frappe._("Description / What happened is required"), frappe.ValidationError)
+
 	issue_doc.save()
 
 	try:

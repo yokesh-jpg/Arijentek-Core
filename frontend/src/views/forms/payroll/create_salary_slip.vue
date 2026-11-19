@@ -504,6 +504,10 @@
 
           <!-- Actions Footer -->
           <footer class="modal-footer flex flex-col mt-auto shrink-0">
+            <div v-if="!hasSalaryStructure && !formData.earnings.length && !formData.deductions.length && formData.employee" class="p-3 mb-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs flex items-center gap-2">
+              <span class="material-symbols-outlined text-base">info</span>
+              <span>No active Salary Structure found for this employee for the given dates. Please add salary components or assign a Salary Structure.</span>
+            </div>
             <p v-if="submitError" class="field-error text-red-500 dark:text-red-400 text-center mb-3 flex items-center justify-center gap-1">
               <span class="material-symbols-outlined text-sm">warning</span>
               {{ submitError }}
@@ -584,6 +588,7 @@ const companyCurrency = ref('USD');
 const earningComponents = ref([]);
 
 const isInitializing = ref(false);
+const hasSalaryStructure = ref(true);
 const deductionComponents = ref([]);
 const pendingTimesheets = ref([]);
 
@@ -743,6 +748,7 @@ const fetchPrefillDetails = async () => {
     });
 
     if (res) {
+      hasSalaryStructure.value = Boolean(res.salary_structure || res.has_salary_structure || (res.earnings && res.earnings.length));
       if (res.company) formData.value.company = res.company;
       if (res.currency) companyCurrency.value = res.currency;
       
@@ -899,6 +905,7 @@ const loadOptions = async () => {
 watch(show, async (newVal) => {
   if (newVal) {
     isInitializing.value = true;
+    hasSalaryStructure.value = true;
     formData.value = getInitialFormData();
     submitError.value = '';
     errors.value = {};
@@ -1038,6 +1045,11 @@ const validate = () => {
     isValid = false;
   } else if (formData.value.start_date && formData.value.end_date < formData.value.start_date) {
     errors.value.end_date = 'End Date cannot be earlier than Start Date';
+    isValid = false;
+  }
+
+  if (!formData.value.earnings.length && !formData.value.deductions.length && !hasSalaryStructure.value) {
+    submitError.value = `No active Salary Structure found for employee ${formData.value.employee} for the given dates. Please add salary components or assign a Salary Structure.`;
     isValid = false;
   }
 
